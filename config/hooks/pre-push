@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# Block direct pushes to main branch
+# Forces use of PRs for all main changes
+
+PROTECTED_BRANCH="main"
+
+while read local_ref local_sha remote_ref remote_sha; do
+    if echo "$remote_ref" | grep -q "refs/heads/$PROTECTED_BRANCH"; then
+        echo ""
+        echo "🚫 Direct push to '$PROTECTED_BRANCH' is blocked!"
+        echo ""
+        echo "   Use a feature branch + PR instead:"
+        echo "   git checkout -b feature/my-change"
+        echo "   git push -u origin feature/my-change"
+        echo ""
+        echo "   To bypass (emergency only): git push --no-verify"
+        exit 1
+    fi
+done
+
+exit 0
