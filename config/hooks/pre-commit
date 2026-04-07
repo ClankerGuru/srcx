@@ -1,0 +1,17 @@
+#!/bin/sh
+
+echo ""
+echo "🔨 Running Gradle build (includes detekt + ktlint)..."
+echo "──────────────────────────────────────────"
+
+./gradlew build
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ Build failed. Commit aborted."
+    exit 1
+fi
+
+echo ""
+echo "✅ All checks passed. Proceeding with commit."
+exit 0
