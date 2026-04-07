@@ -9,14 +9,12 @@ import io.kotest.core.spec.style.BehaviorSpec
  *
  * The dependency direction is:
  * ```
- * extractor → model (extractors consume models)
- * report → model (renderers consume models)
- * model → (nothing internal — models are leaf nodes)
+ * model      -> (nothing internal -- models are leaf nodes)
+ * parse      -> model (parsers produce model types)
+ * analysis   -> model (analyzers consume model types)
+ * task       -> model, parse, analysis, report (tasks orchestrate everything)
+ * report     -> model (renderers consume models)
  * ```
- *
- * Models must never depend on extractors or reports.
- * Extractors may depend on models but not on reports.
- * This prevents circular dependencies and keeps the model layer pure.
  */
 class PackageBoundaryTest :
     BehaviorSpec({
@@ -31,9 +29,21 @@ class PackageBoundaryTest :
                         it.packagee?.name?.contains("srcx.model") == true
                     }
 
-                then("models never import from the extractor package") {
+                then("models never import from the parse package") {
                     modelFiles.assertTrue {
-                        it.imports.none { imp -> imp.name.contains("srcx.extractor") }
+                        it.imports.none { imp -> imp.name.contains("srcx.parse") }
+                    }
+                }
+
+                then("models never import from the analysis package") {
+                    modelFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.analysis") }
+                    }
+                }
+
+                then("models never import from the task package") {
+                    modelFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.task") }
                     }
                 }
 
@@ -44,15 +54,65 @@ class PackageBoundaryTest :
                 }
             }
 
-            `when`("files are in the extractor package") {
-                val extractorFiles =
+            `when`("files are in the parse package") {
+                val parseFiles =
                     mainScope.files.filter {
-                        it.packagee?.name?.contains("srcx.extractor") == true
+                        it.packagee?.name?.contains("srcx.parse") == true
                     }
 
-                then("extractors never import from the report package") {
-                    extractorFiles.assertTrue {
+                then("parse never imports from the task package") {
+                    parseFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.task") }
+                    }
+                }
+
+                then("parse never imports from the report package") {
+                    parseFiles.assertTrue {
                         it.imports.none { imp -> imp.name.contains("srcx.report") }
+                    }
+                }
+            }
+
+            `when`("files are in the analysis package") {
+                val analysisFiles =
+                    mainScope.files.filter {
+                        it.packagee?.name?.contains("srcx.analysis") == true
+                    }
+
+                then("analysis never imports from the task package") {
+                    analysisFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.task") }
+                    }
+                }
+
+                then("analysis never imports from the report package") {
+                    analysisFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.report") }
+                    }
+                }
+            }
+
+            `when`("files are in the report package") {
+                val reportFiles =
+                    mainScope.files.filter {
+                        it.packagee?.name?.contains("srcx.report") == true
+                    }
+
+                then("report never imports from the parse package") {
+                    reportFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.parse") }
+                    }
+                }
+
+                then("report never imports from the task package") {
+                    reportFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.task") }
+                    }
+                }
+
+                then("report never imports from the analysis package") {
+                    reportFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.analysis") }
                     }
                 }
             }

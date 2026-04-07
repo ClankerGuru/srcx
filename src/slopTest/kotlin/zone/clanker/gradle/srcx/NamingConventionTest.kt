@@ -7,32 +7,15 @@ import io.kotest.core.spec.style.BehaviorSpec
 /**
  * Enforces naming conventions across the codebase.
  *
- * Every class must communicate its role through its name:
- * - Classes in `extractor` end with `Extractor` (e.g. `SymbolExtractor`)
- * - Classes in `report` end with `Renderer` (e.g. `DashboardRenderer`)
- * - Value classes in `model` use domain nouns, never generic suffixes
- *
- * Generic names like `Helper`, `Manager`, or `Util` are banned.
+ * - Classes in `task` end with `Task`
+ * - Classes in `report` end with `Renderer`
+ * - No generic suffixes anywhere
  */
 class NamingConventionTest :
     BehaviorSpec({
 
         val mainScope = Konsist.scopeFromSourceSet("main")
         val allClasses = mainScope.classes()
-
-        given("extractor package naming") {
-
-            `when`("top-level classes are in the extractor package") {
-                val extractorClasses =
-                    allClasses
-                        .filter { it.packagee?.name?.contains("srcx.extractor") == true }
-                        .filter { it.isTopLevel }
-
-                then("every class name ends with Extractor") {
-                    extractorClasses.assertTrue { it.name.endsWith("Extractor") }
-                }
-            }
-        }
 
         given("report package naming") {
 

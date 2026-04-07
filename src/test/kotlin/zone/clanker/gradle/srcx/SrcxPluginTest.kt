@@ -133,61 +133,53 @@ class SrcxPluginTest :
 
                 then("the plugin applies without error") {
                     val result = projectDir.gradle("tasks", "--group=srcx").build()
-                    result.output shouldContain "srcx-generate"
-                    result.output shouldContain "srcx-dashboard"
+                    result.output shouldContain "srcx-context"
+                    result.output shouldContain "srcx-context"
                 }
-
-                projectDir.deleteRecursively()
             }
 
-            `when`("srcx-generate runs on a multi-project build") {
+            `when`("srcx-context runs on a multi-project build") {
                 val projectDir = tempProject().withMultiProject()
 
                 then("it creates the .srcx directory") {
-                    projectDir.gradle(Srcx.TASK_GENERATE).build()
+                    projectDir.gradle(Srcx.TASK_CONTEXT).build()
                     val srcxDir = projectDir.resolve(".srcx")
                     srcxDir.shouldExist()
                 }
-
-                projectDir.deleteRecursively()
             }
 
-            `when`("srcx-generate produces per-project reports") {
+            `when`("srcx-context produces per-project reports") {
                 val projectDir = tempProject().withMultiProject()
 
                 then("each subproject has its own report") {
-                    projectDir.gradle(Srcx.TASK_GENERATE).build()
+                    projectDir.gradle(Srcx.TASK_CONTEXT).build()
                     projectDir.resolve(".srcx/app/symbols.md").shouldExist()
                     projectDir.resolve(".srcx/lib/symbols.md").shouldExist()
                     projectDir.resolve(".srcx/core/symbols.md").shouldExist()
                     projectDir.resolve(".srcx/root/symbols.md").shouldExist()
                 }
-
-                projectDir.deleteRecursively()
             }
 
-            `when`("srcx-dashboard runs") {
+            `when`("srcx-context runs") {
                 val projectDir = tempProject().withMultiProject()
 
-                then("dashboard index.md exists with links to all projects") {
-                    projectDir.gradle(Srcx.TASK_DASHBOARD).build()
-                    val indexFile = projectDir.resolve(".srcx/index.md")
+                then("dashboard context.md exists with links to all projects") {
+                    projectDir.gradle(Srcx.TASK_CONTEXT).build()
+                    val indexFile = projectDir.resolve(".srcx/context.md")
                     indexFile.shouldExist()
                     val content = indexFile.readText()
-                    content shouldContain "Source Dashboard"
+                    content shouldContain "# test-workspace"
                     content shouldContain ":app"
                     content shouldContain ":lib"
                     content shouldContain ":core"
                 }
-
-                projectDir.deleteRecursively()
             }
 
             `when`("symbols are extracted from source") {
                 val projectDir = tempProject().withMultiProject()
 
                 then("symbols are extracted correctly") {
-                    projectDir.gradle(Srcx.TASK_GENERATE).build()
+                    projectDir.gradle(Srcx.TASK_CONTEXT).build()
                     val coreReport = projectDir.resolve(".srcx/core/symbols.md").readText()
                     coreReport shouldContain "Core"
                     coreReport shouldContain "CLASS"
@@ -195,49 +187,41 @@ class SrcxPluginTest :
                     coreReport shouldContain "FUNCTION"
                     coreReport shouldContain "com.example.core"
                 }
-
-                projectDir.deleteRecursively()
             }
 
             `when`("dependencies are extracted") {
                 val projectDir = tempProject().withMultiProject()
 
                 then("dependencies appear in the report") {
-                    projectDir.gradle(Srcx.TASK_GENERATE).build()
+                    projectDir.gradle(Srcx.TASK_CONTEXT).build()
                     val appReport = projectDir.resolve(".srcx/app/symbols.md").readText()
                     appReport shouldContain "Dependencies"
                 }
-
-                projectDir.deleteRecursively()
             }
 
-            `when`("srcx-generate runs") {
+            `when`("srcx-context runs") {
                 val projectDir = tempProject().withMultiProject()
 
                 then(".srcx/.gitignore is created") {
-                    projectDir.gradle(Srcx.TASK_GENERATE).build()
+                    projectDir.gradle(Srcx.TASK_CONTEXT).build()
                     val gitignore = projectDir.resolve(".srcx/.gitignore")
                     gitignore.shouldExist()
                     gitignore.readText().trim() shouldBe "*"
                 }
-
-                projectDir.deleteRecursively()
             }
 
-            `when`("srcx-generate runs twice") {
+            `when`("srcx-context runs twice") {
                 val projectDir = tempProject().withMultiProject()
 
                 then("running twice overwrites cleanly") {
-                    projectDir.gradle(Srcx.TASK_GENERATE).build()
+                    projectDir.gradle(Srcx.TASK_CONTEXT).build()
                     val firstContent = projectDir.resolve(".srcx/core/symbols.md").readText()
 
-                    val result = projectDir.gradle(Srcx.TASK_GENERATE).build()
-                    result.task(":${Srcx.TASK_GENERATE}")?.outcome shouldBe TaskOutcome.SUCCESS
+                    val result = projectDir.gradle(Srcx.TASK_CONTEXT).build()
+                    result.task(":${Srcx.TASK_CONTEXT}")?.outcome shouldBe TaskOutcome.SUCCESS
                     val secondContent = projectDir.resolve(".srcx/core/symbols.md").readText()
                     secondContent shouldBe firstContent
                 }
-
-                projectDir.deleteRecursively()
             }
         }
     })
