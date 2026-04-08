@@ -57,7 +57,7 @@ class SrcxSettingsPluginTest :
                 }
 
                 then("project path is set") {
-                    summary.projectPath shouldBe ":"
+                    summary.projectPath.value shouldBe ":"
                 }
 
                 then("build file is detected") {
@@ -67,8 +67,121 @@ class SrcxSettingsPluginTest :
                 then("source dirs are detected") {
                     summary.sourceDirs shouldBe listOf("src/main/kotlin")
                 }
+            }
 
-                projectDir.deleteRecursively()
+            `when`("Srcx data object is accessed") {
+                @Suppress("RedundantCompanionReference")
+                then("data object identity methods work") {
+                    Srcx.GROUP shouldBe "srcx"
+                    Srcx.toString() shouldBe "Srcx"
+                    Srcx.hashCode() shouldBe Srcx.hashCode()
+                    @Suppress("KotlinConstantConditions")
+                    (Srcx == Srcx) shouldBe true
+                    Srcx.TASK_CONTEXT shouldBe "srcx-context"
+                    Srcx.TASK_CLEAN shouldBe "srcx-clean"
+                    Srcx.EXTENSION_NAME shouldBe "srcx"
+                    Srcx.OUTPUT_DIR shouldBe ".srcx"
+                }
+            }
+
+            `when`("generateIncludedBuildReports with no included builds") {
+                val projectDir = tempDir()
+                projectDir.resolve("build.gradle.kts").writeText("")
+                val project =
+                    ProjectBuilder.builder().withProjectDir(projectDir).build()
+                val ext = Srcx.SettingsExtension()
+
+                then("runs without error") {
+                    plugin.generateIncludedBuildReports(project, ext)
+                }
+            }
+
+            `when`("collectIncludedBuildSummaries with no included builds") {
+                val projectDir = tempDir()
+                projectDir.resolve("build.gradle.kts").writeText("")
+                val project =
+                    ProjectBuilder.builder().withProjectDir(projectDir).build()
+
+                val result = plugin.collectIncludedBuildSummaries(project)
+
+                then("returns empty map") {
+                    result.isEmpty() shouldBe true
+                }
+            }
+
+            `when`("project has dependencies via Gradle API") {
+                val projectDir = tempDir()
+                projectDir.resolve("build.gradle.kts").writeText("")
+                val project =
+                    ProjectBuilder.builder().withProjectDir(projectDir).build()
+                project.pluginManager.apply("java-library")
+                project.repositories.mavenCentral()
+                project.dependencies.add("implementation", "com.google.guava:guava:33.0.0-jre")
+
+                val summary = plugin.extractProjectSummary(project, project)
+
+                then("dependencies are extracted") {
+                    summary.dependencies.any { it.artifact.value == "guava" } shouldBe true
+                    summary.dependencies.first { it.artifact.value == "guava" }.scope shouldBe "implementation"
+                }
+            }
+
+            `when`("project has main and test source files") {
+                val projectDir = tempDir()
+                val mainSrcDir = File(projectDir, "src/main/kotlin/com/example")
+                mainSrcDir.mkdirs()
+                mainSrcDir.resolve("Hello.kt").writeText(
+                    """
+                    package com.example
+
+                    class Hello {
+                        fun greet(): String = "hi"
+                    }
+                    """.trimIndent(),
+                )
+                val testSrcDir = File(projectDir, "src/test/kotlin/com/example")
+                testSrcDir.mkdirs()
+                testSrcDir.resolve("HelloTest.kt").writeText(
+                    """
+                    package com.example
+
+                    class HelloTest {
+                        fun testGreet() {}
+                    }
+                    """.trimIndent(),
+                )
+                projectDir.resolve("build.gradle.kts").writeText("")
+
+                val project =
+                    ProjectBuilder
+                        .builder()
+                        .withProjectDir(projectDir)
+                        .build()
+                project.pluginManager.apply("java-library")
+
+                val summary = plugin.extractProjectSummary(project, project)
+
+                then("source sets are discovered") {
+                    summary.sourceSets.size shouldBe 2
+                    summary.sourceSets[0].name.value shouldBe "main"
+                    summary.sourceSets[1].name.value shouldBe "test"
+                }
+
+                then("main source set has 2 symbols") {
+                    summary.sourceSets[0].symbols.size shouldBe 2
+                }
+
+                then("test source set has 2 symbols") {
+                    summary.sourceSets[1].symbols.size shouldBe 2
+                }
+
+                then("total symbols are combined") {
+                    summary.symbols.size shouldBe 4
+                }
+
+                then("source dirs include both") {
+                    summary.sourceDirs.size shouldBe 2
+                }
             }
 
             `when`("project has no source files") {
@@ -87,8 +200,6 @@ class SrcxSettingsPluginTest :
                 then("symbols list is empty") {
                     summary.symbols.size shouldBe 0
                 }
-
-                projectDir.deleteRecursively()
             }
 
             `when`("project is a subproject (not root)") {
@@ -119,8 +230,6 @@ class SrcxSettingsPluginTest :
                 then("subprojects list is empty for non-root projects") {
                     summary.subprojects.size shouldBe 0
                 }
-
-                rootDir.deleteRecursively()
             }
         }
 
@@ -139,8 +248,6 @@ class SrcxSettingsPluginTest :
                 then("it returns build.gradle.kts") {
                     plugin.buildFileName(project) shouldBe "build.gradle.kts"
                 }
-
-                projectDir.deleteRecursively()
             }
 
             `when`("project has build.gradle") {
@@ -155,8 +262,6 @@ class SrcxSettingsPluginTest :
                 then("it returns build.gradle") {
                     plugin.buildFileName(project) shouldBe "build.gradle"
                 }
-
-                projectDir.deleteRecursively()
             }
 
             `when`("project has no build file") {
@@ -170,8 +275,6 @@ class SrcxSettingsPluginTest :
                 then("it returns none") {
                     plugin.buildFileName(project) shouldBe "none"
                 }
-
-                projectDir.deleteRecursively()
             }
         }
 
@@ -199,8 +302,6 @@ class SrcxSettingsPluginTest :
                     val content = File(projectDir, ".srcx/root/symbols.md").readText()
                     content shouldContain "# :"
                 }
-
-                projectDir.deleteRecursively()
             }
         }
 
@@ -223,8 +324,6 @@ class SrcxSettingsPluginTest :
                     gitignore.shouldExist()
                     gitignore.readText() shouldBe "*\n"
                 }
-
-                projectDir.deleteRecursively()
             }
         }
 
@@ -248,8 +347,6 @@ class SrcxSettingsPluginTest :
                 then("it executes work for each project") {
                     plugin.runParallel(listOf(project)) { p -> "OK ${p.path}" }
                 }
-
-                projectDir.deleteRecursively()
             }
         }
 
@@ -271,6 +368,23 @@ class SrcxSettingsPluginTest :
                     extension.outputDir shouldBe ".custom-output"
                 }
             }
+
+            `when`("autoGenerate defaults") {
+                val extension = Srcx.SettingsExtension()
+
+                then("autoGenerate defaults to false") {
+                    extension.autoGenerate shouldBe false
+                }
+            }
+
+            `when`("autoGenerate is enabled") {
+                val extension = Srcx.SettingsExtension()
+                extension.autoGenerate = true
+
+                then("autoGenerate reflects the new value") {
+                    extension.autoGenerate shouldBe true
+                }
+            }
         }
 
         given("Srcx constants") {
@@ -288,12 +402,12 @@ class SrcxSettingsPluginTest :
                     Srcx.OUTPUT_DIR shouldBe ".srcx"
                 }
 
-                then("TASK_GENERATE is srcx-generate") {
-                    Srcx.TASK_GENERATE shouldBe "srcx-generate"
+                then("TASK_CONTEXT is srcx-context") {
+                    Srcx.TASK_CONTEXT shouldBe "srcx-context"
                 }
 
-                then("TASK_DASHBOARD is srcx-dashboard") {
-                    Srcx.TASK_DASHBOARD shouldBe "srcx-dashboard"
+                then("TASK_CONTEXT is srcx-context") {
+                    Srcx.TASK_CONTEXT shouldBe "srcx-context"
                 }
             }
         }
@@ -314,30 +428,18 @@ class SrcxSettingsPluginTest :
 
                 plugin.registerTasks(project, extension)
 
-                then("srcx-generate task is registered") {
-                    project.tasks.findByName(Srcx.TASK_GENERATE) shouldBe
-                        project.tasks.getByName(Srcx.TASK_GENERATE)
+                then("srcx-context task is registered") {
+                    project.tasks.findByName(Srcx.TASK_CONTEXT) shouldBe
+                        project.tasks.getByName(Srcx.TASK_CONTEXT)
                 }
 
-                then("srcx-dashboard task is registered") {
-                    project.tasks.findByName(Srcx.TASK_DASHBOARD) shouldBe
-                        project.tasks.getByName(Srcx.TASK_DASHBOARD)
-                }
-
-                then("executing srcx-generate doLast actions") {
-                    val task = project.tasks.getByName(Srcx.TASK_GENERATE)
+                then("executing srcx-context produces symbols and context") {
+                    val task = project.tasks.getByName(Srcx.TASK_CONTEXT)
                     task.actions.forEach { it.execute(task) }
                     File(projectDir, ".srcx/root/symbols.md").shouldExist()
                     File(projectDir, ".srcx/.gitignore").shouldExist()
+                    File(projectDir, ".srcx/context.md").shouldExist()
                 }
-
-                then("executing srcx-dashboard doLast actions") {
-                    val task = project.tasks.getByName(Srcx.TASK_DASHBOARD)
-                    task.actions.forEach { it.execute(task) }
-                    File(projectDir, ".srcx/index.md").shouldExist()
-                }
-
-                projectDir.deleteRecursively()
             }
         }
 
@@ -357,8 +459,6 @@ class SrcxSettingsPluginTest :
                     projects.size shouldBe 1
                     projects[0] shouldBe project
                 }
-
-                projectDir.deleteRecursively()
             }
         }
     })

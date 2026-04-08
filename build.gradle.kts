@@ -2,6 +2,11 @@ plugins {
     id("clkx-conventions")
 }
 
+dependencies {
+    compileOnly("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.1.20")
+    testImplementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.1.20")
+}
+
 gradlePlugin {
     plugins {
         register("srcx") {
