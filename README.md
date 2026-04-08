@@ -1,5 +1,10 @@
 # srcx
 
+[![GitHub release](https://img.shields.io/github/v/release/ClankerGuru/srcx)](https://github.com/ClankerGuru/srcx/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20-7F52FF.svg)](https://kotlinlang.org)
+[![Gradle](https://img.shields.io/badge/Gradle-9.x-02303A.svg)](https://gradle.org)
+
 Source symbol extraction, architecture analysis, and LLM-ready context generation for Gradle projects.
 
 ## Package Structure
