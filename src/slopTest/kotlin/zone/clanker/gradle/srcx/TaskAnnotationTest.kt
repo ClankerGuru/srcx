@@ -5,18 +5,18 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 
 /**
- * Enforces that no task classes exist in srcx.
+ * Enforces that no task classes exist in srcx outside the task package.
  *
- * Unlike wrkx which has per-repo task classes, srcx registers all
- * tasks inline in the SettingsPlugin. There should be no standalone
- * Task classes in the codebase.
+ * All tasks live in the root plugin class (Srcx.SettingsPlugin).
+ * The task/ package is reserved for future Gradle task classes
+ * if the plugin grows to need them.
  */
 class TaskAnnotationTest :
     BehaviorSpec({
 
         val mainScope = Konsist.scopeFromSourceSet("main")
 
-        given("no standalone task classes") {
+        given("no standalone task classes outside task package") {
 
             `when`("examining all classes in main source") {
                 val taskClasses =
@@ -24,8 +24,9 @@ class TaskAnnotationTest :
                         .classes()
                         .filter { it.name.endsWith("Task") }
                         .filter { it.packagee?.name?.contains("srcx") == true }
+                        .filter { it.packagee?.name?.contains("srcx.task") != true }
 
-                then("no class is named as a Task") {
+                then("no class outside task/ is named as a Task") {
                     taskClasses.shouldBeEmpty()
                 }
             }

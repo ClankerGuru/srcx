@@ -1,56 +1,103 @@
 package zone.clanker.gradle.srcx.report
 
+import zone.clanker.gradle.srcx.model.FindingSeverity
+import zone.clanker.gradle.srcx.model.HubClass
 import zone.clanker.gradle.srcx.model.ProjectSummary
+import zone.clanker.gradle.srcx.model.SourceSetSummary
+import zone.clanker.gradle.srcx.model.SymbolKind
 
 /**
- * Renders the root dashboard index as Markdown.
+ * Renders a comprehensive dashboard as Markdown.
  *
- * Produces a summary table linking to all project reports, plus an
- * optional included builds section. Output is written to `.srcx/index.md`.
- *
- * ```kotlin
- * val renderer = DashboardRenderer(summaries, includedBuildNames)
- * val markdown = renderer.render()
- * ```
- *
- * @property summaries the list of project summaries to include
- * @property includedBuilds names of included builds (for the extra section)
- * @see zone.clanker.gradle.srcx.report.ProjectReportRenderer
+ * The dashboard is the single output file that serves as both a human-readable
+ * overview and LLM-ready context. It contains: project structure, package groups,
+ * dependencies, build dependency graph (Mermaid), per-project symbols with roles,
+ * included build summaries with links, and a problems section.
  */
 internal class DashboardRenderer(
+    private val rootName: String,
     private val summaries: List<ProjectSummary>,
-    private val includedBuilds: List<String>,
+    private val includedBuilds: List<IncludedBuildRef>,
+    private val includedBuildSummaries: Map<String, List<ProjectSummary>> = emptyMap(),
+    private val buildEdges: List<BuildEdge> = emptyList(),
+    private val classDiagram: String = "",
 ) {
-    /**
-     * Render the full dashboard Markdown report.
-     *
-     * @return the complete Markdown content for the dashboard index
-     */
+    data class IncludedBuildRef(
+        val name: String,
+        val relativePath: String,
+    )
+
+    data class BuildEdge(
+        val from: String,
+        val to: String,
+    )
+
     fun render(): String =
         buildString {
-            appendLine("# Source Dashboard")
+            appendLine("# $rootName")
             appendLine()
-            appendProjectsTable()
+            appendOverview()
+            appendProjects()
+            appendBuildGraph()
             appendIncludedBuilds()
+            appendSymbols()
+            appendClassGraph()
+            appendProblems()
         }
 
-    private fun StringBuilder.appendProjectsTable() {
+    private fun StringBuilder.appendOverview() {
+        val totalSymbols = summaries.sumOf { it.symbols.size }
+        val totalWarnings =
+            summaries.sumOf { s ->
+                s.analysis?.findings?.count { it.severity == FindingSeverity.WARNING } ?: 0
+            }
+        val subprojects = summaries.flatMap { it.subprojects }.distinct()
+        val packages = summaries.flatMap { s -> s.symbols.map { it.packageName.value } }.distinct().sorted()
+
+        appendLine("## Overview")
+        appendLine()
+        appendLine("- $totalSymbols symbols across ${summaries.size} project(s)")
+        if (totalWarnings > 0) appendLine("- $totalWarnings warning(s)")
+        if (includedBuilds.isNotEmpty()) appendLine("- ${includedBuilds.size} included build(s)")
+        if (subprojects.isNotEmpty()) {
+            appendLine("- subprojects: ${subprojects.joinToString(", ")}")
+        }
+        if (packages.isNotEmpty()) {
+            appendLine("- packages: ${packages.joinToString(", ")}")
+        }
+        appendLine()
+    }
+
+    private fun StringBuilder.appendProjects() {
+        if (summaries.size <= 1 && summaries.firstOrNull()?.symbols?.isEmpty() == true) return
+
         appendLine("## Projects")
         appendLine()
-        if (summaries.isEmpty()) {
-            appendLine("No projects found.")
-            appendLine()
-            return
+        appendLine("| Project | Symbols | Source Sets | Dependencies | Warnings |")
+        appendLine("|---------|---------|------------|-------------|----------|")
+        for (s in summaries) {
+            val sets = s.sourceSets.joinToString(", ") { it.name.value }.ifEmpty { "-" }
+            val warnings = s.analysis?.findings?.count { it.severity == FindingSeverity.WARNING } ?: 0
+            appendLine("| ${s.projectPath} | ${s.symbols.size} | $sets | ${s.dependencies.size} | $warnings |")
         }
-        appendLine("| Project | Symbols | Dependencies | Report |")
-        appendLine("|---------|---------|-------------|--------|")
-        for (summary in summaries) {
-            val reportPath = projectReportPath(summary.projectPath)
-            appendLine(
-                "| ${summary.projectPath} | ${summary.symbols.size}" +
-                    " | ${summary.dependencies.size} | [view]($reportPath) |",
-            )
+        appendLine()
+    }
+
+    private fun StringBuilder.appendBuildGraph() {
+        if (buildEdges.isEmpty()) return
+        appendLine("## Build Dependencies")
+        appendLine()
+        appendLine("```mermaid")
+        appendLine("flowchart TD")
+        val nodeIds = mutableSetOf<String>()
+        for (edge in buildEdges) {
+            val fromId = nodeId(edge.from)
+            val toId = nodeId(edge.to)
+            nodeIds.add(fromId)
+            nodeIds.add(toId)
+            appendLine("    $fromId --> $toId")
         }
+        appendLine("```")
         appendLine()
     }
 
@@ -58,24 +105,134 @@ internal class DashboardRenderer(
         if (includedBuilds.isEmpty()) return
         appendLine("## Included Builds")
         appendLine()
-        appendLine("| Build | Report |")
-        appendLine("|-------|--------|")
-        for (build in includedBuilds) {
-            appendLine("| $build | [view]($build/index.md) |")
+        appendLine("| Build | Projects | Symbols | Warnings | Dashboard |")
+        appendLine("|-------|----------|---------|----------|-----------|")
+        for (ref in includedBuilds) {
+            val buildSummaries = includedBuildSummaries[ref.name]
+            val projectCount = buildSummaries?.size ?: 0
+            val symbolCount = buildSummaries?.sumOf { it.symbols.size } ?: 0
+            val warningCount =
+                buildSummaries?.sumOf { s ->
+                    s.analysis?.findings?.count { it.severity == FindingSeverity.WARNING } ?: 0
+                } ?: 0
+            val link = "${ref.relativePath}/.srcx/context.md"
+            appendLine("| ${ref.name} | $projectCount | $symbolCount | $warningCount | [view]($link) |")
         }
         appendLine()
     }
 
+    private fun StringBuilder.appendSymbols() {
+        for (summary in summaries) {
+            if (summary.symbols.isEmpty()) continue
+            appendProjectSymbols(summary)
+        }
+    }
+
+    private fun StringBuilder.appendProjectSymbols(summary: ProjectSummary) {
+        appendLine("## ${summary.projectPath}")
+        appendLine()
+
+        val hubs = summary.analysis?.hubs?.associate { it.name to it } ?: emptyMap()
+
+        for (ss in summary.sourceSets) {
+            if (ss.symbols.isEmpty()) continue
+            appendSourceSetSymbols(ss, hubs)
+        }
+
+        appendProjectDependencies(summary)
+    }
+
+    private fun StringBuilder.appendSourceSetSymbols(
+        ss: SourceSetSummary,
+        hubs: Map<String, HubClass>,
+    ) {
+        appendLine("### ${ss.name}")
+        appendLine()
+        for (s in ss.symbols) {
+            if (s.kind != SymbolKind.CLASS) continue
+            val hub = hubs[s.name.value]
+            val roleTag = if (hub != null && hub.role.isNotEmpty()) " [${hub.role}]" else ""
+            val depTag = if (hub != null && hub.dependents > 0) " (${hub.dependents} dependents)" else ""
+            appendLine("- class `${s.name}`$roleTag$depTag — ${s.packageName}, ${s.filePath}:${s.lineNumber}")
+        }
+        val functions = ss.symbols.filter { it.kind == SymbolKind.FUNCTION }
+        if (functions.isNotEmpty()) {
+            appendLine("- ${functions.size} functions")
+        }
+        val properties = ss.symbols.filter { it.kind == SymbolKind.PROPERTY }
+        if (properties.isNotEmpty()) {
+            appendLine("- ${properties.size} properties")
+        }
+        appendLine()
+    }
+
+    private fun StringBuilder.appendProjectDependencies(summary: ProjectSummary) {
+        if (summary.dependencies.isNotEmpty()) {
+            appendLine("### dependencies")
+            appendLine()
+            val byScope = summary.dependencies.groupBy { it.scope }
+            for ((scope, deps) in byScope) {
+                val artifacts = deps.joinToString(", ") { "${it.group}:${it.artifact}:${it.version}" }
+                appendLine("- $scope: $artifacts")
+            }
+            appendLine()
+        }
+    }
+
+    private fun StringBuilder.appendClassGraph() {
+        if (classDiagram.isBlank()) return
+        appendLine("## Class Dependencies")
+        appendLine()
+        appendLine(classDiagram)
+        appendLine()
+    }
+
+    private fun StringBuilder.appendProblems() {
+        val allFindings =
+            summaries.flatMap { s ->
+                val path = s.projectPath.value
+                s.analysis?.findings?.map { f -> Triple(path, f.severity, f) } ?: emptyList()
+            }
+
+        val buildFindings =
+            includedBuildSummaries.flatMap { (name, projects) ->
+                projects.flatMap { s ->
+                    s.analysis?.findings?.map { f -> Triple(name, f.severity, f) } ?: emptyList()
+                }
+            }
+
+        val warnings = (allFindings + buildFindings).filter { it.second == FindingSeverity.WARNING }
+        val notes = (allFindings + buildFindings).filter { it.second == FindingSeverity.INFO }
+
+        if (warnings.isEmpty() && notes.isEmpty()) return
+
+        appendLine("## Problems")
+        appendLine()
+        if (warnings.isNotEmpty()) {
+            appendLine("### Warnings")
+            appendLine()
+            for ((source, _, finding) in warnings) {
+                appendLine("- **$source** — ${finding.message}")
+            }
+            appendLine()
+        }
+        if (notes.isNotEmpty()) {
+            appendLine("### Notes")
+            appendLine()
+            for ((source, _, finding) in notes) {
+                appendLine("- **$source** — ${finding.message}")
+            }
+            appendLine()
+        }
+    }
+
     companion object {
-        /**
-         * Convert a Gradle project path to its report file path.
-         *
-         * @param projectPath the Gradle project path (e.g. ":app" or ":")
-         * @return the relative path to the project's report file
-         */
         fun projectReportPath(projectPath: String): String {
             val sanitized = projectPath.replace(":", "/").trimStart('/')
             return if (sanitized.isEmpty()) "root/symbols.md" else "$sanitized/symbols.md"
         }
+
+        private fun nodeId(name: String): String =
+            name.replace(Regex("[^a-zA-Z0-9]"), "_")
     }
 }

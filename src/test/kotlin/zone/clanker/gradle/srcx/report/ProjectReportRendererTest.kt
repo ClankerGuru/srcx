@@ -3,10 +3,17 @@ package zone.clanker.gradle.srcx.report
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import zone.clanker.gradle.srcx.model.ArtifactGroup
+import zone.clanker.gradle.srcx.model.ArtifactName
+import zone.clanker.gradle.srcx.model.ArtifactVersion
 import zone.clanker.gradle.srcx.model.DependencyEntry
+import zone.clanker.gradle.srcx.model.FilePath
+import zone.clanker.gradle.srcx.model.PackageName
+import zone.clanker.gradle.srcx.model.ProjectPath
 import zone.clanker.gradle.srcx.model.ProjectSummary
 import zone.clanker.gradle.srcx.model.SymbolEntry
 import zone.clanker.gradle.srcx.model.SymbolKind
+import zone.clanker.gradle.srcx.model.SymbolName
 
 /**
  * Tests for [ProjectReportRenderer] markdown generation.
@@ -19,17 +26,45 @@ class ProjectReportRendererTest :
             `when`("rendering a project with symbols and dependencies") {
                 val summary =
                     ProjectSummary(
-                        projectPath = ":app",
+                        projectPath = ProjectPath(":app"),
                         symbols =
                             listOf(
-                                SymbolEntry("App", SymbolKind.CLASS, "com.example", "App.kt", 1),
-                                SymbolEntry("run", SymbolKind.FUNCTION, "com.example", "App.kt", 5),
-                                SymbolEntry("version", SymbolKind.PROPERTY, "com.example", "App.kt", 2),
+                                SymbolEntry(
+                                    SymbolName("App"),
+                                    SymbolKind.CLASS,
+                                    PackageName("com.example"),
+                                    FilePath("App.kt"),
+                                    1,
+                                ),
+                                SymbolEntry(
+                                    SymbolName("run"),
+                                    SymbolKind.FUNCTION,
+                                    PackageName("com.example"),
+                                    FilePath("App.kt"),
+                                    5,
+                                ),
+                                SymbolEntry(
+                                    SymbolName("version"),
+                                    SymbolKind.PROPERTY,
+                                    PackageName("com.example"),
+                                    FilePath("App.kt"),
+                                    2,
+                                ),
                             ),
                         dependencies =
                             listOf(
-                                DependencyEntry("org.jetbrains.kotlin", "kotlin-stdlib", "2.1.20", "implementation"),
-                                DependencyEntry("com.foo", "bar", "1.0", "api"),
+                                DependencyEntry(
+                                    ArtifactGroup("org.jetbrains.kotlin"),
+                                    ArtifactName("kotlin-stdlib"),
+                                    ArtifactVersion("2.1.20"),
+                                    "implementation",
+                                ),
+                                DependencyEntry(
+                                    ArtifactGroup("com.foo"),
+                                    ArtifactName("bar"),
+                                    ArtifactVersion("1.0"),
+                                    "api",
+                                ),
                             ),
                         buildFile = "build.gradle.kts",
                         sourceDirs = listOf("src/main/kotlin", "src/main/java"),
@@ -65,7 +100,7 @@ class ProjectReportRendererTest :
             `when`("rendering a project with no symbols") {
                 val summary =
                     ProjectSummary(
-                        projectPath = ":",
+                        projectPath = ProjectPath(":"),
                         symbols = emptyList(),
                         dependencies = emptyList(),
                         buildFile = "build.gradle.kts",
@@ -95,7 +130,7 @@ class ProjectReportRendererTest :
             `when`("rendering a project with build.gradle") {
                 val summary =
                     ProjectSummary(
-                        projectPath = ":legacy",
+                        projectPath = ProjectPath(":legacy"),
                         symbols = emptyList(),
                         dependencies = emptyList(),
                         buildFile = "build.gradle",

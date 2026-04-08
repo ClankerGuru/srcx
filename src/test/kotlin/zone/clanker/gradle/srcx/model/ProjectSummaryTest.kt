@@ -1,11 +1,13 @@
 package zone.clanker.gradle.srcx.model
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 
 /**
- * Tests for [ProjectSummary] data class behavior.
+ * Tests for [ProjectSummary] data class and [ProjectPath] value class.
  */
 class ProjectSummaryTest :
     BehaviorSpec({
@@ -15,16 +17,33 @@ class ProjectSummaryTest :
             `when`("created with symbols and dependencies") {
                 val symbols =
                     listOf(
-                        SymbolEntry("App", SymbolKind.CLASS, "com.example", "App.kt", 1),
-                        SymbolEntry("run", SymbolKind.FUNCTION, "com.example", "App.kt", 5),
+                        SymbolEntry(
+                            SymbolName("App"),
+                            SymbolKind.CLASS,
+                            PackageName("com.example"),
+                            FilePath("App.kt"),
+                            1,
+                        ),
+                        SymbolEntry(
+                            SymbolName("run"),
+                            SymbolKind.FUNCTION,
+                            PackageName("com.example"),
+                            FilePath("App.kt"),
+                            5,
+                        ),
                     )
                 val deps =
                     listOf(
-                        DependencyEntry("org.jetbrains.kotlin", "kotlin-stdlib", "2.1.20", "implementation"),
+                        DependencyEntry(
+                            ArtifactGroup("org.jetbrains.kotlin"),
+                            ArtifactName("kotlin-stdlib"),
+                            ArtifactVersion("2.1.20"),
+                            "implementation",
+                        ),
                     )
                 val summary =
                     ProjectSummary(
-                        projectPath = ":app",
+                        projectPath = ProjectPath(":app"),
                         symbols = symbols,
                         dependencies = deps,
                         buildFile = "build.gradle.kts",
@@ -33,7 +52,7 @@ class ProjectSummaryTest :
                     )
 
                 then("all fields are accessible") {
-                    summary.projectPath shouldBe ":app"
+                    summary.projectPath.value shouldBe ":app"
                     summary.symbols.size shouldBe 2
                     summary.dependencies.size shouldBe 1
                     summary.buildFile shouldBe "build.gradle.kts"
@@ -45,7 +64,7 @@ class ProjectSummaryTest :
             `when`("created with empty lists") {
                 val summary =
                     ProjectSummary(
-                        projectPath = ":",
+                        projectPath = ProjectPath(":"),
                         symbols = emptyList(),
                         dependencies = emptyList(),
                         buildFile = "none",
@@ -63,12 +82,65 @@ class ProjectSummaryTest :
 
             `when`("two summaries have the same values") {
                 val summary1 =
-                    ProjectSummary(":lib", emptyList(), emptyList(), "build.gradle.kts", emptyList(), emptyList())
+                    ProjectSummary(
+                        ProjectPath(":lib"),
+                        emptyList(),
+                        emptyList(),
+                        "build.gradle.kts",
+                        emptyList(),
+                        emptyList(),
+                    )
                 val summary2 =
-                    ProjectSummary(":lib", emptyList(), emptyList(), "build.gradle.kts", emptyList(), emptyList())
+                    ProjectSummary(
+                        ProjectPath(":lib"),
+                        emptyList(),
+                        emptyList(),
+                        "build.gradle.kts",
+                        emptyList(),
+                        emptyList(),
+                    )
 
                 then("they are equal") {
                     summary1 shouldBe summary2
+                }
+            }
+        }
+
+        given("ProjectPath value class") {
+
+            `when`("created with valid input") {
+                then("it stores the value") {
+                    ProjectPath(":app").value shouldBe ":app"
+                }
+            }
+
+            `when`("created with root path") {
+                then("it stores the value") {
+                    ProjectPath(":").value shouldBe ":"
+                }
+            }
+
+            `when`("toString is called") {
+                then("it returns the raw value") {
+                    ProjectPath(":app").toString() shouldBe ":app"
+                }
+            }
+
+            `when`("created with input not starting with colon") {
+                then("it throws IllegalArgumentException") {
+                    val ex =
+                        shouldThrow<IllegalArgumentException> {
+                            ProjectPath("app")
+                        }
+                    ex.message shouldContain "ProjectPath must start with ':'"
+                }
+            }
+
+            `when`("created with empty input") {
+                then("it throws IllegalArgumentException") {
+                    shouldThrow<IllegalArgumentException> {
+                        ProjectPath("")
+                    }
                 }
             }
         }

@@ -7,12 +7,10 @@ import io.kotest.core.spec.style.BehaviorSpec
 /**
  * Prevents creation of junk-drawer packages.
  *
- * Packages like `utils`, `helpers`, `managers`, `common`, or `misc`
- * are symptoms of unclear responsibility. Every file must belong to
- * a package that describes what it does, not how it's used.
+ * Packages like `utils`, `helpers`, `managers`, `common`, `misc`,
+ * `shared`, `core`, `base`, `internal`, `support` are banned.
  *
- * If something feels like a utility, it either belongs in the domain
- * package that uses it or deserves its own named package.
+ * Every file must belong to a package that describes what it does.
  */
 class ForbiddenPackageTest :
     BehaviorSpec({
@@ -23,9 +21,16 @@ class ForbiddenPackageTest :
 
             val forbidden =
                 listOf(
-                    "util",
-                    "helper",
-                    "manager",
+                    "utils",
+                    "helpers",
+                    "managers",
+                    "common",
+                    "misc",
+                    "shared",
+                    "core",
+                    "base",
+                    "internal",
+                    "support",
                 )
 
             `when`("examining all main source files") {
