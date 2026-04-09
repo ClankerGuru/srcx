@@ -141,7 +141,7 @@ class SrcxIncludedBuildPluginTest :
                     val content = index.readText()
                     content shouldContain "## Included Builds"
                     content shouldContain "lib-build"
-                    content shouldContain "| Build | Projects | Symbols | Warnings | Dashboard |"
+                    content shouldContain "| Build | Projects | Symbols | Warnings | Context |"
                 }
             }
         }

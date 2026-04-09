@@ -6,6 +6,7 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.SetProperty
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
@@ -76,6 +77,10 @@ abstract class ContextTask : DefaultTask() {
     /** Pre-computed dependencies per project path. */
     @get:Internal
     abstract val projectDeps: MapProperty<String, List<DependencyEntry>>
+
+    /** Dependency scopes to exclude from scanning. */
+    @get:Input
+    abstract val excludeDepScopes: SetProperty<String>
 
     /** Included build info: name → (dir, relPath, projects). */
     @get:Internal
