@@ -44,97 +44,46 @@ object ReportWriter {
         File(reportDir, "context.md").writeText(renderer.render())
     }
 
-    /** Write a .gitignore with wildcard to the output directory. */
+    /** Write a .gitignore with wildcard to the given directory. */
     internal fun writeGitignore(
         rootProjectDir: File,
         outputDir: String,
     ) {
         val dir = File(rootProjectDir, outputDir)
-        dir.mkdirs()
-        File(dir, ".gitignore").writeText("*\n")
+        writeGitignoreAt(dir)
     }
 
-    /** Generate per-project reports for each included build. */
-    internal fun generateIncludedBuildReports(
-        builds: Collection<org.gradle.api.initialization.IncludedBuild>,
-        outputDir: String,
-    ) {
-        for (build in builds) {
-            val buildDir = build.projectDir
-            val buildOutputDir = File(buildDir, outputDir)
-            buildOutputDir.mkdirs()
-
-            val projectDirs =
-                ProjectScanner.discoverIncludedBuildProjects(build).map { (path, dir) ->
-                    dir to path
-                }
-
-            val summaries =
-                projectDirs.map { (dir, path) ->
-                    SymbolExtractor.extractStandaloneProjectSummary(dir, path)
-                }
-
-            for (summary in summaries) {
-                val renderer = ProjectReportRenderer(summary)
-                val sanitized =
-                    summary.projectPath.value
-                        .replace(":", "/")
-                        .trimStart('/')
-                        .ifEmpty { "root" }
-                val reportDir = File(buildOutputDir, sanitized)
-                reportDir.mkdirs()
-                File(reportDir, "context.md").writeText(renderer.render())
-            }
-
-            val buildRenderer = IncludedBuildRenderer(build.name, summaries)
-            File(buildOutputDir, "context.md").writeText(buildRenderer.render())
-            writeGitignoreAt(buildOutputDir)
-        }
-        if (builds.isNotEmpty()) {
-            println("srcx: generated reports for ${builds.size} included build(s)")
-        }
-    }
-
-    /** Generate included build reports from pre-computed data (no IncludedBuild). */
+    /** Generate included build reports from pre-computed data. */
     internal fun generateIncludedBuildReportsFromData(
         builds: List<zone.clanker.gradle.srcx.task.IncludedBuildInfo>,
         outputDir: String,
     ) {
         for (info in builds) {
-            val buildOutputDir = File(info.dir, outputDir)
-            buildOutputDir.mkdirs()
-
             val summaries =
                 info.projects.map { (path, dir) ->
                     SymbolExtractor.extractStandaloneProjectSummary(dir, path)
                 }
-
-            for (summary in summaries) {
-                writeProjectReportToDir(info.dir, summary, outputDir)
-            }
-
-            val buildRenderer = IncludedBuildRenderer(info.name, summaries)
-            File(buildOutputDir, "context.md").writeText(buildRenderer.render())
-            writeGitignoreAt(buildOutputDir)
+            writeBuildReports(info.name, info.dir, summaries, outputDir)
         }
         if (builds.isNotEmpty()) {
             println("srcx: generated reports for ${builds.size} included build(s)")
         }
     }
 
-    /** Collect summaries for all projects in each included build. */
-    internal fun collectIncludedBuildSummaries(
-        builds: Collection<org.gradle.api.initialization.IncludedBuild>,
-    ): Map<String, List<ProjectSummary>> {
-        val result = mutableMapOf<String, List<ProjectSummary>>()
-        for (build in builds) {
-            val projectEntries = ProjectScanner.discoverIncludedBuildProjects(build)
-            result[build.name] =
-                projectEntries.map { (path, dir) ->
-                    SymbolExtractor.extractStandaloneProjectSummary(dir, path)
-                }
+    private fun writeBuildReports(
+        buildName: String,
+        buildDir: File,
+        summaries: List<ProjectSummary>,
+        outputDir: String,
+    ) {
+        val buildOutputDir = File(buildDir, outputDir)
+        buildOutputDir.mkdirs()
+        for (summary in summaries) {
+            writeProjectReportToDir(buildDir, summary, outputDir)
         }
-        return result
+        val renderer = IncludedBuildRenderer(buildName, summaries)
+        File(buildOutputDir, "context.md").writeText(renderer.render())
+        writeGitignoreAt(buildOutputDir)
     }
 
     /** Compute cross-build dependency edges for the dashboard diagram. */

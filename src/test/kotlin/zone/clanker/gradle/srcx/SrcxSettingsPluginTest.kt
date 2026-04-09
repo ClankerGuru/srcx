@@ -86,17 +86,9 @@ class SrcxSettingsPluginTest :
                 }
             }
 
-            `when`("generateIncludedBuildReports with no included builds") {
+            `when`("generateIncludedBuildReportsFromData with no builds") {
                 then("runs without error") {
-                    ReportWriter.generateIncludedBuildReports(emptyList(), Srcx.OUTPUT_DIR)
-                }
-            }
-
-            `when`("collectIncludedBuildSummaries with no included builds") {
-                val result = ReportWriter.collectIncludedBuildSummaries(emptyList())
-
-                then("returns empty map") {
-                    result.isEmpty() shouldBe true
+                    ReportWriter.generateIncludedBuildReportsFromData(emptyList(), Srcx.OUTPUT_DIR)
                 }
             }
 
@@ -399,8 +391,8 @@ class SrcxSettingsPluginTest :
                     Srcx.TASK_CONTEXT shouldBe "srcx-context"
                 }
 
-                then("TASK_CONTEXT is srcx-context") {
-                    Srcx.TASK_CONTEXT shouldBe "srcx-context"
+                then("TASK_CLEAN is srcx-clean") {
+                    Srcx.TASK_CLEAN shouldBe "srcx-clean"
                 }
             }
         }
