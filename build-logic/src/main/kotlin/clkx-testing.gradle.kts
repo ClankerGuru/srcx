@@ -23,11 +23,11 @@ kover {
         }
         verify {
             rule {
-                // Settings.apply(), data object synthetic lines, and IncludedBuild
-                // methods (which use Gradle internal API via reflection and can't be
-                // constructed in unit tests) run only in TestKit's forked JVM which
-                // kover cannot instrument.
-                minBound(91)
+                // Settings.apply(), data object synthetic lines, task @TaskAction
+                // methods, and IncludedBuild methods (which use Gradle internal API
+                // via reflection and can't be constructed in unit tests) run only in
+                // TestKit's forked JVM which kover cannot instrument.
+                minBound(90)
             }
         }
     }

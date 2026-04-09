@@ -136,6 +136,59 @@ object SymbolExtractor {
         )
     }
 
+    /** Extract a project summary from pre-computed data (no Gradle Project access). */
+    internal fun extractProjectSummaryFromData(
+        projectDir: File,
+        projectPath: String,
+        subprojectPaths: List<String>,
+        dependencies: List<DependencyEntry>,
+    ): ProjectSummary {
+        val sourceSets = ProjectScanner.discoverSourceSets(projectDir)
+        val allSymbols = mutableListOf<SymbolEntry>()
+        val sourceSetSummaries = mutableListOf<SourceSetSummary>()
+
+        for (sourceSetName in sourceSets) {
+            val dirs = ProjectScanner.sourceSetDirs(projectDir, sourceSetName.value)
+            val symbols = extractSymbolsFromDirs(dirs)
+            allSymbols.addAll(symbols)
+            val dirNames = dirs.filter { it.exists() }.map { it.relativeTo(projectDir).path }
+            sourceSetSummaries.add(SourceSetSummary(sourceSetName, symbols, dirNames))
+        }
+
+        val allSourceDirNames =
+            sourceSets.flatMap { ssName ->
+                ProjectScanner
+                    .sourceSetDirs(projectDir, ssName.value)
+                    .filter { it.exists() }
+                    .map { it.relativeTo(projectDir).path }
+            }
+
+        val buildFileName = buildFileNameFromDir(projectDir)
+        val allDirs = sourceSets.flatMap { ProjectScanner.sourceSetDirs(projectDir, it.value) }
+        val projectAnalysis =
+            runCatching {
+                analyzeProject(allDirs, projectDir).toSummary()
+            }.getOrNull()
+
+        return ProjectSummary(
+            projectPath = ProjectPath(projectPath),
+            symbols = allSymbols,
+            dependencies = dependencies,
+            buildFile = buildFileName,
+            sourceDirs = allSourceDirNames,
+            subprojects = subprojectPaths,
+            sourceSets = sourceSetSummaries,
+            analysis = projectAnalysis,
+        )
+    }
+
+    private fun buildFileNameFromDir(projectDir: File): String =
+        when {
+            File(projectDir, "build.gradle.kts").exists() -> "build.gradle.kts"
+            File(projectDir, "build.gradle").exists() -> "build.gradle"
+            else -> "none"
+        }
+
     /** Extract a project summary from a standalone directory (not backed by Gradle Project API). */
     internal fun extractStandaloneProjectSummary(
         projectDir: File,
@@ -224,6 +277,10 @@ object SymbolExtractor {
                 }
         }
     }
+
+    /** Extract dependencies from a Gradle project's configurations. Call at configuration time. */
+    internal fun extractDependenciesFromProject(project: Project): List<DependencyEntry> =
+        extractDependencies(project)
 
     private fun extractDependencies(project: Project): List<DependencyEntry> {
         val results = mutableListOf<DependencyEntry>()

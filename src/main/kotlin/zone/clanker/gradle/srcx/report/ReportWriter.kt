@@ -24,13 +24,22 @@ object ReportWriter {
         summary: ProjectSummary,
         outputDir: String,
     ) {
+        writeProjectReportToDir(rootProject.projectDir, summary, outputDir)
+    }
+
+    /** Write a per-project symbol report using a root directory (no Project). */
+    internal fun writeProjectReportToDir(
+        rootDir: File,
+        summary: ProjectSummary,
+        outputDir: String,
+    ) {
         val renderer = ProjectReportRenderer(summary)
         val sanitized =
             summary.projectPath.value
                 .replace(":", "/")
                 .trimStart('/')
                 .ifEmpty { "root" }
-        val reportDir = File(rootProject.projectDir, "$outputDir/$sanitized")
+        val reportDir = File(rootDir, "$outputDir/$sanitized")
         reportDir.mkdirs()
         File(reportDir, "context.md").writeText(renderer.render())
     }
@@ -78,6 +87,33 @@ object ReportWriter {
             }
 
             val buildRenderer = IncludedBuildRenderer(build.name, summaries)
+            File(buildOutputDir, "context.md").writeText(buildRenderer.render())
+            writeGitignoreAt(buildOutputDir)
+        }
+        if (builds.isNotEmpty()) {
+            println("srcx: generated reports for ${builds.size} included build(s)")
+        }
+    }
+
+    /** Generate included build reports from pre-computed data (no IncludedBuild). */
+    internal fun generateIncludedBuildReportsFromData(
+        builds: List<zone.clanker.gradle.srcx.task.IncludedBuildInfo>,
+        outputDir: String,
+    ) {
+        for (info in builds) {
+            val buildOutputDir = File(info.dir, outputDir)
+            buildOutputDir.mkdirs()
+
+            val summaries =
+                info.projects.map { (path, dir) ->
+                    SymbolExtractor.extractStandaloneProjectSummary(dir, path)
+                }
+
+            for (summary in summaries) {
+                writeProjectReportToDir(info.dir, summary, outputDir)
+            }
+
+            val buildRenderer = IncludedBuildRenderer(info.name, summaries)
             File(buildOutputDir, "context.md").writeText(buildRenderer.render())
             writeGitignoreAt(buildOutputDir)
         }
@@ -144,6 +180,25 @@ object ReportWriter {
         }.onFailure { e ->
             System.err.println("srcx: class diagram generation failed: ${e.message}")
         }.getOrDefault("")
+    }
+
+    /** Run work in parallel across items, returning mapped results (no Project). */
+    internal fun <T, R> runParallelMapped(
+        items: List<T>,
+        work: (T) -> R,
+    ): List<R> {
+        if (items.isEmpty()) return emptyList()
+        val pool = Executors.newFixedThreadPool(THREAD_POOL_SIZE)
+        val futures =
+            items.map { item ->
+                pool.submit(Callable { work(item) })
+            }
+        val results =
+            runCatching { futures.map { it.get(TASK_TIMEOUT_MINUTES, TimeUnit.MINUTES) } }
+        pool.shutdown()
+        runCatching { pool.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
+        if (!pool.isTerminated) pool.shutdownNow()
+        return results.getOrThrow()
     }
 
     /** Run work in parallel across a list of projects. */

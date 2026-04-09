@@ -1,10 +1,17 @@
 package zone.clanker.gradle.srcx
 
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.file.shouldExist
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import zone.clanker.gradle.srcx.model.ArtifactGroup
+import zone.clanker.gradle.srcx.model.ArtifactName
+import zone.clanker.gradle.srcx.model.ArtifactVersion
+import zone.clanker.gradle.srcx.model.DependencyEntry
+import zone.clanker.gradle.srcx.report.ReportWriter
 import zone.clanker.gradle.srcx.scan.SymbolExtractor
+import zone.clanker.gradle.srcx.task.IncludedBuildInfo
 import java.io.File
 
 class IncludedBuildReportTest :
@@ -98,6 +105,146 @@ class IncludedBuildReportTest :
                 then("core subproject dependencies extracted from build file") {
                     coreSummary.dependencies.size shouldBe 1
                     coreSummary.dependencies[0].artifact.value shouldBe "codec"
+                }
+            }
+        }
+
+        given("extractProjectSummaryFromData") {
+
+            `when`("extracting with pre-computed deps") {
+                val projectDir = tempDir()
+                val srcDir = File(projectDir, "src/main/kotlin/com/example")
+                srcDir.mkdirs()
+                srcDir.resolve("Service.kt").writeText(
+                    """
+                    package com.example
+                    class Service
+                    """.trimIndent(),
+                )
+                projectDir.resolve("build.gradle.kts").writeText("")
+
+                val deps =
+                    listOf(
+                        DependencyEntry(
+                            ArtifactGroup("com.example"),
+                            ArtifactName("lib"),
+                            ArtifactVersion("1.0"),
+                            "implementation",
+                        ),
+                    )
+
+                val summary =
+                    SymbolExtractor.extractProjectSummaryFromData(
+                        projectDir, ":app", listOf(":lib"), deps,
+                    )
+
+                then("it includes pre-computed dependencies") {
+                    summary.dependencies.size shouldBe 1
+                    summary.dependencies[0].artifact.value shouldBe "lib"
+                }
+
+                then("it includes subproject paths") {
+                    summary.subprojects shouldBe listOf(":lib")
+                }
+
+                then("it extracts symbols") {
+                    summary.symbols.any { it.name.value == "Service" } shouldBe true
+                }
+            }
+        }
+
+        given("writeProjectReportToDir") {
+
+            `when`("writing report with root dir") {
+                val rootDir = tempDir()
+                val srcDir = File(rootDir, "src/main/kotlin/com/example")
+                srcDir.mkdirs()
+                srcDir.resolve("App.kt").writeText("package com.example\nclass App")
+                rootDir.resolve("build.gradle.kts").writeText("")
+
+                val summary = SymbolExtractor.extractStandaloneProjectSummary(rootDir, ":")
+
+                ReportWriter
+                    .writeProjectReportToDir(rootDir, summary, ".srcx")
+
+                then("it creates the report file") {
+                    File(rootDir, ".srcx/root/context.md").shouldExist()
+                    File(rootDir, ".srcx/root/context.md").readText() shouldContain "App"
+                }
+            }
+        }
+
+        given("runParallelMapped") {
+
+            `when`("mapping items in parallel") {
+                val items = listOf(1, 2, 3, 4)
+                val results =
+                    ReportWriter
+                        .runParallelMapped(items) { it * 2 }
+
+                then("it returns mapped results") {
+                    results shouldBe listOf(2, 4, 6, 8)
+                }
+            }
+
+            `when`("mapping empty list") {
+                val results =
+                    ReportWriter
+                        .runParallelMapped(emptyList<Int>()) { it * 2 }
+
+                then("it returns empty list") {
+                    results.shouldBeEmpty()
+                }
+            }
+        }
+
+        given("generateIncludedBuildReportsFromData") {
+
+            `when`("generating from pre-computed data") {
+                val buildDir = tempDir()
+                val srcDir = File(buildDir, "src/main/kotlin/com/example")
+                srcDir.mkdirs()
+                srcDir.resolve("Lib.kt").writeText("package com.example\nclass Lib")
+                buildDir.resolve("build.gradle.kts").writeText("")
+
+                val info =
+                    IncludedBuildInfo(
+                        name = "mylib",
+                        dir = buildDir,
+                        relPath = "../mylib",
+                        projects = listOf(":" to buildDir),
+                    )
+
+                ReportWriter
+                    .generateIncludedBuildReportsFromData(listOf(info), ".srcx")
+
+                then("it creates context.md for the included build") {
+                    File(buildDir, ".srcx/context.md").shouldExist()
+                    File(buildDir, ".srcx/context.md").readText() shouldContain "# mylib"
+                }
+
+                then("it creates per-project reports") {
+                    File(buildDir, ".srcx/root/context.md").shouldExist()
+                    File(buildDir, ".srcx/root/context.md").readText() shouldContain "Lib"
+                }
+            }
+        }
+
+        given("IncludedBuildInfo serializable") {
+
+            `when`("created with data") {
+                val info =
+                    IncludedBuildInfo(
+                        name = "test",
+                        dir = File("/tmp"),
+                        relPath = "../test",
+                        projects = listOf(":" to File("/tmp")),
+                    )
+
+                then("it holds the data") {
+                    info.name shouldBe "test"
+                    info.relPath shouldBe "../test"
+                    info.projects.size shouldBe 1
                 }
             }
         }

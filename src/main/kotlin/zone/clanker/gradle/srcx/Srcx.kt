@@ -5,8 +5,11 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.initialization.Settings
 import org.gradle.api.provider.Property
+import zone.clanker.gradle.srcx.scan.ProjectScanner
+import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import zone.clanker.gradle.srcx.task.CleanTask
 import zone.clanker.gradle.srcx.task.ContextTask
+import zone.clanker.gradle.srcx.task.IncludedBuildInfo
 import java.io.File
 import javax.inject.Inject
 
@@ -115,11 +118,40 @@ data object Srcx {
                         task.sourceFiles.from(
                             rootProject.provider { collectSourceTrees(rootProject) },
                         )
+                        task.rootName.set(rootProject.name)
+                        task.rootDir.set(rootProject.projectDir)
+                        task.projectDirs.set(
+                            rootProject.provider {
+                                rootProject.allprojects.associate { it.path to it.projectDir }
+                            },
+                        )
+                        task.subprojectPaths.set(
+                            rootProject.provider { rootProject.subprojects.map { it.path } },
+                        )
+                        task.projectDeps.set(
+                            rootProject.provider {
+                                rootProject.allprojects.associate { proj ->
+                                    proj.path to SymbolExtractor.extractDependenciesFromProject(proj)
+                                }
+                            },
+                        )
+                        task.includedBuildInfos.set(
+                            rootProject.provider { collectIncludedBuildInfos(rootProject) },
+                        )
                     }
                 }
             val cleanTask =
                 rootProject.tasks.register(TASK_CLEAN, CleanTask::class.java).apply {
-                    configure { it.outputDir.convention(extension.outputDir) }
+                    configure { task ->
+                        task.outputDir.convention(extension.outputDir)
+                        task.baseDirs.set(
+                            rootProject.provider {
+                                val dirs = mutableListOf(rootProject.projectDir)
+                                rootProject.gradle.includedBuilds.forEach { dirs.add(it.projectDir) }
+                                dirs
+                            },
+                        )
+                    }
                 }
             rootProject.plugins.withType(
                 org.gradle.language.base.plugins.LifecycleBasePlugin::class.java,
@@ -130,6 +162,19 @@ data object Srcx {
                 wireAutoGenerate(rootProject, contextTask)
             }
         }
+
+        private fun collectIncludedBuildInfos(rootProject: Project): List<IncludedBuildInfo> =
+            rootProject.gradle.includedBuilds.map { build ->
+                val relPath =
+                    build.projectDir.relativeToOrNull(rootProject.projectDir)?.path
+                        ?: build.projectDir.absolutePath
+                IncludedBuildInfo(
+                    name = build.name,
+                    dir = build.projectDir,
+                    relPath = relPath,
+                    projects = ProjectScanner.discoverIncludedBuildProjects(build),
+                )
+            }
 
         private fun collectSourceTrees(rootProject: Project): List<Any> {
             val trees = mutableListOf<Any>()
