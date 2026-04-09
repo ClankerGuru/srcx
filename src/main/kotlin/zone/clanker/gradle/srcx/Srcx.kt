@@ -4,6 +4,7 @@ import org.gradle.api.Action
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.initialization.Settings
+import org.gradle.api.logging.Logging
 import org.gradle.api.provider.Property
 import zone.clanker.gradle.srcx.scan.ProjectScanner
 import zone.clanker.gradle.srcx.scan.SymbolExtractor
@@ -25,6 +26,8 @@ import javax.inject.Inject
  * [zone.clanker.gradle.srcx.report.ReportWriter].
  */
 data object Srcx {
+    private val logger = Logging.getLogger(Srcx::class.java)
+
     /** Gradle task group name for all srcx tasks. */
     const val GROUP = "srcx"
 
@@ -45,9 +48,9 @@ data object Srcx {
         if (dir.exists()) {
             val count = dir.walkTopDown().filter { it.isFile }.count()
             dir.deleteRecursively()
-            println("srcx: deleted ${dir.name}/ ($count files)")
+            logger.lifecycle("srcx: deleted ${dir.name}/ ($count files)")
         } else {
-            println("srcx: nothing to clean")
+            logger.lifecycle("srcx: nothing to clean")
         }
     }
 

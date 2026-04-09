@@ -1,6 +1,7 @@
 package zone.clanker.gradle.srcx.report
 
 import org.gradle.api.Project
+import org.gradle.api.logging.Logging
 import zone.clanker.gradle.srcx.model.ProjectSummary
 import zone.clanker.gradle.srcx.scan.ProjectScanner
 import zone.clanker.gradle.srcx.scan.SymbolExtractor
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeUnit
  * dashboard files, included build reports, and class diagrams.
  */
 object ReportWriter {
+    private val logger = Logging.getLogger(ReportWriter::class.java)
     private const val THREAD_POOL_SIZE = 4
     private const val TASK_TIMEOUT_MINUTES = 10L
     private const val SHUTDOWN_TIMEOUT_SECONDS = 30L
@@ -66,7 +68,7 @@ object ReportWriter {
             writeBuildReports(info.name, info.dir, summaries, outputDir)
         }
         if (builds.isNotEmpty()) {
-            println("srcx: generated reports for ${builds.size} included build(s)")
+            logger.lifecycle("srcx: generated reports for ${builds.size} included build(s)")
         }
     }
 
@@ -127,7 +129,7 @@ object ReportWriter {
             zone.clanker.gradle.srcx.analysis
                 .generateDependencyDiagram(components, depEdges)
         }.onFailure { e ->
-            System.err.println("srcx: class diagram generation failed: ${e.message}")
+            logger.warn("srcx: class diagram generation failed: ${e.message}")
         }.getOrDefault("")
     }
 
@@ -156,7 +158,7 @@ object ReportWriter {
         work: (Project) -> String,
     ) {
         if (projects.isEmpty()) {
-            println("srcx: No projects to process.")
+            logger.lifecycle("srcx: No projects to process.")
             return
         }
         val pool = Executors.newFixedThreadPool(THREAD_POOL_SIZE)
@@ -175,9 +177,9 @@ object ReportWriter {
         runCatching { pool.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
         if (!pool.isTerminated) pool.shutdownNow()
         val output = results.getOrThrow()
-        output.forEach { println(it) }
+        output.forEach { logger.lifecycle(it) }
         val failed = output.count { it.startsWith("FAIL") }
-        println("srcx: symbols complete -- ${projects.size} projects, $failed failed")
+        logger.lifecycle("srcx: symbols complete -- ${projects.size} projects, $failed failed")
         if (failed > 0) error("srcx: $failed project(s) failed during generation")
     }
 

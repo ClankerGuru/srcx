@@ -137,7 +137,7 @@ abstract class ContextTask : DefaultTask() {
         dir.mkdirs()
         File(dir, "context.md").writeText(renderer.render())
         ReportWriter.writeGitignore(root, outDir)
-        println("srcx: context written to $outDir/context.md")
+        logger.lifecycle("srcx: context written to $outDir/context.md")
     }
 
     private fun collectIncludedBuildSummaries(
@@ -167,7 +167,7 @@ abstract class ContextTask : DefaultTask() {
             val depEdges = buildDependencyGraph(components)
             generateDependencyDiagram(components, depEdges)
         }.onFailure { e ->
-            System.err.println("srcx: class diagram generation failed: ${e.message}")
+            logger.warn("srcx: class diagram generation failed: ${e.message}")
         }.getOrDefault("")
     }
 }
