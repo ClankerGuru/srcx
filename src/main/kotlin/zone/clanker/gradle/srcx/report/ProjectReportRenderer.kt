@@ -116,10 +116,11 @@ internal class ProjectReportRenderer(
     private fun StringBuilder.appendHubTree(hub: HubClass) {
         val roleTag = if (hub.role.isNotEmpty()) " [${hub.role}]" else ""
         val loc = if (hub.filePath.isNotEmpty()) " — ${hub.filePath}:${hub.line}" else ""
+        val depLabel = if (hub.dependentCount == 1) "dependent" else "dependents"
         if (hub.dependentCount >= SUPER_NODE_THRESHOLD) {
-            appendLine("- **${hub.name}**$roleTag$loc — super node (${hub.dependentCount} dependents)")
+            appendLine("- **${hub.name}**$roleTag$loc — super node (${hub.dependentCount} $depLabel)")
         } else {
-            appendLine("- **${hub.name}**$roleTag$loc (${hub.dependentCount} dependents)")
+            appendLine("- **${hub.name}**$roleTag$loc (${hub.dependentCount} $depLabel)")
             for (dep in hub.dependents) {
                 appendLine("  - ${dep.name} — ${dep.filePath}:${dep.line}")
             }
