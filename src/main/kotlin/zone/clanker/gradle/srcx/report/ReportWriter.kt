@@ -108,7 +108,12 @@ object ReportWriter {
         val results =
             runCatching { futures.map { it.get(TASK_TIMEOUT_MINUTES, TimeUnit.MINUTES) } }
         pool.shutdown()
-        runCatching { pool.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
+        val awaitResult =
+            runCatching { pool.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
+        if (awaitResult.exceptionOrNull() is InterruptedException) {
+            pool.shutdownNow()
+            Thread.currentThread().interrupt()
+        }
         if (!pool.isTerminated) pool.shutdownNow()
         return results.getOrThrow()
     }

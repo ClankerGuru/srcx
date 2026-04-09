@@ -198,9 +198,13 @@ class BuildEdgesTest :
                         .flatMap { ss ->
                             ProjectScanner.sourceSetDirs(projectDir, ss.value)
                         }.filter { it.exists() }
+                val sources = scanSources(srcDirs)
+                val components = classifyAll(sources)
+                val edges = buildDependencyGraph(components)
+                val diagram = generateDependencyDiagram(components, edges)
 
-                then("it returns empty") {
-                    srcDirs.isEmpty() shouldBe true
+                then("it returns empty diagram") {
+                    diagram shouldBe ""
                 }
             }
         }
