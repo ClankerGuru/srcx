@@ -4,7 +4,10 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import org.gradle.testfixtures.ProjectBuilder
+import zone.clanker.gradle.srcx.analysis.buildDependencyGraph
+import zone.clanker.gradle.srcx.analysis.classifyAll
+import zone.clanker.gradle.srcx.analysis.generateDependencyDiagram
+import zone.clanker.gradle.srcx.analysis.scanSources
 import zone.clanker.gradle.srcx.model.ArtifactGroup
 import zone.clanker.gradle.srcx.model.ArtifactName
 import zone.clanker.gradle.srcx.model.ArtifactVersion
@@ -13,6 +16,7 @@ import zone.clanker.gradle.srcx.model.ProjectPath
 import zone.clanker.gradle.srcx.model.ProjectSummary
 import zone.clanker.gradle.srcx.report.DashboardRenderer
 import zone.clanker.gradle.srcx.report.ReportWriter
+import zone.clanker.gradle.srcx.scan.ProjectScanner
 import java.io.File
 
 class BuildEdgesTest :
@@ -146,7 +150,6 @@ class BuildEdgesTest :
         }
 
         given("generateClassDiagram") {
-            val plugin = Srcx.SettingsPlugin()
 
             `when`("project has source files with dependencies") {
                 val projectDir = tempDir()
@@ -171,20 +174,16 @@ class BuildEdgesTest :
                     """.trimIndent(),
                 )
 
-                val project =
-                    ProjectBuilder
-                        .builder()
-                        .withProjectDir(projectDir)
-                        .build()
-                project.pluginManager.apply("java-library")
-                val extension =
-                    project.objects
-                        .newInstance(Srcx.SettingsExtension::class.java)
-                extension.outputDir.convention(Srcx.OUTPUT_DIR)
-                extension.autoGenerate.convention(false)
-                plugin.registerTasks(project, extension)
-
-                val diagram = ReportWriter.generateClassDiagram(project)
+                val srcDirs =
+                    ProjectScanner
+                        .discoverSourceSets(projectDir)
+                        .flatMap { ss ->
+                            ProjectScanner.sourceSetDirs(projectDir, ss.value)
+                        }.filter { it.exists() }
+                val sources = scanSources(srcDirs)
+                val components = classifyAll(sources)
+                val edges = buildDependencyGraph(components)
+                val diagram = generateDependencyDiagram(components, edges)
 
                 then("it produces a mermaid diagram") {
                     diagram shouldContain "Service"
@@ -193,23 +192,18 @@ class BuildEdgesTest :
 
             `when`("project has no source files") {
                 val projectDir = tempDir()
-                projectDir.resolve("build.gradle.kts").writeText("")
+                val srcDirs =
+                    ProjectScanner
+                        .discoverSourceSets(projectDir)
+                        .flatMap { ss ->
+                            ProjectScanner.sourceSetDirs(projectDir, ss.value)
+                        }.filter { it.exists() }
+                val sources = scanSources(srcDirs)
+                val components = classifyAll(sources)
+                val edges = buildDependencyGraph(components)
+                val diagram = generateDependencyDiagram(components, edges)
 
-                val project =
-                    ProjectBuilder
-                        .builder()
-                        .withProjectDir(projectDir)
-                        .build()
-                val extension =
-                    project.objects
-                        .newInstance(Srcx.SettingsExtension::class.java)
-                extension.outputDir.convention(Srcx.OUTPUT_DIR)
-                extension.autoGenerate.convention(false)
-                plugin.registerTasks(project, extension)
-
-                val diagram = ReportWriter.generateClassDiagram(project)
-
-                then("it returns empty") {
+                then("it returns empty diagram") {
                     diagram shouldBe ""
                 }
             }

@@ -272,7 +272,7 @@ class SrcxSettingsPluginTest :
                 project.pluginManager.apply("java-library")
 
                 val summary = SymbolExtractor.extractProjectSummary(project, project)
-                ReportWriter.writeProjectReport(project, summary, Srcx.OUTPUT_DIR)
+                ReportWriter.writeProjectReportToDir(projectDir, summary, Srcx.OUTPUT_DIR)
 
                 then("report file is created") {
                     File(projectDir, ".srcx/root/context.md").shouldExist()
@@ -296,28 +296,6 @@ class SrcxSettingsPluginTest :
                     val gitignore = File(projectDir, ".srcx/.gitignore")
                     gitignore.shouldExist()
                     gitignore.readText() shouldBe "*\n"
-                }
-            }
-        }
-
-        given("runParallel") {
-
-            `when`("running with empty project list") {
-                then("it prints no projects message") {
-                    ReportWriter.runParallel(emptyList()) { "OK" }
-                }
-            }
-
-            `when`("running with projects") {
-                val projectDir = tempDir()
-                val project =
-                    ProjectBuilder
-                        .builder()
-                        .withProjectDir(projectDir)
-                        .build()
-
-                then("it executes work for each project") {
-                    ReportWriter.runParallel(listOf(project)) { p -> "OK ${p.path}" }
                 }
             }
         }
