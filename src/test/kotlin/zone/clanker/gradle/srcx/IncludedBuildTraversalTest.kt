@@ -2,7 +2,6 @@ package zone.clanker.gradle.srcx
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
-import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import java.io.File
 
@@ -17,68 +16,6 @@ class IncludedBuildTraversalTest :
             }
 
         val plugin = Srcx.SettingsPlugin()
-
-        given("discoverSubprojects") {
-
-            `when`("settings file has include statements") {
-                val buildDir = tempDir()
-                buildDir.resolve("settings.gradle.kts").writeText(
-                    """
-                    rootProject.name = "test-build"
-                    include(":app")
-                    include(":lib")
-                    include(":core")
-                    """.trimIndent(),
-                )
-
-                val result = plugin.discoverSubprojects(buildDir)
-
-                then("it discovers all included projects") {
-                    result shouldContainExactly listOf(":app", ":lib", ":core")
-                }
-            }
-
-            `when`("settings file has no includes") {
-                val buildDir = tempDir()
-                buildDir.resolve("settings.gradle.kts").writeText(
-                    """
-                    rootProject.name = "single-project"
-                    """.trimIndent(),
-                )
-
-                val result = plugin.discoverSubprojects(buildDir)
-
-                then("it returns empty") {
-                    result.shouldBeEmpty()
-                }
-            }
-
-            `when`("no settings file exists") {
-                val buildDir = tempDir()
-
-                val result = plugin.discoverSubprojects(buildDir)
-
-                then("it returns empty") {
-                    result.shouldBeEmpty()
-                }
-            }
-
-            `when`("settings.gradle (groovy) exists") {
-                val buildDir = tempDir()
-                buildDir.resolve("settings.gradle").writeText(
-                    """
-                    rootProject.name = 'groovy-build'
-                    include(":api")
-                    """.trimIndent(),
-                )
-
-                val result = plugin.discoverSubprojects(buildDir)
-
-                then("it discovers projects from groovy settings") {
-                    result shouldContainExactly listOf(":api")
-                }
-            }
-        }
 
         given("extractStandaloneProjectSummary") {
 
@@ -123,7 +60,6 @@ class IncludedBuildTraversalTest :
                     plugin.extractStandaloneProjectSummary(
                         projectDir,
                         ":",
-                        projectDir,
                     )
 
                 then("it discovers both source sets") {
@@ -163,7 +99,6 @@ class IncludedBuildTraversalTest :
                     plugin.extractStandaloneProjectSummary(
                         projectDir,
                         ":",
-                        projectDir,
                     )
 
                 then("source sets are empty") {
@@ -198,7 +133,6 @@ class IncludedBuildTraversalTest :
                     plugin.extractStandaloneProjectSummary(
                         projectDir,
                         ":",
-                        projectDir,
                     )
 
                 then("it detects build.gradle") {
@@ -216,7 +150,6 @@ class IncludedBuildTraversalTest :
                     plugin.extractStandaloneProjectSummary(
                         projectDir,
                         ":",
-                        projectDir,
                     )
 
                 then("it returns none for build file") {
@@ -236,33 +169,6 @@ class IncludedBuildTraversalTest :
                 then("it discovers the main source set from groovy files") {
                     sourceSets.size shouldBe 1
                     sourceSets[0].value shouldBe "main"
-                }
-            }
-
-            `when`("project has subprojects in included build") {
-                val buildDir = tempDir()
-                buildDir.resolve("settings.gradle.kts").writeText(
-                    """
-                    rootProject.name = "parent"
-                    include(":child")
-                    """.trimIndent(),
-                )
-                buildDir.resolve("build.gradle.kts").writeText("")
-
-                val childDir = File(buildDir, "child")
-                childDir.mkdirs()
-                childDir.resolve("build.gradle.kts").writeText("")
-                val childSrc = File(childDir, "src/main/kotlin/com/child")
-                childSrc.mkdirs()
-                childSrc.resolve("Child.kt").writeText("package com.child\nclass Child")
-
-                val builds = listOf("parent" to buildDir)
-                val summaries = plugin.collectIncludedBuildSummaries(builds)
-
-                then("it discovers subproject summaries") {
-                    summaries["parent"]!!.size shouldBe 2
-                    val childSummary = summaries["parent"]!!.find { it.projectPath.value == ":child" }
-                    childSummary!!.symbols.size shouldBe 1
                 }
             }
         }

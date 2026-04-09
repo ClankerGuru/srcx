@@ -85,24 +85,15 @@ class SrcxSettingsPluginTest :
             }
 
             `when`("generateIncludedBuildReports with no included builds") {
-                val projectDir = tempDir()
-                projectDir.resolve("build.gradle.kts").writeText("")
-                val project =
-                    ProjectBuilder.builder().withProjectDir(projectDir).build()
                 val ext = Srcx.SettingsExtension()
 
                 then("runs without error") {
-                    plugin.generateIncludedBuildReports(project, ext)
+                    plugin.generateIncludedBuildReports(emptyList(), ext)
                 }
             }
 
             `when`("collectIncludedBuildSummaries with no included builds") {
-                val projectDir = tempDir()
-                projectDir.resolve("build.gradle.kts").writeText("")
-                val project =
-                    ProjectBuilder.builder().withProjectDir(projectDir).build()
-
-                val result = plugin.collectIncludedBuildSummaries(project)
+                val result = plugin.collectIncludedBuildSummaries(emptyList())
 
                 then("returns empty map") {
                     result.isEmpty() shouldBe true

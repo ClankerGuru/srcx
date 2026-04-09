@@ -130,18 +130,19 @@ data object Srcx {
                         writeProjectReport(rootProject, summary, extension)
                         "OK ${project.path}"
                     }
-                    generateIncludedBuildReports(rootProject, extension)
+                    val includedBuilds = rootProject.gradle.includedBuilds
+                    generateIncludedBuildReports(includedBuilds, extension)
 
                     // Context report
                     val summaries = projects.map { extractProjectSummary(it, rootProject) }
                     val includedBuildRefs =
-                        rootProject.gradle.includedBuilds.map { build ->
+                        includedBuilds.map { build ->
                             val relPath = build.projectDir.relativeTo(rootProject.projectDir).path
                             DashboardRenderer.IncludedBuildRef(build.name, relPath)
                         }
-                    val builds = rootProject.gradle.includedBuilds.map { it.name to it.projectDir }
-                    val includedBuildSummaries = collectIncludedBuildSummaries(builds)
-                    val buildEdges = computeBuildEdges(builds, includedBuildSummaries)
+                    val includedBuildSummaries = collectIncludedBuildSummaries(includedBuilds)
+                    val buildPairs = includedBuilds.map { it.name to it.projectDir }
+                    val buildEdges = computeBuildEdges(buildPairs, includedBuildSummaries)
                     val classDiagram = generateClassDiagram(rootProject)
                     val renderer =
                         DashboardRenderer(
@@ -242,30 +243,22 @@ data object Srcx {
         }
 
         internal fun generateIncludedBuildReports(
-            rootProject: Project,
+            builds: Collection<org.gradle.api.initialization.IncludedBuild>,
             extension: SettingsExtension,
         ) {
-            val builds = rootProject.gradle.includedBuilds.map { it.name to it.projectDir }
-            generateIncludedBuildReports(builds, extension)
-        }
-
-        internal fun generateIncludedBuildReports(
-            builds: List<Pair<String, File>>,
-            extension: SettingsExtension,
-        ) {
-            for ((name, buildDir) in builds) {
+            for (build in builds) {
+                val buildDir = build.projectDir
                 val buildOutputDir = File(buildDir, extension.outputDir)
                 buildOutputDir.mkdirs()
 
-                val projectDirs = mutableListOf(buildDir to ":")
-                for (sub in discoverSubprojects(buildDir)) {
-                    val subDir = File(buildDir, sub.removePrefix(":").replace(":", "/"))
-                    projectDirs.add(subDir to sub)
-                }
+                val projectDirs =
+                    discoverIncludedBuildProjects(build).map { (path, dir) ->
+                        dir to path
+                    }
 
                 val summaries =
                     projectDirs.map { (dir, path) ->
-                        extractStandaloneProjectSummary(dir, path, buildDir)
+                        extractStandaloneProjectSummary(dir, path)
                     }
 
                 for (summary in summaries) {
@@ -280,7 +273,7 @@ data object Srcx {
                     File(reportDir, "symbols.md").writeText(renderer.render())
                 }
 
-                val buildRenderer = IncludedBuildRenderer(name, summaries)
+                val buildRenderer = IncludedBuildRenderer(build.name, summaries)
                 File(buildOutputDir, "context.md").writeText(buildRenderer.render())
                 writeGitignoreAt(buildOutputDir)
             }
@@ -295,25 +288,14 @@ data object Srcx {
         }
 
         internal fun collectIncludedBuildSummaries(
-            rootProject: Project,
-        ): Map<String, List<ProjectSummary>> {
-            val builds = rootProject.gradle.includedBuilds.map { it.name to it.projectDir }
-            return collectIncludedBuildSummaries(builds)
-        }
-
-        internal fun collectIncludedBuildSummaries(
-            builds: List<Pair<String, File>>,
+            builds: Collection<org.gradle.api.initialization.IncludedBuild>,
         ): Map<String, List<ProjectSummary>> {
             val result = mutableMapOf<String, List<ProjectSummary>>()
-            for ((name, buildDir) in builds) {
-                val projectDirs = mutableListOf(buildDir to ":")
-                for (sub in discoverSubprojects(buildDir)) {
-                    val subDir = File(buildDir, sub.removePrefix(":").replace(":", "/"))
-                    projectDirs.add(subDir to sub)
-                }
-                result[name] =
-                    projectDirs.map { (dir, path) ->
-                        extractStandaloneProjectSummary(dir, path, buildDir)
+            for (build in builds) {
+                val projectEntries = discoverIncludedBuildProjects(build)
+                result[build.name] =
+                    projectEntries.map { (path, dir) ->
+                        extractStandaloneProjectSummary(dir, path)
                     }
             }
             return result
@@ -322,7 +304,6 @@ data object Srcx {
         internal fun extractStandaloneProjectSummary(
             projectDir: File,
             projectPath: String,
-            buildDir: File,
         ): ProjectSummary {
             val sourceSets = discoverSourceSets(projectDir)
             val allSymbols = mutableListOf<SymbolEntry>()
@@ -350,12 +331,8 @@ data object Srcx {
                         .map { it.relativeTo(projectDir).path }
                 }
 
-            val subprojects =
-                if (projectPath == ":") {
-                    discoverSubprojects(buildDir)
-                } else {
-                    emptyList()
-                }
+            // Subprojects are discovered by the caller via Gradle API
+            val subprojects = emptyList<String>()
 
             val dependencies = extractDependenciesFromBuildFile(projectDir)
 
@@ -580,17 +557,41 @@ data object Srcx {
             return results
         }
 
-        internal fun discoverSubprojects(buildDir: File): List<String> {
-            val settingsFile =
-                File(buildDir, "settings.gradle.kts").takeIf { it.exists() }
-                    ?: File(buildDir, "settings.gradle").takeIf { it.exists() }
-                    ?: return emptyList()
-
-            val includePattern = Regex("""include\("([^"]+)"\)""")
-            return settingsFile
-                .readLines()
-                .mapNotNull { line -> includePattern.find(line)?.groupValues?.get(1) }
-        }
+        @Suppress("SwallowedException")
+        internal fun discoverIncludedBuildProjects(
+            build: org.gradle.api.initialization.IncludedBuild,
+        ): List<Pair<String, File>> =
+            runCatching {
+                val target = build.javaClass.getMethod("getTarget").invoke(build)
+                val registry =
+                    target!!.javaClass.getMethod("getProjects").let {
+                        it.isAccessible = true
+                        it.invoke(target)
+                    }
+                val allProjects =
+                    registry!!.javaClass.getMethod("getAllProjects").let {
+                        it.isAccessible = true
+                        it.invoke(registry) as Set<*>
+                    }
+                allProjects.mapNotNull { ps ->
+                    val path =
+                        ps!!.javaClass.getMethod("getIdentityPath").let {
+                            it.isAccessible = true
+                            it.invoke(ps).toString()
+                        }
+                    val dir =
+                        ps.javaClass.getMethod("getProjectDir").let {
+                            it.isAccessible = true
+                            it.invoke(ps) as File
+                        }
+                    // Strip the build prefix from the path to get project-relative path
+                    val relativePath =
+                        path
+                            .removePrefix(":${build.name}")
+                            .ifEmpty { ":" }
+                    relativePath to dir
+                }
+            }.getOrDefault(listOf(":" to build.projectDir))
 
         internal fun buildFileName(project: Project): String =
             when {
