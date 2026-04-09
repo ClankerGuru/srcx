@@ -243,14 +243,24 @@ object SymbolExtractor {
         )
     }
 
-    /** Known scopes for PSI-based build file parsing (no Gradle API available). */
-    private val PSI_DEP_SCOPES =
-        setOf("api", "implementation", "compileOnly", "runtimeOnly", "testImplementation")
+    /** Call expressions in build files that are not dependency declarations. */
+    private val PSI_SKIP_CALLS =
+        setOf(
+            "plugins", "kotlin", "id", "version", "apply",
+            "repositories", "mavenCentral", "google", "gradlePluginPortal", "mavenLocal",
+            "java", "tasks", "register", "named", "configure",
+            "sourceSets", "dependencies", "buildscript", "allprojects", "subprojects",
+            "project", "files", "fileTree", "exclude", "include",
+            "create", "getting", "creating", "withType", "matching",
+            "println", "print", "error", "require", "check",
+            "listOf", "setOf", "mapOf", "mutableListOf", "mutableSetOf",
+            "buildList", "buildString", "buildMap", "run", "let", "also", "apply", "with",
+        )
 
     /** Extract dependencies from a build file by parsing dependency declarations with PSI. */
     internal fun extractDependenciesFromBuildFile(
         projectDir: File,
-        scopes: Set<String> = PSI_DEP_SCOPES,
+        excludeScopes: Set<String> = DEFAULT_EXCLUDED_DEP_SCOPES,
     ): List<DependencyEntry> {
         val buildFile =
             File(projectDir, "build.gradle.kts").takeIf { it.exists() }
@@ -263,8 +273,10 @@ object SymbolExtractor {
 
             ktFile
                 .collectDescendantsOfType<KtCallExpression>()
-                .filter { call -> call.calleeExpression?.text in scopes }
-                .mapNotNull { call ->
+                .filter { call ->
+                    val name = call.calleeExpression?.text ?: return@filter false
+                    name !in excludeScopes && name !in PSI_SKIP_CALLS
+                }.mapNotNull { call ->
                     val scope = call.calleeExpression?.text ?: return@mapNotNull null
                     val arg =
                         call.valueArguments

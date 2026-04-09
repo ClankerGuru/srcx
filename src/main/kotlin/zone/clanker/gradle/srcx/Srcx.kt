@@ -154,8 +154,7 @@ data object Srcx {
                         )
                         task.excludeDepScopes.convention(extension.excludeDepScopes)
                         task.projectDeps.set(
-                            rootProject.provider {
-                                val excludes = extension.excludeDepScopes.get()
+                            task.excludeDepScopes.map { excludes ->
                                 rootProject.allprojects.associate { proj ->
                                     proj.path to SymbolExtractor.extractDependenciesFromProject(proj, excludes)
                                 }
