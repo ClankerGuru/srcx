@@ -5,12 +5,15 @@ import io.kotest.matchers.file.shouldExist
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.gradle.testfixtures.ProjectBuilder
+import zone.clanker.gradle.srcx.report.ReportWriter
+import zone.clanker.gradle.srcx.scan.ProjectScanner
+import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import java.io.File
 
 /**
- * Unit tests for [Srcx.SettingsPlugin] internal methods.
+ * Unit tests for [Srcx] data object utility methods.
  *
- * Tests the plugin's core logic directly without TestKit,
+ * Tests the core logic directly without TestKit,
  * ensuring code coverage for extractProjectSummary, writeProjectReport,
  * writeGitignore, buildFileName, and runParallel.
  */
@@ -25,7 +28,6 @@ class SrcxSettingsPluginTest :
             }
 
         given("extractProjectSummary") {
-            val plugin = Srcx.SettingsPlugin()
 
             `when`("project has source files") {
                 val projectDir = tempDir()
@@ -50,7 +52,7 @@ class SrcxSettingsPluginTest :
                         .build()
                 project.pluginManager.apply("java-library")
 
-                val summary = plugin.extractProjectSummary(project, project)
+                val summary = SymbolExtractor.extractProjectSummary(project, project)
 
                 then("symbols are extracted") {
                     summary.symbols.size shouldBe 3
@@ -85,15 +87,13 @@ class SrcxSettingsPluginTest :
             }
 
             `when`("generateIncludedBuildReports with no included builds") {
-                val ext = Srcx.SettingsExtension()
-
                 then("runs without error") {
-                    plugin.generateIncludedBuildReports(emptyList(), ext)
+                    ReportWriter.generateIncludedBuildReports(emptyList(), Srcx.OUTPUT_DIR)
                 }
             }
 
             `when`("collectIncludedBuildSummaries with no included builds") {
-                val result = plugin.collectIncludedBuildSummaries(emptyList())
+                val result = ReportWriter.collectIncludedBuildSummaries(emptyList())
 
                 then("returns empty map") {
                     result.isEmpty() shouldBe true
@@ -109,7 +109,7 @@ class SrcxSettingsPluginTest :
                 project.repositories.mavenCentral()
                 project.dependencies.add("implementation", "com.google.guava:guava:33.0.0-jre")
 
-                val summary = plugin.extractProjectSummary(project, project)
+                val summary = SymbolExtractor.extractProjectSummary(project, project)
 
                 then("dependencies are extracted") {
                     summary.dependencies.any { it.artifact.value == "guava" } shouldBe true
@@ -150,7 +150,7 @@ class SrcxSettingsPluginTest :
                         .build()
                 project.pluginManager.apply("java-library")
 
-                val summary = plugin.extractProjectSummary(project, project)
+                val summary = SymbolExtractor.extractProjectSummary(project, project)
 
                 then("source sets are discovered") {
                     summary.sourceSets.size shouldBe 2
@@ -186,7 +186,7 @@ class SrcxSettingsPluginTest :
                         .build()
                 project.pluginManager.apply("java-library")
 
-                val summary = plugin.extractProjectSummary(project, project)
+                val summary = SymbolExtractor.extractProjectSummary(project, project)
 
                 then("symbols list is empty") {
                     summary.symbols.size shouldBe 0
@@ -216,7 +216,7 @@ class SrcxSettingsPluginTest :
                         .build()
                 subProject.pluginManager.apply("java-library")
 
-                val summary = plugin.extractProjectSummary(subProject, rootProject)
+                val summary = SymbolExtractor.extractProjectSummary(subProject, rootProject)
 
                 then("subprojects list is empty for non-root projects") {
                     summary.subprojects.size shouldBe 0
@@ -225,7 +225,6 @@ class SrcxSettingsPluginTest :
         }
 
         given("buildFileName") {
-            val plugin = Srcx.SettingsPlugin()
 
             `when`("project has build.gradle.kts") {
                 val projectDir = tempDir()
@@ -237,7 +236,7 @@ class SrcxSettingsPluginTest :
                         .build()
 
                 then("it returns build.gradle.kts") {
-                    plugin.buildFileName(project) shouldBe "build.gradle.kts"
+                    ProjectScanner.buildFileName(project) shouldBe "build.gradle.kts"
                 }
             }
 
@@ -251,7 +250,7 @@ class SrcxSettingsPluginTest :
                         .build()
 
                 then("it returns build.gradle") {
-                    plugin.buildFileName(project) shouldBe "build.gradle"
+                    ProjectScanner.buildFileName(project) shouldBe "build.gradle"
                 }
             }
 
@@ -264,14 +263,12 @@ class SrcxSettingsPluginTest :
                         .build()
 
                 then("it returns none") {
-                    plugin.buildFileName(project) shouldBe "none"
+                    ProjectScanner.buildFileName(project) shouldBe "none"
                 }
             }
         }
 
         given("writeProjectReport") {
-            val plugin = Srcx.SettingsPlugin()
-            val extension = Srcx.SettingsExtension()
 
             `when`("writing a report for a subproject") {
                 val projectDir = tempDir()
@@ -282,8 +279,8 @@ class SrcxSettingsPluginTest :
                         .build()
                 project.pluginManager.apply("java-library")
 
-                val summary = plugin.extractProjectSummary(project, project)
-                plugin.writeProjectReport(project, summary, extension)
+                val summary = SymbolExtractor.extractProjectSummary(project, project)
+                ReportWriter.writeProjectReport(project, summary, Srcx.OUTPUT_DIR)
 
                 then("report file is created") {
                     File(projectDir, ".srcx/root/symbols.md").shouldExist()
@@ -297,18 +294,11 @@ class SrcxSettingsPluginTest :
         }
 
         given("writeGitignore") {
-            val plugin = Srcx.SettingsPlugin()
-            val extension = Srcx.SettingsExtension()
 
             `when`("writing gitignore") {
                 val projectDir = tempDir()
-                val project =
-                    ProjectBuilder
-                        .builder()
-                        .withProjectDir(projectDir)
-                        .build()
 
-                plugin.writeGitignore(project, extension)
+                ReportWriter.writeGitignore(projectDir, Srcx.OUTPUT_DIR)
 
                 then(".gitignore is created with wildcard") {
                     val gitignore = File(projectDir, ".srcx/.gitignore")
@@ -319,11 +309,10 @@ class SrcxSettingsPluginTest :
         }
 
         given("runParallel") {
-            val plugin = Srcx.SettingsPlugin()
 
             `when`("running with empty project list") {
                 then("it prints no projects message") {
-                    plugin.runParallel(emptyList()) { "OK" }
+                    ReportWriter.runParallel(emptyList()) { "OK" }
                 }
             }
 
@@ -336,44 +325,57 @@ class SrcxSettingsPluginTest :
                         .build()
 
                 then("it executes work for each project") {
-                    plugin.runParallel(listOf(project)) { p -> "OK ${p.path}" }
+                    ReportWriter.runParallel(listOf(project)) { p -> "OK ${p.path}" }
                 }
             }
         }
 
         given("SettingsExtension") {
+            val objects =
+                ProjectBuilder
+                    .builder()
+                    .build()
+                    .objects
+
+            fun newExtension(): Srcx.SettingsExtension =
+                objects
+                    .newInstance(Srcx.SettingsExtension::class.java)
+                    .also {
+                        it.outputDir.convention(Srcx.OUTPUT_DIR)
+                        it.autoGenerate.convention(false)
+                    }
 
             `when`("created with defaults") {
-                val extension = Srcx.SettingsExtension()
+                val extension = newExtension()
 
                 then("outputDir defaults to .srcx") {
-                    extension.outputDir shouldBe ".srcx"
+                    extension.outputDir.get() shouldBe ".srcx"
                 }
             }
 
             `when`("outputDir is changed") {
-                val extension = Srcx.SettingsExtension()
-                extension.outputDir = ".custom-output"
+                val extension = newExtension()
+                extension.outputDir.set(".custom-output")
 
                 then("outputDir reflects the new value") {
-                    extension.outputDir shouldBe ".custom-output"
+                    extension.outputDir.get() shouldBe ".custom-output"
                 }
             }
 
             `when`("autoGenerate defaults") {
-                val extension = Srcx.SettingsExtension()
+                val extension = newExtension()
 
                 then("autoGenerate defaults to false") {
-                    extension.autoGenerate shouldBe false
+                    extension.autoGenerate.get() shouldBe false
                 }
             }
 
             `when`("autoGenerate is enabled") {
-                val extension = Srcx.SettingsExtension()
-                extension.autoGenerate = true
+                val extension = newExtension()
+                extension.autoGenerate.set(true)
 
                 then("autoGenerate reflects the new value") {
-                    extension.autoGenerate shouldBe true
+                    extension.autoGenerate.get() shouldBe true
                 }
             }
         }
@@ -405,7 +407,14 @@ class SrcxSettingsPluginTest :
 
         given("registerTasks") {
             val plugin = Srcx.SettingsPlugin()
-            val extension = Srcx.SettingsExtension()
+            val extension =
+                ProjectBuilder
+                    .builder()
+                    .build()
+                    .objects
+                    .newInstance(Srcx.SettingsExtension::class.java)
+            extension.outputDir.convention(Srcx.OUTPUT_DIR)
+            extension.autoGenerate.convention(false)
 
             `when`("registering tasks on a root project") {
                 val projectDir = tempDir()
@@ -435,7 +444,6 @@ class SrcxSettingsPluginTest :
         }
 
         given("collectProjects") {
-            val plugin = Srcx.SettingsPlugin()
 
             `when`("called on a root project") {
                 val projectDir = tempDir()
@@ -446,7 +454,7 @@ class SrcxSettingsPluginTest :
                         .build()
 
                 then("it returns the root project") {
-                    val projects = plugin.collectProjects(project)
+                    val projects = ProjectScanner.collectProjects(project)
                     projects.size shouldBe 1
                     projects[0] shouldBe project
                 }

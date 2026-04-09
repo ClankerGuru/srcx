@@ -1,5 +1,22 @@
 package zone.clanker.gradle.srcx.analysis
 
+import org.jetbrains.kotlin.com.intellij.ide.highlighter.JavaFileType
+import org.jetbrains.kotlin.com.intellij.psi.PsiJavaFile
+import org.jetbrains.kotlin.com.intellij.psi.PsiManager
+import org.jetbrains.kotlin.com.intellij.psi.PsiMethod
+import org.jetbrains.kotlin.com.intellij.psi.PsiModifier
+import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile
+import org.jetbrains.kotlin.idea.KotlinFileType
+import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtObjectDeclaration
+import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
+import org.jetbrains.kotlin.psi.KtSuperTypeEntry
+import org.jetbrains.kotlin.psi.KtSuperTypeListEntry
+import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import zone.clanker.gradle.srcx.parse.PsiEnvironment
 import java.io.File
 
 /**
@@ -43,112 +60,186 @@ data class SourceFileMetadata(
     enum class Language { KOTLIN, JAVA }
 }
 
+private val PLATFORM_PREFIXES = listOf("java.", "javax.", "kotlin.", "kotlinx.")
+
+/**
+ * Parse a Kotlin or Java source file into [SourceFileMetadata] using PSI.
+ * Requires a [PsiManager] from a shared [PsiEnvironment].
+ */
+fun parseSourceFile(file: File, psiManager: PsiManager): SourceFileMetadata? {
+    if (!file.isFile) return null
+    return when (file.extension) {
+        "kt" -> parseKotlinFile(file, psiManager)
+        "java" -> parseJavaFile(file, psiManager)
+        else -> null
+    }
+}
+
 /**
  * Parse a Kotlin or Java source file into [SourceFileMetadata].
- * Reads only structural parts -- package, imports, class declaration, annotations.
- * Does not compile anything.
+ * Creates a temporary [PsiEnvironment] for single-file parsing.
+ * Prefer the overload that accepts a [PsiManager] for batch parsing.
  */
-@Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
 fun parseSourceFile(file: File): SourceFileMetadata? {
     if (!file.isFile) return null
-    val lang =
-        when (file.extension) {
-            "kt" -> SourceFileMetadata.Language.KOTLIN
-            "java" -> SourceFileMetadata.Language.JAVA
-            else -> return null
-        }
+    if (file.extension != "kt" && file.extension != "java") return null
+    return PsiEnvironment().use { env -> parseSourceFile(file, env.psiManager) }
+}
 
-    val lines = file.readLines()
-    val packageName =
-        lines
-            .firstOrNull { it.trimStart().startsWith("package ") }
-            ?.trimStart()
-            ?.removePrefix("package ")
-            ?.trimEnd(';')
-            ?.trim() ?: ""
+/** Resolved type-level info from the first class/object in a Kotlin file. */
+private data class KtTypeInfo(
+    val className: String,
+    val annotations: List<String>,
+    val supertypes: List<String>,
+    val isInterface: Boolean,
+    val isAbstract: Boolean,
+    val isObject: Boolean,
+    val isDataClass: Boolean,
+)
 
+private fun resolveKtTypeInfo(ktFile: KtFile, fallbackName: String): KtTypeInfo {
+    val firstClass = ktFile.collectDescendantsOfType<KtClass>().firstOrNull()
+    if (firstClass != null) {
+        return KtTypeInfo(
+            className = firstClass.name ?: fallbackName,
+            annotations = firstClass.annotationEntries.mapNotNull { it.shortName?.asString() },
+            supertypes = firstClass.superTypeListEntries.mapNotNull { supertypeName(it) },
+            isInterface = firstClass.isInterface(),
+            isAbstract = firstClass.hasModifier(KtTokens.ABSTRACT_KEYWORD),
+            isObject = false,
+            isDataClass = firstClass.isData(),
+        )
+    }
+    val firstObject = ktFile.collectDescendantsOfType<KtObjectDeclaration>().firstOrNull { !it.isCompanion() }
+    if (firstObject != null) {
+        return KtTypeInfo(
+            className = firstObject.name ?: fallbackName,
+            annotations = firstObject.annotationEntries.mapNotNull { it.shortName?.asString() },
+            supertypes = firstObject.superTypeListEntries.mapNotNull { supertypeName(it) },
+            isInterface = false,
+            isAbstract = false,
+            isObject = true,
+            isDataClass = false,
+        )
+    }
+    return KtTypeInfo(
+        className = fallbackName,
+        annotations = emptyList(),
+        supertypes = emptyList(),
+        isInterface = false,
+        isAbstract = false,
+        isObject = false,
+        isDataClass = false,
+    )
+}
+
+private fun parseKotlinFile(file: File, psiManager: PsiManager): SourceFileMetadata? {
+    val vf = LightVirtualFile(file.name, KotlinFileType.INSTANCE, file.readText())
+    val ktFile = psiManager.findFile(vf) as? KtFile ?: return null
+
+    val packageName = ktFile.packageFqName.asString()
     val imports =
-        lines
-            .filter { it.trimStart().startsWith("import ") }
-            .map {
-                it
-                    .trimStart()
-                    .removePrefix("import ")
-                    .trimEnd(';')
-                    .trim()
-            }.filter {
-                !it.startsWith("java.") &&
-                    !it.startsWith("javax.") &&
-                    !it.startsWith("kotlin.") &&
-                    !it.startsWith("kotlinx.")
-            }
+        ktFile.importDirectives
+            .mapNotNull { it.importedFqName?.asString() }
+            .filter { fqn -> PLATFORM_PREFIXES.none { fqn.startsWith(it) } }
 
-    val annotations = mutableListOf<String>()
-    val methods = mutableListOf<String>()
-    var className = ""
-    var isInterface = false
-    var isAbstract = false
-    var isObject = false
-    var isDataClass = false
-    var supertypes = listOf<String>()
-
-    for (line in lines) {
-        val trimmed = line.trim()
-
-        if (className.isEmpty()) {
-            if (isAnnotationLine(trimmed)) {
-                val anno = trimmed.substringBefore("(").substringBefore(" ").removePrefix("@")
-                annotations.add(anno)
-            }
-
-            val classMatch = findClassDeclaration(trimmed, lang)
-            if (classMatch != null) {
-                className = classMatch.name
-                isInterface = classMatch.isInterface
-                isAbstract = classMatch.isAbstract
-                isObject = classMatch.isObject
-                isDataClass = classMatch.isDataClass
-                supertypes = classMatch.supertypes
-            }
-        }
-
-        if (lang == SourceFileMetadata.Language.KOTLIN) {
-            if (isKotlinMethodLine(trimmed)) {
-                extractKotlinMethodName(trimmed)?.let { methods.add(it) }
-            }
-        } else {
-            val javaMethodPattern =
-                Regex(
-                    """^(public|private|protected|static|final|synchronized|abstract|override|\s)*""" +
-                        """(void|int|long|boolean|String|List|Map|Set|Optional|[A-Z]\w*(<.*>)?)\s+\w+\s*\(.*""",
-                )
-            if (javaMethodPattern.containsMatchIn(trimmed)) {
-                extractJavaMethodName(trimmed)?.let { methods.add(it) }
-            }
-        }
-    }
-
-    if (className.isEmpty()) {
-        className = file.nameWithoutExtension
-    }
-
-    val qualifiedName = if (packageName.isNotEmpty()) "$packageName.$className" else className
+    val info = resolveKtTypeInfo(ktFile, file.nameWithoutExtension)
+    val methods = ktFile.collectDescendantsOfType<KtNamedFunction>().mapNotNull { it.name }
+    val qualifiedName = if (packageName.isNotEmpty()) "$packageName.${info.className}" else info.className
 
     return SourceFileMetadata(
         file = file,
         packageName = packageName,
         qualifiedName = qualifiedName,
-        simpleName = className,
+        simpleName = info.className,
         imports = imports,
-        annotations = annotations,
-        supertypes = supertypes,
-        isInterface = isInterface,
-        isAbstract = isAbstract,
-        isObject = isObject,
-        isDataClass = isDataClass,
-        language = lang,
-        lineCount = countCodeLines(lines),
+        annotations = info.annotations,
+        supertypes = info.supertypes,
+        isInterface = info.isInterface,
+        isAbstract = info.isAbstract,
+        isObject = info.isObject,
+        isDataClass = info.isDataClass,
+        language = SourceFileMetadata.Language.KOTLIN,
+        lineCount = countCodeLines(file.readLines()),
         methods = methods,
+    )
+}
+
+private fun supertypeName(entry: KtSuperTypeListEntry): String? =
+    when (entry) {
+        is KtSuperTypeCallEntry -> entry.calleeExpression.constructorReferenceExpression?.text
+        is KtSuperTypeEntry -> entry.typeReference?.text?.substringBefore('<')
+        else -> null
+    }
+
+/** Resolved type-level info from the first class in a Java file. */
+private data class JavaTypeInfo(
+    val className: String,
+    val annotations: List<String>,
+    val supertypes: List<String>,
+    val isInterface: Boolean,
+    val isAbstract: Boolean,
+    val methods: List<String>,
+)
+
+private fun resolveJavaTypeInfo(javaFile: PsiJavaFile, fallbackName: String): JavaTypeInfo {
+    val cls =
+        javaFile.classes.firstOrNull()
+            ?: return JavaTypeInfo(
+                className = fallbackName,
+                annotations = emptyList(),
+                supertypes = emptyList(),
+                isInterface = false,
+                isAbstract = false,
+                methods = emptyList(),
+            )
+    val superList = mutableListOf<String>()
+    cls.extendsList?.referenceElements?.forEach { ref ->
+        ref.referenceName?.let { superList.add(it) }
+    }
+    cls.implementsList?.referenceElements?.forEach { ref ->
+        ref.referenceName?.let { superList.add(it) }
+    }
+    return JavaTypeInfo(
+        className = cls.name ?: fallbackName,
+        annotations = cls.annotations.mapNotNull { it.qualifiedName?.substringAfterLast('.') },
+        supertypes = superList,
+        isInterface = cls.isInterface,
+        isAbstract = cls.hasModifierProperty(PsiModifier.ABSTRACT),
+        methods = cls.methods.mapNotNull(PsiMethod::getName),
+    )
+}
+
+private fun parseJavaFile(file: File, psiManager: PsiManager): SourceFileMetadata? {
+    val vf = LightVirtualFile(file.name, JavaFileType.INSTANCE, file.readText())
+    val javaFile = psiManager.findFile(vf) as? PsiJavaFile ?: return null
+
+    val packageName = javaFile.packageName
+    val imports =
+        javaFile.importList
+            ?.importStatements
+            ?.mapNotNull { it.qualifiedName }
+            ?.filter { fqn -> PLATFORM_PREFIXES.none { fqn.startsWith(it) } }
+            ?: emptyList()
+
+    val info = resolveJavaTypeInfo(javaFile, file.nameWithoutExtension)
+    val qualifiedName = if (packageName.isNotEmpty()) "$packageName.${info.className}" else info.className
+
+    return SourceFileMetadata(
+        file = file,
+        packageName = packageName,
+        qualifiedName = qualifiedName,
+        simpleName = info.className,
+        imports = imports,
+        annotations = info.annotations,
+        supertypes = info.supertypes,
+        isInterface = info.isInterface,
+        isAbstract = info.isAbstract,
+        isObject = false,
+        isDataClass = false,
+        language = SourceFileMetadata.Language.JAVA,
+        lineCount = countCodeLines(file.readLines()),
+        methods = info.methods,
     )
 }
 
@@ -171,149 +262,21 @@ private fun countCodeLines(lines: List<String>): Int {
     }
 }
 
-private data class ClassDeclaration(
-    val name: String,
-    val isInterface: Boolean,
-    val isAbstract: Boolean,
-    val isObject: Boolean,
-    val isDataClass: Boolean,
-    val supertypes: List<String>,
-)
-
-private val ANNOTATION_EXCLUSION_PREFIXES = listOf("@file", "@param", "@return")
-
-private val KOTLIN_METHOD_PREFIXES =
-    listOf(
-        "fun ", "suspend fun ", "override fun ",
-        "private fun ", "internal fun ", "protected fun ",
-    )
-
-private fun isKotlinMethodLine(line: String): Boolean =
-    KOTLIN_METHOD_PREFIXES.any { line.startsWith(it) }
-
-private fun isAnnotationLine(line: String): Boolean =
-    line.startsWith("@") && ANNOTATION_EXCLUSION_PREFIXES.none { line.startsWith(it) }
-
-private fun isCommentLine(line: String): Boolean =
-    line.startsWith("//") || line.startsWith("*") || line.startsWith("/*")
-
-private fun extractNameToken(keywords: List<String>, classIdx: Int): String? {
-    val raw =
-        keywords
-            .getOrNull(classIdx + 1)
-            ?.substringBefore("(")
-            ?.substringBefore("{")
-            ?.substringBefore(":")
-            ?.substringBefore("<")
-            ?.trim()
-            ?: return null
-    return if (raw.isNotEmpty() && raw[0].isUpperCase()) raw else null
-}
-
-@Suppress("ReturnCount", "NestedBlockDepth", "CyclomaticComplexMethod", "LongMethod")
-private fun findClassDeclaration(line: String, lang: SourceFileMetadata.Language): ClassDeclaration? {
-    if (isCommentLine(line)) return null
-
-    val keywords = line.split(" ", "\t").filter { it.isNotBlank() }
-    val classIdx = keywords.indexOfFirst { it in setOf("class", "interface", "object", "enum") }
-    if (classIdx < 0) return null
-
-    val typeKeyword = keywords[classIdx]
-    val nameToken = extractNameToken(keywords, classIdx) ?: return null
-
-    val isAbstract = "abstract" in keywords.subList(0, classIdx)
-    val isData = "data" in keywords.subList(0, classIdx)
-
-    val supertypes = mutableListOf<String>()
-    val afterName = line.substringAfter(nameToken, "")
-    if (lang == SourceFileMetadata.Language.KOTLIN) {
-        val afterConstructor =
-            if (afterName.contains("(")) {
-                var depth = 0
-                var endIdx = 0
-                for ((i, ch) in afterName.withIndex()) {
-                    if (ch == '(') {
-                        depth++
-                    } else if (ch == ')') {
-                        depth--
-                        if (depth == 0) {
-                            endIdx = i + 1
-                            break
-                        }
-                    }
-                }
-                afterName.substring(endIdx)
-            } else {
-                afterName
-            }
-        val colonPart = afterConstructor.substringAfter(":", "").substringBefore("{").trim()
-        if (colonPart.isNotEmpty()) {
-            colonPart.split(",").forEach { s ->
-                val clean =
-                    s
-                        .trim()
-                        .substringBefore("(")
-                        .substringBefore("<")
-                        .trim()
-                if (clean.isNotEmpty() && clean[0].isUpperCase()) supertypes.add(clean)
-            }
-        }
-    } else {
-        val extendsPart =
-            afterName
-                .substringAfter("extends ", "")
-                .substringBefore("{")
-                .substringBefore("implements")
-                .trim()
-        if (extendsPart.isNotEmpty()) {
-            extendsPart.split(",").forEach { s ->
-                val clean = s.trim().substringBefore("<").trim()
-                if (clean.isNotEmpty() && clean[0].isUpperCase()) supertypes.add(clean)
-            }
-        }
-        val implPart = afterName.substringAfter("implements ", "").substringBefore("{").trim()
-        if (implPart.isNotEmpty()) {
-            implPart.split(",").forEach { s ->
-                val clean = s.trim().substringBefore("<").trim()
-                if (clean.isNotEmpty() && clean[0].isUpperCase()) supertypes.add(clean)
-            }
-        }
-    }
-
-    return ClassDeclaration(
-        name = nameToken,
-        isInterface = typeKeyword == "interface",
-        isAbstract = isAbstract,
-        isObject = typeKeyword == "object",
-        isDataClass = isData,
-        supertypes = supertypes,
-    )
-}
-
-private fun extractKotlinMethodName(line: String): String? {
-    val funIdx = line.indexOf("fun ")
-    if (funIdx < 0) return null
-    val afterFun = line.substring(funIdx + 4).trim()
-    val name = afterFun.substringBefore("(").substringAfterLast(".").trim()
-    return name.ifEmpty { null }
-}
-
-private fun extractJavaMethodName(line: String): String? {
-    val parenIdx = line.indexOf('(')
-    if (parenIdx < 0) return null
-    val beforeParen = line.substring(0, parenIdx).trim()
-    val name = beforeParen.substringAfterLast(" ").trim()
-    return if (name.isNotEmpty() && name[0].isLowerCase()) name else null
-}
-
 /** Scan source directories and parse all source files into [SourceFileMetadata]. */
-fun scanSources(srcDirs: List<File>): List<SourceFileMetadata> =
-    srcDirs
-        .filter { it.exists() }
-        .flatMap { dir ->
-            dir
-                .walkTopDown()
-                .filter { it.isFile && (it.extension == "kt" || it.extension == "java") }
-                .mapNotNull { parseSourceFile(it) }
-                .toList()
-        }
+fun scanSources(srcDirs: List<File>): List<SourceFileMetadata> {
+    val files =
+        srcDirs
+            .filter { it.exists() }
+            .flatMap { dir ->
+                dir
+                    .walkTopDown()
+                    .filter { it.isFile && (it.extension == "kt" || it.extension == "java") }
+                    .toList()
+            }
+    if (files.isEmpty()) return emptyList()
+
+    return PsiEnvironment().use { env ->
+        val psiManager = env.psiManager
+        files.mapNotNull { file -> parseSourceFile(file, psiManager) }
+    }
+}

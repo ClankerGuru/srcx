@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.file.shouldExist
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import java.io.File
 
 class IncludedBuildReportTest :
@@ -15,8 +16,6 @@ class IncludedBuildReportTest :
                 mkdirs()
                 deleteOnExit()
             }
-
-        val plugin = Srcx.SettingsPlugin()
 
         given("generateIncludedBuildReports via extractStandaloneProjectSummary") {
 
@@ -70,8 +69,8 @@ class IncludedBuildReportTest :
                     """.trimIndent(),
                 )
 
-                val rootSummary = plugin.extractStandaloneProjectSummary(buildDir, ":")
-                val coreSummary = plugin.extractStandaloneProjectSummary(coreDir, ":core")
+                val rootSummary = SymbolExtractor.extractStandaloneProjectSummary(buildDir, ":")
+                val coreSummary = SymbolExtractor.extractStandaloneProjectSummary(coreDir, ":core")
 
                 then("root project subprojects are empty (discovered by Gradle API)") {
                     rootSummary.subprojects shouldBe emptyList()
@@ -121,7 +120,7 @@ class IncludedBuildReportTest :
                 buildDir.resolve("build.gradle.kts").writeText("")
                 buildDir.resolve("settings.gradle.kts").writeText("rootProject.name = \"codec\"")
 
-                val summary = plugin.extractStandaloneProjectSummary(buildDir, ":")
+                val summary = SymbolExtractor.extractStandaloneProjectSummary(buildDir, ":")
 
                 val renderer =
                     zone.clanker.gradle.srcx.report

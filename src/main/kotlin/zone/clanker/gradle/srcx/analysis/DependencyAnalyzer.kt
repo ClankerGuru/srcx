@@ -26,6 +26,7 @@ fun buildDependencyGraph(components: List<ClassifiedComponent>): List<ClassDepen
     for (component in components) {
         addImportEdges(component, byQualifiedName, edges)
         addSupertypeEdges(component, byQualifiedName, bySimpleName, edges)
+        addSamePackageEdges(component, components, edges)
     }
 
     return edges.distinct()
@@ -59,6 +60,23 @@ private fun addSupertypeEdges(
             edges.add(ClassDependency(component, resolved))
         }
     }
+}
+
+private fun addSamePackageEdges(
+    component: ClassifiedComponent,
+    allComponents: List<ClassifiedComponent>,
+    edges: MutableList<ClassDependency>,
+) {
+    val pkg = component.source.packageName
+    if (pkg.isEmpty()) return
+    val sourceText = runCatching { component.source.file.readText() }.getOrDefault("")
+    if (sourceText.isEmpty()) return
+
+    allComponents
+        .filter { it !== component && it.source.packageName == pkg && it.source.simpleName.length >= 2 }
+        .filter { candidate ->
+            Regex("\\b${Regex.escape(candidate.source.simpleName)}\\b").containsMatchIn(sourceText)
+        }.forEach { edges.add(ClassDependency(component, it)) }
 }
 
 private fun resolveSupertypeTarget(

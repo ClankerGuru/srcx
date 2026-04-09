@@ -12,8 +12,9 @@ import io.kotest.core.spec.style.BehaviorSpec
  * model      -> (nothing internal -- models are leaf nodes)
  * parse      -> model (parsers produce model types)
  * analysis   -> model (analyzers consume model types)
- * task       -> model, parse, analysis, report (tasks orchestrate everything)
- * report     -> model (renderers consume models)
+ * scan       -> model, analysis, parse (scanners use PSI parser for symbol extraction)
+ * report     -> model, scan (renderers consume models; ReportWriter uses scan)
+ * task       -> model, parse, analysis, report, scan (tasks orchestrate everything)
  * ```
  */
 class PackageBoundaryTest :
@@ -52,6 +53,12 @@ class PackageBoundaryTest :
                         it.imports.none { imp -> imp.name.contains("srcx.report") }
                     }
                 }
+
+                then("models never import from the scan package") {
+                    modelFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.scan") }
+                    }
+                }
             }
 
             `when`("files are in the parse package") {
@@ -71,6 +78,12 @@ class PackageBoundaryTest :
                         it.imports.none { imp -> imp.name.contains("srcx.report") }
                     }
                 }
+
+                then("parse never imports from the scan package") {
+                    parseFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.scan") }
+                    }
+                }
             }
 
             `when`("files are in the analysis package") {
@@ -88,6 +101,38 @@ class PackageBoundaryTest :
                 then("analysis never imports from the report package") {
                     analysisFiles.assertTrue {
                         it.imports.none { imp -> imp.name.contains("srcx.report") }
+                    }
+                }
+
+                then("analysis never imports from the scan package") {
+                    analysisFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.scan") }
+                    }
+                }
+            }
+
+            `when`("files are in the scan package") {
+                val scanFiles =
+                    mainScope.files.filter {
+                        it.packagee?.name?.contains("srcx.scan") == true
+                    }
+
+                then("scan never imports from the task package") {
+                    scanFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.task") }
+                    }
+                }
+
+                then("scan never imports from the report package") {
+                    scanFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.report") }
+                    }
+                }
+
+                then("scan may import from parse for PSI symbol extraction") {
+                    // Allowed: scan uses parse/PsiParser for extraction
+                    scanFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.parse.SourceScanner") }
                     }
                 }
             }

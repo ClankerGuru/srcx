@@ -3,6 +3,7 @@ package zone.clanker.gradle.srcx
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import org.gradle.testfixtures.ProjectBuilder
 import org.gradle.testkit.runner.GradleRunner
 import java.io.File
 
@@ -32,7 +33,7 @@ class SrcxDslTest :
                     }
                     rootProject.name = "dsl-test"
                     srcx {
-                        outputDir = ".custom-srcx"
+                        outputDir.set(".custom-srcx")
                     }
                     """.trimIndent(),
                 )
@@ -53,10 +54,17 @@ class SrcxDslTest :
             }
 
             `when`("default extension values are used") {
-                val extension = Srcx.SettingsExtension()
+                val objects =
+                    ProjectBuilder
+                        .builder()
+                        .build()
+                        .objects
+                val extension = objects.newInstance(Srcx.SettingsExtension::class.java)
+                extension.outputDir.convention(Srcx.OUTPUT_DIR)
+                extension.autoGenerate.convention(false)
 
                 then("outputDir is .srcx") {
-                    extension.outputDir shouldBe ".srcx"
+                    extension.outputDir.get() shouldBe ".srcx"
                 }
             }
         }
