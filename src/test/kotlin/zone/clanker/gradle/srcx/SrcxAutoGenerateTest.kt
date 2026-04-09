@@ -7,6 +7,20 @@ import org.gradle.testfixtures.ProjectBuilder
 import org.gradle.testkit.runner.GradleRunner
 import java.io.File
 
+private fun newExtension(): Srcx.SettingsExtension {
+    val objects =
+        ProjectBuilder
+            .builder()
+            .build()
+            .objects
+    return objects
+        .newInstance(Srcx.SettingsExtension::class.java)
+        .also {
+            it.outputDir.convention(Srcx.OUTPUT_DIR)
+            it.autoGenerate.convention(false)
+        }
+}
+
 class SrcxAutoGenerateTest :
     BehaviorSpec({
 
@@ -29,7 +43,7 @@ class SrcxAutoGenerateTest :
                         .withProjectDir(projectDir)
                         .build()
 
-                val extension = Srcx.SettingsExtension().apply { autoGenerate = true }
+                val extension = newExtension().apply { autoGenerate.set(true) }
                 plugin.registerTasks(project, extension)
 
                 project.tasks.register("compileKotlin")
@@ -50,7 +64,7 @@ class SrcxAutoGenerateTest :
                         .withProjectDir(projectDir)
                         .build()
 
-                val extension = Srcx.SettingsExtension().apply { autoGenerate = true }
+                val extension = newExtension().apply { autoGenerate.set(true) }
                 plugin.registerTasks(project, extension)
 
                 project.tasks.register("compileJava")
@@ -71,7 +85,7 @@ class SrcxAutoGenerateTest :
                         .withProjectDir(projectDir)
                         .build()
 
-                val extension = Srcx.SettingsExtension()
+                val extension = newExtension()
                 plugin.registerTasks(project, extension)
 
                 project.tasks.register("compileKotlin")
@@ -95,7 +109,7 @@ class SrcxAutoGenerateTest :
                     }
                     rootProject.name = "auto-test"
                     srcx {
-                        autoGenerate = true
+                        autoGenerate.set(true)
                     }
                     """.trimIndent(),
                 )

@@ -1,5 +1,6 @@
 package zone.clanker.gradle.srcx.parse
 
+import org.gradle.api.logging.Logging
 import zone.clanker.gradle.srcx.model.MethodCall
 import zone.clanker.gradle.srcx.model.Reference
 import zone.clanker.gradle.srcx.model.ReferenceKind
@@ -283,7 +284,8 @@ class SymbolIndex(
                         allSymbols.addAll(parser.extractDeclarations(file))
                         allRefs.addAll(parser.extractReferences(file))
                     }.onFailure { e ->
-                        System.err.println("srcx: failed to parse ${file.name}: ${e.message}")
+                        val log = Logging.getLogger(SymbolIndex::class.java)
+                        log.warn("srcx: failed to parse ${file.name}: ${e.message}")
                     }
                 }
             }

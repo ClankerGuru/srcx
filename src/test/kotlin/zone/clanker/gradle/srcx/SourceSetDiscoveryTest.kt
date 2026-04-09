@@ -4,6 +4,8 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import zone.clanker.gradle.srcx.scan.ProjectScanner
+import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import java.io.File
 
 class SourceSetDiscoveryTest :
@@ -15,8 +17,6 @@ class SourceSetDiscoveryTest :
                 mkdirs()
                 deleteOnExit()
             }
-
-        val plugin = Srcx.SettingsPlugin()
 
         given("discoverSourceSets") {
 
@@ -30,7 +30,7 @@ class SourceSetDiscoveryTest :
                 testDir.mkdirs()
                 testDir.resolve("AppTest.kt").writeText("package com.example\nclass AppTest")
 
-                val result = plugin.discoverSourceSets(projectDir)
+                val result = ProjectScanner.discoverSourceSets(projectDir)
 
                 then("it discovers both source sets in order") {
                     result.map { it.value } shouldContainExactly listOf("main", "test")
@@ -45,7 +45,7 @@ class SourceSetDiscoveryTest :
                     dir.resolve("Src.kt").writeText("package com.example\nclass Src")
                 }
 
-                val result = plugin.discoverSourceSets(projectDir)
+                val result = ProjectScanner.discoverSourceSets(projectDir)
 
                 then("it orders main, test, androidTest") {
                     result.map { it.value } shouldContainExactly listOf("main", "test", "androidTest")
@@ -58,7 +58,7 @@ class SourceSetDiscoveryTest :
                 javaDir.mkdirs()
                 javaDir.resolve("App.java").writeText("package com.example;\npublic class App {}")
 
-                val result = plugin.discoverSourceSets(projectDir)
+                val result = ProjectScanner.discoverSourceSets(projectDir)
 
                 then("it discovers the main source set") {
                     result.map { it.value } shouldContainExactly listOf("main")
@@ -68,7 +68,7 @@ class SourceSetDiscoveryTest :
             `when`("project has no src directory") {
                 val projectDir = tempDir()
 
-                val result = plugin.discoverSourceSets(projectDir)
+                val result = ProjectScanner.discoverSourceSets(projectDir)
 
                 then("it returns empty") {
                     result.shouldBeEmpty()
@@ -79,7 +79,7 @@ class SourceSetDiscoveryTest :
                 val projectDir = tempDir()
                 File(projectDir, "src").writeText("not a directory")
 
-                val result = plugin.discoverSourceSets(projectDir)
+                val result = ProjectScanner.discoverSourceSets(projectDir)
 
                 then("it returns empty for null listFiles") {
                     result.shouldBeEmpty()
@@ -90,7 +90,7 @@ class SourceSetDiscoveryTest :
                 val projectDir = tempDir()
                 File(projectDir, "src/main/kotlin").mkdirs()
 
-                val result = plugin.discoverSourceSets(projectDir)
+                val result = ProjectScanner.discoverSourceSets(projectDir)
 
                 then("it returns empty because no source files exist") {
                     result.shouldBeEmpty()
@@ -105,7 +105,7 @@ class SourceSetDiscoveryTest :
                     dir.resolve("Src.kt").writeText("package com.example\nclass Src")
                 }
 
-                val result = plugin.discoverSourceSets(projectDir)
+                val result = ProjectScanner.discoverSourceSets(projectDir)
 
                 then("main and test come first, then custom sets alphabetically") {
                     result.map { it.value } shouldContainExactly
@@ -118,7 +118,7 @@ class SourceSetDiscoveryTest :
 
             `when`("given a source set name") {
                 val projectDir = tempDir()
-                val dirs = plugin.sourceSetDirs(projectDir, "test")
+                val dirs = ProjectScanner.sourceSetDirs(projectDir, "test")
 
                 then("it returns kotlin and java dirs for that source set") {
                     dirs.size shouldBe 2
@@ -146,7 +146,7 @@ class SourceSetDiscoveryTest :
                 )
 
                 val dirs = listOf(File(projectDir, "src/test/kotlin"))
-                val symbols = plugin.extractSymbolsFromDirs(dirs)
+                val symbols = SymbolExtractor.extractSymbolsFromDirs(dirs)
 
                 then("it extracts test class, function, and property") {
                     symbols.size shouldBe 3
@@ -158,7 +158,7 @@ class SourceSetDiscoveryTest :
 
             `when`("scanning dirs that don't exist") {
                 val dirs = listOf(File("/nonexistent/path"))
-                val symbols = plugin.extractSymbolsFromDirs(dirs)
+                val symbols = SymbolExtractor.extractSymbolsFromDirs(dirs)
 
                 then("it returns empty") {
                     symbols.shouldBeEmpty()

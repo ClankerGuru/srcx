@@ -3,6 +3,8 @@ package zone.clanker.gradle.srcx
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import zone.clanker.gradle.srcx.scan.ProjectScanner
+import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import java.io.File
 
 class IncludedBuildTraversalTest :
@@ -14,8 +16,6 @@ class IncludedBuildTraversalTest :
                 mkdirs()
                 deleteOnExit()
             }
-
-        val plugin = Srcx.SettingsPlugin()
 
         given("extractStandaloneProjectSummary") {
 
@@ -57,7 +57,7 @@ class IncludedBuildTraversalTest :
                 )
 
                 val summary =
-                    plugin.extractStandaloneProjectSummary(
+                    SymbolExtractor.extractStandaloneProjectSummary(
                         projectDir,
                         ":",
                     )
@@ -96,7 +96,7 @@ class IncludedBuildTraversalTest :
                 projectDir.resolve("build.gradle.kts").writeText("")
 
                 val summary =
-                    plugin.extractStandaloneProjectSummary(
+                    SymbolExtractor.extractStandaloneProjectSummary(
                         projectDir,
                         ":",
                     )
@@ -130,7 +130,7 @@ class IncludedBuildTraversalTest :
                 )
 
                 val summary =
-                    plugin.extractStandaloneProjectSummary(
+                    SymbolExtractor.extractStandaloneProjectSummary(
                         projectDir,
                         ":",
                     )
@@ -147,7 +147,7 @@ class IncludedBuildTraversalTest :
                 srcDir.resolve("App.kt").writeText("package com.example\nclass App")
 
                 val summary =
-                    plugin.extractStandaloneProjectSummary(
+                    SymbolExtractor.extractStandaloneProjectSummary(
                         projectDir,
                         ":",
                     )
@@ -157,18 +157,17 @@ class IncludedBuildTraversalTest :
                 }
             }
 
-            `when`("project has groovy source files") {
+            `when`("project has only groovy source files") {
                 val projectDir = tempDir()
                 projectDir.resolve("build.gradle.kts").writeText("")
                 val groovyDir = File(projectDir, "src/main/groovy/com/example")
                 groovyDir.mkdirs()
                 groovyDir.resolve("App.groovy").writeText("package com.example\nclass App {}")
 
-                val sourceSets = plugin.discoverSourceSets(projectDir)
+                val sourceSets = ProjectScanner.discoverSourceSets(projectDir)
 
-                then("it discovers the main source set from groovy files") {
-                    sourceSets.size shouldBe 1
-                    sourceSets[0].value shouldBe "main"
+                then("it does not discover groovy-only source sets (PSI does not support groovy)") {
+                    sourceSets.isEmpty() shouldBe true
                 }
             }
         }
@@ -188,7 +187,7 @@ class IncludedBuildTraversalTest :
                     """.trimIndent(),
                 )
 
-                val deps = plugin.extractDependenciesFromBuildFile(projectDir)
+                val deps = SymbolExtractor.extractDependenciesFromBuildFile(projectDir)
 
                 then("it extracts all three dependencies") {
                     deps.size shouldBe 3
@@ -213,7 +212,7 @@ class IncludedBuildTraversalTest :
             `when`("no build file exists") {
                 val projectDir = tempDir()
 
-                val deps = plugin.extractDependenciesFromBuildFile(projectDir)
+                val deps = SymbolExtractor.extractDependenciesFromBuildFile(projectDir)
 
                 then("it returns empty") {
                     deps.shouldBeEmpty()

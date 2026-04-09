@@ -1,6 +1,7 @@
 package zone.clanker.gradle.srcx.report
 
 import zone.clanker.gradle.srcx.model.FindingSeverity
+import zone.clanker.gradle.srcx.model.HubClass
 import zone.clanker.gradle.srcx.model.ProjectSummary
 import zone.clanker.gradle.srcx.model.SourceSetSummary
 
@@ -17,6 +18,11 @@ import zone.clanker.gradle.srcx.model.SourceSetSummary
 internal class ProjectReportRenderer(
     private val summary: ProjectSummary,
 ) {
+    companion object {
+        /** Hubs with this many or more dependents are labeled as super nodes. */
+        const val SUPER_NODE_THRESHOLD = 50
+    }
+
     fun render(): String =
         buildString {
             appendLine("# ${summary.projectPath}")
@@ -75,15 +81,9 @@ internal class ProjectReportRenderer(
         if (analysis.hubs.isNotEmpty()) {
             appendLine("## Hub Classes")
             appendLine()
-            appendLine("Most depended-on classes:")
-            appendLine()
-            appendLine("| Class | Dependents |")
-            appendLine("|-------|-----------|")
             for (hub in analysis.hubs) {
-                val roleLabel = if (hub.role.isNotEmpty()) " (${hub.role})" else ""
-                appendLine("| ${hub.name}$roleLabel | ${hub.dependents} |")
+                appendHubTree(hub)
             }
-            appendLine()
         }
 
         val warnings = analysis.findings.filter { it.severity == FindingSeverity.WARNING }
@@ -111,6 +111,20 @@ internal class ProjectReportRenderer(
             }
             appendLine()
         }
+    }
+
+    private fun StringBuilder.appendHubTree(hub: HubClass) {
+        val roleTag = if (hub.role.isNotEmpty()) " [${hub.role}]" else ""
+        val loc = if (hub.filePath.isNotEmpty()) " — ${hub.filePath}:${hub.line}" else ""
+        if (hub.dependentCount >= SUPER_NODE_THRESHOLD) {
+            appendLine("- **${hub.name}**$roleTag$loc — super node (${hub.dependentCount} dependents)")
+        } else {
+            appendLine("- **${hub.name}**$roleTag$loc (${hub.dependentCount} dependents)")
+            for (dep in hub.dependents) {
+                appendLine("  - ${dep.name} — ${dep.filePath}:${dep.line}")
+            }
+        }
+        appendLine()
     }
 
     private fun StringBuilder.appendDependencies() {

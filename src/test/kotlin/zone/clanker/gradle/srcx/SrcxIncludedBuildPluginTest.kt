@@ -106,8 +106,8 @@ class SrcxIncludedBuildPluginTest :
                 then("it generates reports in the root project") {
                     projectDir.gradle(Srcx.TASK_CONTEXT).build()
 
-                    projectDir.resolve(".srcx/app/symbols.md").shouldExist()
-                    projectDir.resolve(".srcx/root/symbols.md").shouldExist()
+                    projectDir.resolve(".srcx/app/context.md").shouldExist()
+                    projectDir.resolve(".srcx/root/context.md").shouldExist()
                 }
 
                 then("it generates reports inside the included build's own directory") {
@@ -118,9 +118,9 @@ class SrcxIncludedBuildPluginTest :
                     libDashboard.shouldExist()
                     val libContent = libDashboard.readText()
                     libContent shouldContain "# lib-build"
-                    libContent shouldContain "main, test"
+                    libContent shouldContain "## main"
 
-                    val libSymbols = libSrcx.resolve("root/symbols.md")
+                    val libSymbols = libSrcx.resolve("root/context.md")
                     libSymbols.shouldExist()
                     val symbolsContent = libSymbols.readText()
                     symbolsContent shouldContain "Lib"

@@ -152,7 +152,12 @@ internal class DashboardRenderer(
             if (s.kind != SymbolKind.CLASS) continue
             val hub = hubs[s.name.value]
             val roleTag = if (hub != null && hub.role.isNotEmpty()) " [${hub.role}]" else ""
-            val depTag = if (hub != null && hub.dependents > 0) " (${hub.dependents} dependents)" else ""
+            val depTag =
+                if (hub != null && hub.dependentCount > 0) {
+                    " (${hub.dependentCount} dependents)"
+                } else {
+                    ""
+                }
             appendLine("- class `${s.name}`$roleTag$depTag — ${s.packageName}, ${s.filePath}:${s.lineNumber}")
         }
         val functions = ss.symbols.filter { it.kind == SymbolKind.FUNCTION }
@@ -229,7 +234,7 @@ internal class DashboardRenderer(
     companion object {
         fun projectReportPath(projectPath: String): String {
             val sanitized = projectPath.replace(":", "/").trimStart('/')
-            return if (sanitized.isEmpty()) "root/symbols.md" else "$sanitized/symbols.md"
+            return if (sanitized.isEmpty()) "root/context.md" else "$sanitized/context.md"
         }
 
         private fun nodeId(name: String): String =

@@ -153,10 +153,10 @@ class SrcxPluginTest :
 
                 then("each subproject has its own report") {
                     projectDir.gradle(Srcx.TASK_CONTEXT).build()
-                    projectDir.resolve(".srcx/app/symbols.md").shouldExist()
-                    projectDir.resolve(".srcx/lib/symbols.md").shouldExist()
-                    projectDir.resolve(".srcx/core/symbols.md").shouldExist()
-                    projectDir.resolve(".srcx/root/symbols.md").shouldExist()
+                    projectDir.resolve(".srcx/app/context.md").shouldExist()
+                    projectDir.resolve(".srcx/lib/context.md").shouldExist()
+                    projectDir.resolve(".srcx/core/context.md").shouldExist()
+                    projectDir.resolve(".srcx/root/context.md").shouldExist()
                 }
             }
 
@@ -180,7 +180,7 @@ class SrcxPluginTest :
 
                 then("symbols are extracted correctly") {
                     projectDir.gradle(Srcx.TASK_CONTEXT).build()
-                    val coreReport = projectDir.resolve(".srcx/core/symbols.md").readText()
+                    val coreReport = projectDir.resolve(".srcx/core/context.md").readText()
                     coreReport shouldContain "Core"
                     coreReport shouldContain "CLASS"
                     coreReport shouldContain "process"
@@ -194,7 +194,7 @@ class SrcxPluginTest :
 
                 then("dependencies appear in the report") {
                     projectDir.gradle(Srcx.TASK_CONTEXT).build()
-                    val appReport = projectDir.resolve(".srcx/app/symbols.md").readText()
+                    val appReport = projectDir.resolve(".srcx/app/context.md").readText()
                     appReport shouldContain "Dependencies"
                 }
             }
@@ -213,13 +213,13 @@ class SrcxPluginTest :
             `when`("srcx-context runs twice") {
                 val projectDir = tempProject().withMultiProject()
 
-                then("running twice overwrites cleanly") {
+                then("second run is up-to-date when sources unchanged") {
                     projectDir.gradle(Srcx.TASK_CONTEXT).build()
-                    val firstContent = projectDir.resolve(".srcx/core/symbols.md").readText()
+                    val firstContent = projectDir.resolve(".srcx/core/context.md").readText()
 
                     val result = projectDir.gradle(Srcx.TASK_CONTEXT).build()
-                    result.task(":${Srcx.TASK_CONTEXT}")?.outcome shouldBe TaskOutcome.SUCCESS
-                    val secondContent = projectDir.resolve(".srcx/core/symbols.md").readText()
+                    result.task(":${Srcx.TASK_CONTEXT}")?.outcome shouldBe TaskOutcome.UP_TO_DATE
+                    val secondContent = projectDir.resolve(".srcx/core/context.md").readText()
                     secondContent shouldBe firstContent
                 }
             }

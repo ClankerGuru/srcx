@@ -7,9 +7,8 @@ import io.kotest.matchers.collections.shouldBeEmpty
 /**
  * Enforces that no task classes exist in srcx outside the task package.
  *
- * All tasks live in the root plugin class (Srcx.SettingsPlugin).
- * The task/ package is reserved for future Gradle task classes
- * if the plugin grows to need them.
+ * Task classes live in the task/ package (e.g. ContextTask, CleanTask).
+ * Reusable logic lives on the Srcx data object.
  */
 class TaskAnnotationTest :
     BehaviorSpec({
