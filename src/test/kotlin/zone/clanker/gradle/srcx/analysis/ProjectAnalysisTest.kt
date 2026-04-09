@@ -17,6 +17,38 @@ class ProjectAnalysisTest :
                 deleteOnExit()
             }
 
+        fun hubResult(
+            name: String,
+            dependentNames: List<String> = emptyList(),
+        ): HubResult {
+            val source =
+                SourceFileMetadata(
+                    file = File("/tmp/$name.kt"),
+                    packageName = "com.example",
+                    qualifiedName = "com.example.$name",
+                    simpleName = name,
+                    imports = emptyList(),
+                    annotations = emptyList(),
+                    supertypes = emptyList(),
+                    isInterface = false,
+                    isAbstract = false,
+                    isObject = false,
+                    isDataClass = false,
+                    language = SourceFileMetadata.Language.KOTLIN,
+                    lineCount = 50,
+                    methods = emptyList(),
+                )
+            val deps =
+                dependentNames.map { depName ->
+                    HubDependent(depName, "com/example/$depName.kt", 1)
+                }
+            return HubResult(
+                ClassifiedComponent(source, ComponentRole.OTHER, "(root)"),
+                deps.size,
+                deps,
+            )
+        }
+
         given("analyzeProject") {
 
             `when`("analyzing a project with classes") {
@@ -128,7 +160,11 @@ class ProjectAnalysisTest :
                                     "Add BarTest",
                                 ),
                             ),
-                        hubs = listOf("Core" to 5, "Repo" to 3),
+                        hubs =
+                            listOf(
+                                hubResult("Core", listOf("A", "B")),
+                                hubResult("Repo", listOf("X")),
+                            ),
                         roles =
                             mapOf(
                                 "Core" to ComponentRole.SERVICE,
@@ -147,12 +183,15 @@ class ProjectAnalysisTest :
                     summary.findings[1].severity shouldBe FindingSeverity.INFO
                 }
 
-                then("hubs are converted with roles") {
+                then("hubs are converted with roles and dependents") {
                     summary.hubs.size shouldBe 2
                     summary.hubs[0].name shouldBe "Core"
-                    summary.hubs[0].dependents shouldBe 5
+                    summary.hubs[0].dependentCount shouldBe 2
                     summary.hubs[0].role shouldBe "service"
+                    summary.hubs[0].dependents.map { it.name } shouldBe listOf("A", "B")
+                    summary.hubs[0].filePath shouldBe "com/example/Core.kt"
                     summary.hubs[1].role shouldBe "repository"
+                    summary.hubs[1].dependents.map { it.name } shouldBe listOf("X")
                 }
 
                 then("cycles are preserved") {
@@ -165,7 +204,7 @@ class ProjectAnalysisTest :
                 val analysis =
                     ProjectAnalysis(
                         antiPatterns = emptyList(),
-                        hubs = listOf("Foo" to 1),
+                        hubs = listOf(hubResult("Foo")),
                         roles = mapOf("Foo" to ComponentRole.OTHER),
                         cycles = emptyList(),
                     )

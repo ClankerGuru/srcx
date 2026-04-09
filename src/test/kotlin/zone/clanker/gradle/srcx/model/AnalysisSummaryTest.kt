@@ -2,6 +2,7 @@ package zone.clanker.gradle.srcx.model
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import zone.clanker.gradle.srcx.model.HubDependentRef
 
 class AnalysisSummaryTest :
     BehaviorSpec({
@@ -24,7 +25,7 @@ class AnalysisSummaryTest :
 
                 then("it holds the data") {
                     hub.name shouldBe "Core"
-                    hub.dependents shouldBe 5
+                    hub.dependentCount shouldBe 5
                     hub.role shouldBe "service"
                 }
             }
@@ -34,6 +35,27 @@ class AnalysisSummaryTest :
 
                 then("role is empty") {
                     hub.role shouldBe ""
+                }
+            }
+
+            `when`("created with dependent details") {
+                val hub =
+                    HubClass(
+                        "Core", 2, "service",
+                        "com/example/Core.kt", 10,
+                        listOf(
+                            HubDependentRef("A", "com/example/A.kt", 5),
+                            HubDependentRef("B", "com/example/B.kt", 8),
+                        ),
+                    )
+
+                then("it holds dependent details") {
+                    hub.dependents.size shouldBe 2
+                    hub.dependents[0].name shouldBe "A"
+                    hub.dependents[0].filePath shouldBe "com/example/A.kt"
+                    hub.dependents[0].line shouldBe 5
+                    hub.filePath shouldBe "com/example/Core.kt"
+                    hub.line shouldBe 10
                 }
             }
         }

@@ -95,10 +95,10 @@ class DependencyAnalyzerTest :
 
                 then("it identifies the hub") {
                     hubs shouldHaveSize 1
-                    hubs
-                        .first()
-                        .first.source.simpleName shouldBe "Hub"
-                    hubs.first().second shouldBe 3
+                    val hub = hubs.first()
+                    hub.component.source.simpleName shouldBe "Hub"
+                    hub.count shouldBe 3
+                    hub.dependents.map { it.name } shouldBe listOf("A", "B", "C")
                 }
             }
         }

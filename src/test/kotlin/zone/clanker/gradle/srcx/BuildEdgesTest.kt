@@ -12,6 +12,7 @@ import zone.clanker.gradle.srcx.model.DependencyEntry
 import zone.clanker.gradle.srcx.model.ProjectPath
 import zone.clanker.gradle.srcx.model.ProjectSummary
 import zone.clanker.gradle.srcx.report.DashboardRenderer
+import zone.clanker.gradle.srcx.report.ReportWriter
 import java.io.File
 
 class BuildEdgesTest :
@@ -23,8 +24,6 @@ class BuildEdgesTest :
                 mkdirs()
                 deleteOnExit()
             }
-
-        val plugin = Srcx.SettingsPlugin()
 
         given("computeBuildEdges") {
 
@@ -94,7 +93,7 @@ class BuildEdgesTest :
                             ),
                     )
 
-                val edges = plugin.computeBuildEdges(builds, summaries)
+                val edges = ReportWriter.computeBuildEdges(builds, summaries)
 
                 then("it finds cross-build edges") {
                     edges.size shouldBe 3
@@ -138,7 +137,7 @@ class BuildEdgesTest :
                             ),
                     )
 
-                val edges = plugin.computeBuildEdges(builds, summaries)
+                val edges = ReportWriter.computeBuildEdges(builds, summaries)
 
                 then("returns empty") {
                     edges.shouldBeEmpty()
@@ -147,6 +146,7 @@ class BuildEdgesTest :
         }
 
         given("generateClassDiagram") {
+            val plugin = Srcx.SettingsPlugin()
 
             `when`("project has source files with dependencies") {
                 val projectDir = tempDir()
@@ -177,10 +177,14 @@ class BuildEdgesTest :
                         .withProjectDir(projectDir)
                         .build()
                 project.pluginManager.apply("java-library")
-                val extension = Srcx.SettingsExtension()
+                val extension =
+                    project.objects
+                        .newInstance(Srcx.SettingsExtension::class.java)
+                extension.outputDir.convention(Srcx.OUTPUT_DIR)
+                extension.autoGenerate.convention(false)
                 plugin.registerTasks(project, extension)
 
-                val diagram = plugin.generateClassDiagram(project)
+                val diagram = ReportWriter.generateClassDiagram(project)
 
                 then("it produces a mermaid diagram") {
                     diagram shouldContain "Service"
@@ -196,10 +200,14 @@ class BuildEdgesTest :
                         .builder()
                         .withProjectDir(projectDir)
                         .build()
-                val extension = Srcx.SettingsExtension()
+                val extension =
+                    project.objects
+                        .newInstance(Srcx.SettingsExtension::class.java)
+                extension.outputDir.convention(Srcx.OUTPUT_DIR)
+                extension.autoGenerate.convention(false)
                 plugin.registerTasks(project, extension)
 
-                val diagram = plugin.generateClassDiagram(project)
+                val diagram = ReportWriter.generateClassDiagram(project)
 
                 then("it returns empty") {
                     diagram shouldBe ""

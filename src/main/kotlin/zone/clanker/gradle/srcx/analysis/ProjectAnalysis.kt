@@ -12,7 +12,7 @@ import java.io.File
  */
 data class ProjectAnalysis(
     val antiPatterns: List<AntiPattern>,
-    val hubs: List<Pair<String, Int>>,
+    val hubs: List<HubResult>,
     val roles: Map<String, ComponentRole>,
     val cycles: List<List<String>>,
 ) {
@@ -31,11 +31,23 @@ data class ProjectAnalysis(
                 )
             }
         val hubClasses =
-            hubs.map { (name, count) ->
+            hubs.map { hub ->
+                val name = hub.component.source.simpleName
                 val role = roles[name]
                 val roleLabel = if (role != null && role != ComponentRole.OTHER) role.name.lowercase() else ""
-                zone.clanker.gradle.srcx.model
-                    .HubClass(name, count, roleLabel)
+                val depRefs =
+                    hub.dependents.map { dep ->
+                        zone.clanker.gradle.srcx.model
+                            .HubDependentRef(dep.name, dep.filePath, dep.line)
+                    }
+                zone.clanker.gradle.srcx.model.HubClass(
+                    name = name,
+                    dependentCount = hub.count,
+                    role = roleLabel,
+                    filePath = hub.component.source.relativePath,
+                    line = hub.component.source.declarationLine,
+                    dependents = depRefs,
+                )
             }
         return zone.clanker.gradle.srcx.model
             .AnalysisSummary(findings, hubClasses, cycles)
@@ -56,7 +68,7 @@ fun analyzeProject(sourceDirs: List<File>, rootDir: File): ProjectAnalysis {
     val edges = buildDependencyGraph(components)
 
     val antiPatterns = detectAntiPatterns(components, edges, rootDir)
-    val hubs = findHubClasses(components, edges).map { (c, count) -> c.source.simpleName to count }
+    val hubs = findHubClasses(components, edges)
     val roles = components.associate { it.source.simpleName to it.role }
     val cycles = findCycles(edges)
 

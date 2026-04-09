@@ -19,8 +19,6 @@ class SrcxContextCleanTest :
                 deleteOnExit()
             }
 
-        val plugin = Srcx.SettingsPlugin()
-
         given("Srcx constants") {
 
             `when`("accessing new constants") {
@@ -40,10 +38,10 @@ class SrcxContextCleanTest :
                 val outputDir = tempDir()
                 File(outputDir, "sub").mkdirs()
                 File(outputDir, "index.md").writeText("# test")
-                File(outputDir, "sub/symbols.md").writeText("# sub")
+                File(outputDir, "sub/context.md").writeText("# sub")
                 File(outputDir, ".gitignore").writeText("*\n")
 
-                plugin.cleanOutputDir(outputDir)
+                Srcx.cleanOutputDir(outputDir)
 
                 then("the directory is deleted") {
                     outputDir.shouldNotExist()
@@ -54,13 +52,21 @@ class SrcxContextCleanTest :
                 val outputDir = File(tempDir(), "nonexistent")
 
                 then("it prints nothing to clean") {
-                    plugin.cleanOutputDir(outputDir)
+                    Srcx.cleanOutputDir(outputDir)
                 }
             }
         }
 
         given("task registration via ProjectBuilder") {
-            val extension = Srcx.SettingsExtension()
+            val plugin = Srcx.SettingsPlugin()
+            val extension =
+                ProjectBuilder
+                    .builder()
+                    .build()
+                    .objects
+                    .newInstance(Srcx.SettingsExtension::class.java)
+            extension.outputDir.convention(Srcx.OUTPUT_DIR)
+            extension.autoGenerate.convention(false)
 
             `when`("registering tasks") {
                 val projectDir = tempDir()

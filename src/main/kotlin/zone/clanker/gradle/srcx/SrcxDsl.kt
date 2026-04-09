@@ -12,7 +12,7 @@ import org.gradle.api.initialization.Settings
  * }
  *
  * srcx {
- *     outputDir = ".srcx"
+ *     outputDir.set(".srcx")
  * }
  * ```
  *
