@@ -105,15 +105,48 @@ data object Srcx {
             rootProject: Project,
             extension: SettingsExtension,
         ) {
-            rootProject.tasks.register(TASK_CONTEXT, ContextTask::class.java).configure {
-                it.outputDir.convention(extension.outputDir)
+            rootProject.tasks.register(TASK_CONTEXT, ContextTask::class.java).configure { task ->
+                task.outputDir.convention(extension.outputDir)
+                task.outputDirectory.set(
+                    rootProject.layout.projectDirectory.dir(extension.outputDir),
+                )
+                task.sourceFiles.from(
+                    rootProject.provider { collectSourceTrees(rootProject) },
+                )
             }
-            rootProject.tasks.register(TASK_CLEAN, CleanTask::class.java).configure {
-                it.outputDir.convention(extension.outputDir)
+            val cleanTask =
+                rootProject.tasks.register(TASK_CLEAN, CleanTask::class.java).apply {
+                    configure { it.outputDir.convention(extension.outputDir) }
+                }
+            rootProject.plugins.withType(
+                org.gradle.language.base.plugins.LifecycleBasePlugin::class.java,
+            ) {
+                rootProject.tasks.named("clean").configure { it.dependsOn(cleanTask) }
             }
             if (extension.autoGenerate.get()) {
                 wireAutoGenerate(rootProject)
             }
+        }
+
+        private fun collectSourceTrees(rootProject: Project): List<Any> {
+            val trees = mutableListOf<Any>()
+            rootProject.allprojects.forEach { project ->
+                trees.add(
+                    project.fileTree("src").matching {
+                        it.include("**/*.kt", "**/*.java", "**/*.kts")
+                    },
+                )
+                if (project.buildFile.exists()) trees.add(project.buildFile)
+            }
+            rootProject.gradle.includedBuilds.forEach { build ->
+                trees.add(
+                    rootProject.fileTree(build.projectDir).matching {
+                        it.include("**/src/**/*.kt", "**/src/**/*.java")
+                        it.include("**/build.gradle.kts", "**/build.gradle")
+                    },
+                )
+            }
+            return trees
         }
 
         private fun wireAutoGenerate(rootProject: Project) {

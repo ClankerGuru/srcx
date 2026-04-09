@@ -4,14 +4,19 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import zone.clanker.gradle.srcx.model.AnalysisSummary
 import zone.clanker.gradle.srcx.model.ArtifactGroup
 import zone.clanker.gradle.srcx.model.ArtifactName
 import zone.clanker.gradle.srcx.model.ArtifactVersion
 import zone.clanker.gradle.srcx.model.DependencyEntry
 import zone.clanker.gradle.srcx.model.FilePath
+import zone.clanker.gradle.srcx.model.HubClass
+import zone.clanker.gradle.srcx.model.HubDependentRef
 import zone.clanker.gradle.srcx.model.PackageName
 import zone.clanker.gradle.srcx.model.ProjectPath
 import zone.clanker.gradle.srcx.model.ProjectSummary
+import zone.clanker.gradle.srcx.model.SourceSetName
+import zone.clanker.gradle.srcx.model.SourceSetSummary
 import zone.clanker.gradle.srcx.model.SymbolEntry
 import zone.clanker.gradle.srcx.model.SymbolKind
 import zone.clanker.gradle.srcx.model.SymbolName
@@ -138,25 +143,83 @@ class DashboardRendererTest :
                     output shouldContain "## Overview"
                 }
             }
+
+            `when`("rendering with hub classes and dependent names") {
+                val summaries =
+                    listOf(
+                        ProjectSummary(
+                            projectPath = ProjectPath(":app"),
+                            symbols =
+                                listOf(
+                                    SymbolEntry(
+                                        SymbolName("Core"), SymbolKind.CLASS,
+                                        PackageName("com.example"), FilePath("Core.kt"), 1,
+                                    ),
+                                ),
+                            dependencies = emptyList(),
+                            buildFile = "build.gradle.kts",
+                            sourceDirs = listOf("src/main/kotlin"),
+                            subprojects = emptyList(),
+                            sourceSets =
+                                listOf(
+                                    SourceSetSummary(
+                                        SourceSetName("main"),
+                                        listOf(
+                                            SymbolEntry(
+                                                SymbolName("Core"), SymbolKind.CLASS,
+                                                PackageName("com.example"),
+                                                FilePath("Core.kt"), 1,
+                                            ),
+                                        ),
+                                        listOf("src/main/kotlin"),
+                                    ),
+                                ),
+                            analysis =
+                                AnalysisSummary(
+                                    findings = emptyList(),
+                                    hubs =
+                                        listOf(
+                                            HubClass(
+                                                "Core", 3, "service",
+                                                "com/example/Core.kt", 10,
+                                                listOf(
+                                                    HubDependentRef("A", "com/example/A.kt", 5),
+                                                    HubDependentRef("B", "com/example/B.kt", 8),
+                                                    HubDependentRef("C", "com/example/C.kt", 12),
+                                                ),
+                                            ),
+                                        ),
+                                    cycles = emptyList(),
+                                ),
+                        ),
+                    )
+                val output =
+                    DashboardRenderer("test", summaries, emptyList()).render()
+
+                then("it shows hub with dependents count") {
+                    output shouldContain "(3 dependents)"
+                    output shouldContain "[service]"
+                }
+            }
         }
 
         given("projectReportPath companion function") {
 
             `when`("given root project path") {
-                then("it returns root/symbols.md") {
-                    DashboardRenderer.projectReportPath(":") shouldBe "root/symbols.md"
+                then("it returns root/context.md") {
+                    DashboardRenderer.projectReportPath(":") shouldBe "root/context.md"
                 }
             }
 
             `when`("given a subproject path") {
                 then("it returns the sanitized path") {
-                    DashboardRenderer.projectReportPath(":app") shouldBe "app/symbols.md"
+                    DashboardRenderer.projectReportPath(":app") shouldBe "app/context.md"
                 }
             }
 
             `when`("given a nested subproject path") {
                 then("it returns the full nested path") {
-                    DashboardRenderer.projectReportPath(":lib:core") shouldBe "lib/core/symbols.md"
+                    DashboardRenderer.projectReportPath(":lib:core") shouldBe "lib/core/context.md"
                 }
             }
         }

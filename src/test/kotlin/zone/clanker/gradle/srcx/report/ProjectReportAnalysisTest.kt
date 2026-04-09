@@ -8,6 +8,7 @@ import zone.clanker.gradle.srcx.model.FilePath
 import zone.clanker.gradle.srcx.model.Finding
 import zone.clanker.gradle.srcx.model.FindingSeverity
 import zone.clanker.gradle.srcx.model.HubClass
+import zone.clanker.gradle.srcx.model.HubDependentRef
 import zone.clanker.gradle.srcx.model.PackageName
 import zone.clanker.gradle.srcx.model.ProjectPath
 import zone.clanker.gradle.srcx.model.ProjectSummary
@@ -76,10 +77,12 @@ class ProjectReportAnalysisTest :
 
                 val output = ProjectReportRenderer(summary).render()
 
-                then("it contains hub classes section") {
+                then("it contains hub classes section as tree") {
                     output shouldContain "## Hub Classes"
-                    output shouldContain "| Core (service) | 5 |"
-                    output shouldContain "| Repo (repository) | 3 |"
+                    output shouldContain "**Core** [service]"
+                    output shouldContain "(5 dependents)"
+                    output shouldContain "**Repo** [repository]"
+                    output shouldContain "(3 dependents)"
                 }
 
                 then("it contains findings section") {
@@ -92,6 +95,44 @@ class ProjectReportAnalysisTest :
                 then("it contains cycles section") {
                     output shouldContain "## Circular Dependencies"
                     output shouldContain "A -> B -> A"
+                }
+            }
+
+            `when`("rendering hubs with dependent details") {
+                val summary =
+                    ProjectSummary(
+                        projectPath = ProjectPath(":app"),
+                        symbols = emptyList(),
+                        dependencies = emptyList(),
+                        buildFile = "build.gradle.kts",
+                        sourceDirs = emptyList(),
+                        subprojects = emptyList(),
+                        analysis =
+                            AnalysisSummary(
+                                findings = emptyList(),
+                                hubs =
+                                    listOf(
+                                        HubClass(
+                                            "Core", 3, "service",
+                                            "com/example/Core.kt", 10,
+                                            listOf(
+                                                HubDependentRef("A", "com/example/A.kt", 5),
+                                                HubDependentRef("B", "com/example/B.kt", 8),
+                                                HubDependentRef("C", "com/example/C.kt", 12),
+                                            ),
+                                        ),
+                                    ),
+                                cycles = emptyList(),
+                            ),
+                    )
+
+                val output = ProjectReportRenderer(summary).render()
+
+                then("it shows hub tree with dependent file paths") {
+                    output shouldContain "**Core** [service] — com/example/Core.kt:10"
+                    output shouldContain "  - A — com/example/A.kt:5"
+                    output shouldContain "  - B — com/example/B.kt:8"
+                    output shouldContain "  - C — com/example/C.kt:12"
                 }
             }
 

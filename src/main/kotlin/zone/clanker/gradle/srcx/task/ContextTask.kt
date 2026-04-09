@@ -1,8 +1,14 @@
 package zone.clanker.gradle.srcx.task
 
 import org.gradle.api.DefaultTask
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import zone.clanker.gradle.srcx.Srcx
 import zone.clanker.gradle.srcx.report.DashboardRenderer
@@ -25,11 +31,20 @@ import java.io.File
  * @see CleanTask
  * @see Srcx
  */
-@org.gradle.work.DisableCachingByDefault(because = "Reads source files from disk each run")
+@org.gradle.work.DisableCachingByDefault(because = "Output depends on local file layout")
 abstract class ContextTask : DefaultTask() {
     /** Output directory relative to the root project (e.g. `.srcx`). */
     @get:Input
     abstract val outputDir: Property<String>
+
+    /** All source files that feed into context generation. */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sourceFiles: ConfigurableFileCollection
+
+    /** The output directory where context reports are written. */
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
 
     init {
         group = Srcx.GROUP

@@ -30,7 +30,7 @@ object ReportWriter {
                 .ifEmpty { "root" }
         val reportDir = File(rootProject.projectDir, "$outputDir/$sanitized")
         reportDir.mkdirs()
-        File(reportDir, "symbols.md").writeText(renderer.render())
+        File(reportDir, "context.md").writeText(renderer.render())
     }
 
     /** Write a .gitignore with wildcard to the output directory. */
@@ -72,7 +72,7 @@ object ReportWriter {
                         .ifEmpty { "root" }
                 val reportDir = File(buildOutputDir, sanitized)
                 reportDir.mkdirs()
-                File(reportDir, "symbols.md").writeText(renderer.render())
+                File(reportDir, "context.md").writeText(renderer.render())
             }
 
             val buildRenderer = IncludedBuildRenderer(build.name, summaries)

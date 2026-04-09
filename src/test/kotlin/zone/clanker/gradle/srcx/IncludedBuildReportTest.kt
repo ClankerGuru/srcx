@@ -132,16 +132,16 @@ class IncludedBuildReportTest :
                         .ProjectReportRenderer(summary)
                 val reportDir = File(outputDir, "root")
                 reportDir.mkdirs()
-                File(reportDir, "symbols.md").writeText(reportRenderer.render())
+                File(reportDir, "context.md").writeText(reportRenderer.render())
 
                 then("context.md is created") {
                     File(outputDir, "context.md").shouldExist()
                     File(outputDir, "context.md").readText() shouldContain "# codec"
                 }
 
-                then("root/symbols.md is created") {
-                    File(reportDir, "symbols.md").shouldExist()
-                    File(reportDir, "symbols.md").readText() shouldContain "Codec"
+                then("root/context.md is created") {
+                    File(reportDir, "context.md").shouldExist()
+                    File(reportDir, "context.md").readText() shouldContain "Codec"
                 }
             }
         }

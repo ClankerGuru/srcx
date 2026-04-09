@@ -91,7 +91,7 @@ class SrcxNewTasksTest :
 
                 then("report groups symbols by source set") {
                     projectDir.gradle(Srcx.TASK_CONTEXT).build()
-                    val report = projectDir.resolve(".srcx/app/symbols.md")
+                    val report = projectDir.resolve(".srcx/app/context.md")
                     report.shouldExist()
                     val content = report.readText()
                     content shouldContain "## main"

@@ -38,7 +38,7 @@ class SrcxContextCleanTest :
                 val outputDir = tempDir()
                 File(outputDir, "sub").mkdirs()
                 File(outputDir, "index.md").writeText("# test")
-                File(outputDir, "sub/symbols.md").writeText("# sub")
+                File(outputDir, "sub/context.md").writeText("# sub")
                 File(outputDir, ".gitignore").writeText("*\n")
 
                 Srcx.cleanOutputDir(outputDir)

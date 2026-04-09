@@ -283,11 +283,11 @@ class SrcxSettingsPluginTest :
                 ReportWriter.writeProjectReport(project, summary, Srcx.OUTPUT_DIR)
 
                 then("report file is created") {
-                    File(projectDir, ".srcx/root/symbols.md").shouldExist()
+                    File(projectDir, ".srcx/root/context.md").shouldExist()
                 }
 
                 then("report contains project path") {
-                    val content = File(projectDir, ".srcx/root/symbols.md").readText()
+                    val content = File(projectDir, ".srcx/root/context.md").readText()
                     content shouldContain "# :"
                 }
             }
@@ -436,7 +436,7 @@ class SrcxSettingsPluginTest :
                 then("executing srcx-context produces symbols and context") {
                     val task = project.tasks.getByName(Srcx.TASK_CONTEXT)
                     task.actions.forEach { it.execute(task) }
-                    File(projectDir, ".srcx/root/symbols.md").shouldExist()
+                    File(projectDir, ".srcx/root/context.md").shouldExist()
                     File(projectDir, ".srcx/.gitignore").shouldExist()
                     File(projectDir, ".srcx/context.md").shouldExist()
                 }

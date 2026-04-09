@@ -19,16 +19,35 @@ data class Finding(
 )
 
 /**
- * A hub class with its inbound dependency count.
+ * A class that depends on a hub class.
  *
  * @property name simple class name
- * @property dependents number of classes that depend on this
+ * @property filePath relative file path (e.g. "com/example/Foo.kt")
+ * @property line declaration line number
+ */
+data class HubDependentRef(
+    val name: String,
+    val filePath: String,
+    val line: Int,
+)
+
+/**
+ * A hub class with its inbound dependency count and dependent details.
+ *
+ * @property name simple class name
+ * @property dependentCount number of classes that depend on this
  * @property role architectural role label (e.g. "service", "repository")
+ * @property filePath relative file path of the hub class
+ * @property line declaration line number of the hub class
+ * @property dependents details of classes that depend on this hub
  */
 data class HubClass(
     val name: String,
-    val dependents: Int,
+    val dependentCount: Int,
     val role: String,
+    val filePath: String = "",
+    val line: Int = 0,
+    val dependents: List<HubDependentRef> = emptyList(),
 )
 
 /**

@@ -55,12 +55,29 @@ data class SourceFileMetadata(
     val language: Language,
     val lineCount: Int,
     val methods: List<String>,
+    val declarationLine: Int = 1,
 ) {
     /** Source file language. */
     enum class Language { KOTLIN, JAVA }
+
+    /** File path derived from package structure, e.g. "com/example/Foo.kt". */
+    val relativePath: String
+        get() {
+            val pkgPath = packageName.replace('.', '/')
+            return if (pkgPath.isEmpty()) file.name else "$pkgPath/${file.name}"
+        }
 }
 
 private val PLATFORM_PREFIXES = listOf("java.", "javax.", "kotlin.", "kotlinx.")
+
+/** Count newlines in [text] up to [offset] to get a 1-based line number. */
+private fun lineOfOffset(text: String, offset: Int): Int {
+    var count = 0
+    for (i in 0 until offset.coerceAtMost(text.length)) {
+        if (text[i] == '\n') count++
+    }
+    return count + 1
+}
 
 /**
  * Parse a Kotlin or Java source file into [SourceFileMetadata] using PSI.
@@ -95,9 +112,11 @@ private data class KtTypeInfo(
     val isAbstract: Boolean,
     val isObject: Boolean,
     val isDataClass: Boolean,
+    val declarationLine: Int,
 )
 
 private fun resolveKtTypeInfo(ktFile: KtFile, fallbackName: String): KtTypeInfo {
+    val text = ktFile.text
     val firstClass = ktFile.collectDescendantsOfType<KtClass>().firstOrNull()
     if (firstClass != null) {
         return KtTypeInfo(
@@ -108,6 +127,7 @@ private fun resolveKtTypeInfo(ktFile: KtFile, fallbackName: String): KtTypeInfo 
             isAbstract = firstClass.hasModifier(KtTokens.ABSTRACT_KEYWORD),
             isObject = false,
             isDataClass = firstClass.isData(),
+            declarationLine = lineOfOffset(text, firstClass.textOffset),
         )
     }
     val firstObject = ktFile.collectDescendantsOfType<KtObjectDeclaration>().firstOrNull { !it.isCompanion() }
@@ -120,6 +140,7 @@ private fun resolveKtTypeInfo(ktFile: KtFile, fallbackName: String): KtTypeInfo 
             isAbstract = false,
             isObject = true,
             isDataClass = false,
+            declarationLine = lineOfOffset(text, firstObject.textOffset),
         )
     }
     return KtTypeInfo(
@@ -130,6 +151,7 @@ private fun resolveKtTypeInfo(ktFile: KtFile, fallbackName: String): KtTypeInfo 
         isAbstract = false,
         isObject = false,
         isDataClass = false,
+        declarationLine = 1,
     )
 }
 
@@ -162,6 +184,7 @@ private fun parseKotlinFile(file: File, psiManager: PsiManager): SourceFileMetad
         language = SourceFileMetadata.Language.KOTLIN,
         lineCount = countCodeLines(file.readLines()),
         methods = methods,
+        declarationLine = info.declarationLine,
     )
 }
 
@@ -180,6 +203,7 @@ private data class JavaTypeInfo(
     val isInterface: Boolean,
     val isAbstract: Boolean,
     val methods: List<String>,
+    val declarationLine: Int,
 )
 
 private fun resolveJavaTypeInfo(javaFile: PsiJavaFile, fallbackName: String): JavaTypeInfo {
@@ -192,6 +216,7 @@ private fun resolveJavaTypeInfo(javaFile: PsiJavaFile, fallbackName: String): Ja
                 isInterface = false,
                 isAbstract = false,
                 methods = emptyList(),
+                declarationLine = 1,
             )
     val superList = mutableListOf<String>()
     cls.extendsList?.referenceElements?.forEach { ref ->
@@ -200,6 +225,7 @@ private fun resolveJavaTypeInfo(javaFile: PsiJavaFile, fallbackName: String): Ja
     cls.implementsList?.referenceElements?.forEach { ref ->
         ref.referenceName?.let { superList.add(it) }
     }
+    val text = javaFile.text
     return JavaTypeInfo(
         className = cls.name ?: fallbackName,
         annotations = cls.annotations.mapNotNull { it.qualifiedName?.substringAfterLast('.') },
@@ -207,6 +233,7 @@ private fun resolveJavaTypeInfo(javaFile: PsiJavaFile, fallbackName: String): Ja
         isInterface = cls.isInterface,
         isAbstract = cls.hasModifierProperty(PsiModifier.ABSTRACT),
         methods = cls.methods.mapNotNull(PsiMethod::getName),
+        declarationLine = lineOfOffset(text, cls.textOffset),
     )
 }
 
@@ -240,6 +267,7 @@ private fun parseJavaFile(file: File, psiManager: PsiManager): SourceFileMetadat
         language = SourceFileMetadata.Language.JAVA,
         lineCount = countCodeLines(file.readLines()),
         methods = info.methods,
+        declarationLine = info.declarationLine,
     )
 }
 
