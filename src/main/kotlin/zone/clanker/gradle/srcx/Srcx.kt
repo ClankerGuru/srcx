@@ -105,15 +105,18 @@ data object Srcx {
             rootProject: Project,
             extension: SettingsExtension,
         ) {
-            rootProject.tasks.register(TASK_CONTEXT, ContextTask::class.java).configure { task ->
-                task.outputDir.convention(extension.outputDir)
-                task.outputDirectory.set(
-                    rootProject.layout.projectDirectory.dir(extension.outputDir),
-                )
-                task.sourceFiles.from(
-                    rootProject.provider { collectSourceTrees(rootProject) },
-                )
-            }
+            val contextTask =
+                rootProject.tasks.register(TASK_CONTEXT, ContextTask::class.java).apply {
+                    configure { task ->
+                        task.outputDir.convention(extension.outputDir)
+                        task.outputDirectory.set(
+                            rootProject.layout.projectDirectory.dir(extension.outputDir),
+                        )
+                        task.sourceFiles.from(
+                            rootProject.provider { collectSourceTrees(rootProject) },
+                        )
+                    }
+                }
             val cleanTask =
                 rootProject.tasks.register(TASK_CLEAN, CleanTask::class.java).apply {
                     configure { it.outputDir.convention(extension.outputDir) }
@@ -124,7 +127,7 @@ data object Srcx {
                 rootProject.tasks.named("clean").configure { it.dependsOn(cleanTask) }
             }
             if (extension.autoGenerate.get()) {
-                wireAutoGenerate(rootProject)
+                wireAutoGenerate(rootProject, contextTask)
             }
         }
 
@@ -149,13 +152,16 @@ data object Srcx {
             return trees
         }
 
-        private fun wireAutoGenerate(rootProject: Project) {
+        private fun wireAutoGenerate(
+            rootProject: Project,
+            contextTask: org.gradle.api.tasks.TaskProvider<ContextTask>,
+        ) {
             rootProject.allprojects { project ->
                 project.tasks.whenTaskAdded { task ->
                     if (task.name.startsWith("compile") &&
                         (task.name.endsWith("Kotlin") || task.name.endsWith("Java"))
                     ) {
-                        task.finalizedBy(TASK_CONTEXT)
+                        task.finalizedBy(contextTask)
                     }
                 }
             }

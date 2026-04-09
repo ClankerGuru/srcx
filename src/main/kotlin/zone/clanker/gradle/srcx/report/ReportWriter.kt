@@ -15,6 +15,8 @@ import java.util.concurrent.TimeUnit
  */
 object ReportWriter {
     private const val THREAD_POOL_SIZE = 4
+    private const val TASK_TIMEOUT_MINUTES = 10L
+    private const val SHUTDOWN_TIMEOUT_SECONDS = 30L
 
     /** Write a per-project symbol report to the output directory. */
     internal fun writeProjectReport(
@@ -163,11 +165,14 @@ object ReportWriter {
                     },
                 )
             }
-        val results = futures.map { it.get() }
+        val results =
+            runCatching { futures.map { it.get(TASK_TIMEOUT_MINUTES, TimeUnit.MINUTES) } }
         pool.shutdown()
-        runCatching { pool.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS) }
-        results.forEach { println(it) }
-        val failed = results.count { it.startsWith("FAIL") }
+        runCatching { pool.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
+        if (!pool.isTerminated) pool.shutdownNow()
+        val output = results.getOrThrow()
+        output.forEach { println(it) }
+        val failed = output.count { it.startsWith("FAIL") }
         println("srcx: symbols complete -- ${projects.size} projects, $failed failed")
         if (failed > 0) error("srcx: $failed project(s) failed during generation")
     }

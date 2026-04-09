@@ -78,7 +78,9 @@ abstract class ContextTask : DefaultTask() {
         val summaries = projects.map { SymbolExtractor.extractProjectSummary(it, rootProject) }
         val includedBuildRefs =
             includedBuilds.map { build ->
-                val relPath = build.projectDir.relativeTo(rootProject.projectDir).path
+                val relPath =
+                    build.projectDir.relativeToOrNull(rootProject.projectDir)?.path
+                        ?: build.projectDir.absolutePath
                 DashboardRenderer.IncludedBuildRef(build.name, relPath)
             }
         val includedBuildSummaries = ReportWriter.collectIncludedBuildSummaries(includedBuilds)
