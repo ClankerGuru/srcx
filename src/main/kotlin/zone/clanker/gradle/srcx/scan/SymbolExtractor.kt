@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import zone.clanker.gradle.srcx.Srcx
 import zone.clanker.gradle.srcx.analysis.analyzeProject
 import zone.clanker.gradle.srcx.model.ArtifactGroup
 import zone.clanker.gradle.srcx.model.ArtifactName
@@ -33,11 +34,9 @@ import java.io.File
  * and dependencies from build files or the Gradle configuration API.
  */
 object SymbolExtractor {
-    /** Dependency scope names recognised in build files. */
-    private val DEP_SCOPES =
-        setOf(
-            "api", "implementation", "compileOnly", "runtimeOnly", "testImplementation",
-        )
+    /** Dependency scopes excluded from scanning by default. */
+    internal val DEFAULT_EXCLUDED_DEP_SCOPES =
+        Srcx.DEFAULT_EXCLUDED_DEP_SCOPES
 
     /** Minimum number of colon-separated parts in a Maven coordinate (group:artifact:version). */
     private const val MIN_COORDINATE_PARTS = 3
@@ -110,7 +109,7 @@ object SymbolExtractor {
                     .map { it.relativeTo(project.projectDir).path }
             }
 
-        val dependencies = extractDependencies(project)
+        val dependencies = extractDependenciesFromProject(project)
         val buildFileName = ProjectScanner.buildFileName(project)
         val subprojectPaths =
             if (project == rootProject) {
@@ -244,8 +243,15 @@ object SymbolExtractor {
         )
     }
 
+    /** Known scopes for PSI-based build file parsing (no Gradle API available). */
+    private val PSI_DEP_SCOPES =
+        setOf("api", "implementation", "compileOnly", "runtimeOnly", "testImplementation")
+
     /** Extract dependencies from a build file by parsing dependency declarations with PSI. */
-    internal fun extractDependenciesFromBuildFile(projectDir: File): List<DependencyEntry> {
+    internal fun extractDependenciesFromBuildFile(
+        projectDir: File,
+        scopes: Set<String> = PSI_DEP_SCOPES,
+    ): List<DependencyEntry> {
         val buildFile =
             File(projectDir, "build.gradle.kts").takeIf { it.exists() }
                 ?: File(projectDir, "build.gradle").takeIf { it.exists() }
@@ -257,7 +263,7 @@ object SymbolExtractor {
 
             ktFile
                 .collectDescendantsOfType<KtCallExpression>()
-                .filter { call -> call.calleeExpression?.text in DEP_SCOPES }
+                .filter { call -> call.calleeExpression?.text in scopes }
                 .mapNotNull { call ->
                     val scope = call.calleeExpression?.text ?: return@mapNotNull null
                     val arg =
@@ -278,15 +284,14 @@ object SymbolExtractor {
         }
     }
 
-    /** Extract dependencies from a Gradle project's configurations. Call at configuration time. */
-    internal fun extractDependenciesFromProject(project: Project): List<DependencyEntry> =
-        extractDependencies(project)
-
-    private fun extractDependencies(project: Project): List<DependencyEntry> {
+    /** Extract dependencies from all project configurations, excluding specified scopes. */
+    internal fun extractDependenciesFromProject(
+        project: Project,
+        excludeScopes: Set<String> = DEFAULT_EXCLUDED_DEP_SCOPES,
+    ): List<DependencyEntry> {
         val results = mutableListOf<DependencyEntry>()
-        val scopes = listOf("api", "implementation", "compileOnly", "runtimeOnly", "testImplementation")
-        for (scope in scopes) {
-            val config = project.configurations.findByName(scope) ?: continue
+        for (config in project.configurations) {
+            if (config.name in excludeScopes) continue
             config.dependencies.forEach { dep ->
                 if (dep.group != null) {
                     results.add(
@@ -294,12 +299,12 @@ object SymbolExtractor {
                             group = ArtifactGroup(dep.group.orEmpty()),
                             artifact = ArtifactName(dep.name),
                             version = ArtifactVersion(dep.version ?: "unspecified"),
-                            scope = scope,
+                            scope = config.name,
                         ),
                     )
                 }
             }
         }
-        return results
+        return results.distinctBy { "${it.scope}:${it.group}:${it.artifact}" }
     }
 }

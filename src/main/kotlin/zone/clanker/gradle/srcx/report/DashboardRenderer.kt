@@ -46,7 +46,9 @@ internal class DashboardRenderer(
         }
 
     private fun StringBuilder.appendOverview() {
-        val totalSymbols = summaries.sumOf { it.symbols.size }
+        val totalSymbols =
+            summaries.sumOf { it.symbols.size } +
+                includedBuildSummaries.values.sumOf { projects -> projects.sumOf { it.symbols.size } }
         val totalWarnings =
             summaries.sumOf { s ->
                 s.analysis?.findings?.count { it.severity == FindingSeverity.WARNING } ?: 0
@@ -56,9 +58,16 @@ internal class DashboardRenderer(
 
         appendLine("## Overview")
         appendLine()
-        appendLine("- $totalSymbols symbols across ${summaries.size} project(s)")
-        if (totalWarnings > 0) appendLine("- $totalWarnings warning(s)")
-        if (includedBuilds.isNotEmpty()) appendLine("- ${includedBuilds.size} included build(s)")
+        val projectLabel = if (summaries.size == 1) "project" else "projects"
+        appendLine("- $totalSymbols symbols across ${summaries.size} $projectLabel")
+        if (totalWarnings > 0) {
+            val warningLabel = if (totalWarnings == 1) "warning" else "warnings"
+            appendLine("- $totalWarnings $warningLabel")
+        }
+        if (includedBuilds.isNotEmpty()) {
+            val buildLabel = if (includedBuilds.size == 1) "included build" else "included builds"
+            appendLine("- ${includedBuilds.size} $buildLabel")
+        }
         if (subprojects.isNotEmpty()) {
             appendLine("- subprojects: ${subprojects.joinToString(", ")}")
         }
@@ -76,6 +85,7 @@ internal class DashboardRenderer(
         appendLine("| Project | Symbols | Source Sets | Dependencies | Warnings |")
         appendLine("|---------|---------|------------|-------------|----------|")
         for (s in summaries) {
+            if (s.symbols.isEmpty() && s.dependencies.isEmpty() && s.sourceSets.isEmpty()) continue
             val sets = s.sourceSets.joinToString(", ") { it.name.value }.ifEmpty { "-" }
             val warnings = s.analysis?.findings?.count { it.severity == FindingSeverity.WARNING } ?: 0
             appendLine("| ${s.projectPath} | ${s.symbols.size} | $sets | ${s.dependencies.size} | $warnings |")
@@ -105,8 +115,8 @@ internal class DashboardRenderer(
         if (includedBuilds.isEmpty()) return
         appendLine("## Included Builds")
         appendLine()
-        appendLine("| Build | Projects | Symbols | Warnings | Dashboard |")
-        appendLine("|-------|----------|---------|----------|-----------|")
+        appendLine("| Build | Projects | Symbols | Warnings | Context |")
+        appendLine("|-------|----------|---------|----------|---------|")
         for (ref in includedBuilds) {
             val buildSummaries = includedBuildSummaries[ref.name]
             val projectCount = buildSummaries?.size ?: 0
@@ -154,7 +164,8 @@ internal class DashboardRenderer(
             val roleTag = if (hub != null && hub.role.isNotEmpty()) " [${hub.role}]" else ""
             val depTag =
                 if (hub != null && hub.dependentCount > 0) {
-                    " (${hub.dependentCount} dependents)"
+                    val depLabel = if (hub.dependentCount == 1) "dependent" else "dependents"
+                    " (${hub.dependentCount} $depLabel)"
                 } else {
                     ""
                 }
@@ -206,8 +217,9 @@ internal class DashboardRenderer(
                 }
             }
 
-        val warnings = (allFindings + buildFindings).filter { it.second == FindingSeverity.WARNING }
-        val notes = (allFindings + buildFindings).filter { it.second == FindingSeverity.INFO }
+        val combined = (allFindings + buildFindings).distinctBy { it.third.message }
+        val warnings = combined.filter { it.second == FindingSeverity.WARNING }
+        val notes = combined.filter { it.second == FindingSeverity.INFO }
 
         if (warnings.isEmpty() && notes.isEmpty()) return
 

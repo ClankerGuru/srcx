@@ -6,6 +6,7 @@ import org.gradle.api.Project
 import org.gradle.api.initialization.Settings
 import org.gradle.api.logging.Logging
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.SetProperty
 import zone.clanker.gradle.srcx.scan.ProjectScanner
 import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import zone.clanker.gradle.srcx.task.CleanTask
@@ -43,6 +44,22 @@ data object Srcx {
     /** Task: delete the .srcx output directory. */
     const val TASK_CLEAN = "srcx-clean"
 
+    /** Dependency scopes excluded from scanning by default. */
+    val DEFAULT_EXCLUDED_DEP_SCOPES: Set<String> =
+        setOf(
+            "archives",
+            "default",
+            "kotlinBuildToolsApiClasspath",
+            "kotlinCompilerClasspath",
+            "kotlinCompilerPluginClasspath",
+            "kotlinCompilerPluginClasspathMain",
+            "kotlinCompilerPluginClasspathTest",
+            "kotlinKlibCommonizerClasspath",
+            "kotlinNativeCompilerPluginClasspath",
+            "kotlinScriptDef",
+            "kotlinScriptDefExtensions",
+        )
+
     /** Delete an output directory, printing what was removed. */
     fun cleanOutputDir(dir: File) {
         if (dir.exists()) {
@@ -77,6 +94,9 @@ data object Srcx {
 
             /** When true, compileKotlin/compileJava tasks will finalize with srcx-context. */
             abstract val autoGenerate: Property<Boolean>
+
+            /** Dependency scopes to exclude from scanning. All others are discovered automatically. */
+            abstract val excludeDepScopes: SetProperty<String>
         }
 
     /**
@@ -99,6 +119,7 @@ data object Srcx {
             val extension = settings.extensions.create(EXTENSION_NAME, SettingsExtension::class.java)
             extension.outputDir.convention(OUTPUT_DIR)
             extension.autoGenerate.convention(false)
+            extension.excludeDepScopes.convention(DEFAULT_EXCLUDED_DEP_SCOPES)
 
             settings.gradle.rootProject(
                 Action { rootProject ->
@@ -131,10 +152,12 @@ data object Srcx {
                         task.subprojectPaths.set(
                             rootProject.provider { rootProject.subprojects.map { it.path } },
                         )
+                        task.excludeDepScopes.convention(extension.excludeDepScopes)
                         task.projectDeps.set(
                             rootProject.provider {
+                                val excludes = extension.excludeDepScopes.get()
                                 rootProject.allprojects.associate { proj ->
-                                    proj.path to SymbolExtractor.extractDependenciesFromProject(proj)
+                                    proj.path to SymbolExtractor.extractDependenciesFromProject(proj, excludes)
                                 }
                             },
                         )

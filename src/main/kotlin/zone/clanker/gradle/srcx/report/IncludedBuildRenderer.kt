@@ -93,7 +93,8 @@ internal class IncludedBuildRenderer(
                 if (hub != null && hub.role.isNotEmpty()) " [${hub.role}]" else ""
             val depTag =
                 if (hub != null && hub.dependentCount > 0) {
-                    " (${hub.dependentCount} dependents)"
+                    val depLabel = if (hub.dependentCount == 1) "dependent" else "dependents"
+                    " (${hub.dependentCount} $depLabel)"
                 } else {
                     ""
                 }
@@ -124,12 +125,13 @@ internal class IncludedBuildRenderer(
         val roleTag = if (hub.role.isNotEmpty()) " [${hub.role}]" else ""
         val loc =
             if (hub.filePath.isNotEmpty()) " — ${hub.filePath}:${hub.line}" else ""
+        val depLabel = if (hub.dependentCount == 1) "dependent" else "dependents"
         if (hub.dependentCount >= ProjectReportRenderer.SUPER_NODE_THRESHOLD) {
             appendLine(
-                "- **${hub.name}**$roleTag$loc — super node (${hub.dependentCount} dependents)",
+                "- **${hub.name}**$roleTag$loc — super node (${hub.dependentCount} $depLabel)",
             )
         } else {
-            appendLine("- **${hub.name}**$roleTag$loc (${hub.dependentCount} dependents)")
+            appendLine("- **${hub.name}**$roleTag$loc (${hub.dependentCount} $depLabel)")
             for (dep in hub.dependents) {
                 appendLine("  - ${dep.name} — ${dep.filePath}:${dep.line}")
             }
@@ -155,9 +157,9 @@ internal class IncludedBuildRenderer(
 
     private fun StringBuilder.appendProblems() {
         val allFindings =
-            summaries.flatMap { s ->
-                s.analysis?.findings ?: emptyList()
-            }
+            summaries
+                .flatMap { s -> s.analysis?.findings ?: emptyList() }
+                .distinctBy { it.message }
         val warnings = allFindings.filter { it.severity == FindingSeverity.WARNING }
         val notes = allFindings.filter { it.severity == FindingSeverity.INFO }
         val allCycles =

@@ -84,7 +84,7 @@ class DashboardIncludedBuildTest :
                 }
 
                 then("it has the correct table headers") {
-                    output shouldContain "| Build | Projects | Symbols | Warnings | Dashboard |"
+                    output shouldContain "| Build | Projects | Symbols | Warnings | Context |"
                 }
             }
         }
