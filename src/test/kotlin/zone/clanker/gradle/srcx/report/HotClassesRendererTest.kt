@@ -17,6 +17,7 @@ class HotClassesRendererTest :
 
                 then("it shows the header and no-data message") {
                     output shouldContain "# Hub Classes"
+                    output shouldContain "Classes with the most inbound dependencies across the codebase."
                     output shouldContain "No hub classes detected."
                 }
             }
@@ -59,10 +60,12 @@ class HotClassesRendererTest :
                     output shouldContain "| `Util` | util/Util.kt:1 | 2 |  |"
                 }
 
-                then("it shows detail section for hubs with 3+ dependents") {
+                then("it shows tree detail section for hubs with 3+ dependents") {
                     output shouldContain "## ChangeConfig"
-                    output shouldContain "- ChangeReader — workflow/ChangeReader.kt:8"
-                    output shouldContain "- ApplyTask — task/ApplyTask.kt:18"
+                    output shouldContain "model/ChangeConfig.kt:5 \u2014 7 dependents"
+                    output shouldContain "\u251C\u2500\u2500 workflow/ChangeReader.kt:8"
+                    output shouldContain "\u251C\u2500\u2500 task/ApplyTask.kt:18"
+                    output shouldContain "\u2514\u2500\u2500 task/ProposeTask.kt:12"
                 }
 
                 then("it does not show detail section for hubs below threshold") {

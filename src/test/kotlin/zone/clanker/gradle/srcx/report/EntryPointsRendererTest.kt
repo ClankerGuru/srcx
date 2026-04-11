@@ -20,14 +20,14 @@ class EntryPointsRendererTest :
             `when`("rendering with app entry points") {
                 val entryPoints =
                     listOf(
-                        EntryPointsRenderer.EntryPoint("AppController", "com.example.app", "handleRequest"),
+                        EntryPointsRenderer.EntryPoint("AppController", "com.example.app"),
                     )
                 val renderer = EntryPointsRenderer(emptyList(), entryPoints)
                 val output = renderer.render()
 
                 then("it shows app entry points") {
                     output shouldContain "## App Entry Points"
-                    output shouldContain "| `AppController` | com.example.app | handleRequest |"
+                    output shouldContain "| `AppController` | com.example.app |"
                 }
             }
 

@@ -21,7 +21,6 @@ import zone.clanker.gradle.srcx.analysis.buildDependencyGraph
 import zone.clanker.gradle.srcx.analysis.classifyAll
 import zone.clanker.gradle.srcx.analysis.findEntryPoints
 import zone.clanker.gradle.srcx.analysis.generateDependencyDiagram
-import zone.clanker.gradle.srcx.analysis.generateSequenceDiagrams
 import zone.clanker.gradle.srcx.analysis.scanSources
 import zone.clanker.gradle.srcx.model.DependencyEntry
 import zone.clanker.gradle.srcx.model.ProjectSummary
@@ -29,7 +28,6 @@ import zone.clanker.gradle.srcx.report.AntiPatternsRenderer
 import zone.clanker.gradle.srcx.report.CrossBuildRenderer
 import zone.clanker.gradle.srcx.report.DashboardRenderer
 import zone.clanker.gradle.srcx.report.EntryPointsRenderer
-import zone.clanker.gradle.srcx.report.FlowRenderer
 import zone.clanker.gradle.srcx.report.HotClassesRenderer
 import zone.clanker.gradle.srcx.report.InterfacesRenderer
 import zone.clanker.gradle.srcx.report.ReportWriter
@@ -155,7 +153,6 @@ abstract class ContextTask : DefaultTask() {
                 includedBuilds = includedBuildRefs,
                 includedBuildSummaries = includedBuildSummaries,
                 buildEdges = buildEdges,
-                classDiagram = crossBuild.first,
                 crossBuildAnalysis = crossBuildSummary,
             )
         val dir = File(root, outDir)
@@ -202,9 +199,6 @@ abstract class ContextTask : DefaultTask() {
         File(dir, "cross-build.md").writeText(
             CrossBuildRenderer(buildEdges, crossBuildSummary).render(),
         )
-
-        // flows/
-        writeFlowFiles(dir, crossBuild.second)
     }
 
     private fun buildEntryPoints(analysis: ProjectAnalysis?): List<EntryPointsRenderer.EntryPoint> {
@@ -220,31 +214,9 @@ abstract class ContextTask : DefaultTask() {
                 EntryPointsRenderer.EntryPoint(
                     className = ep.source.simpleName,
                     packageName = ep.source.packageName,
-                    firstCall = ep.source.methods.firstOrNull() ?: "",
                 )
             }
         }.getOrDefault(emptyList())
-    }
-
-    private fun writeFlowFiles(dir: File, analysis: ProjectAnalysis?) {
-        if (analysis == null) return
-        val allDirs = collectAllSourceDirs(projectDirs.get(), includedBuildInfos.get())
-        if (allDirs.isEmpty()) return
-        runCatching {
-            val sources = scanSources(allDirs)
-            val components = classifyAll(sources)
-            val depEdges = buildDependencyGraph(components)
-            val diagrams = generateSequenceDiagrams(components, depEdges)
-            val splitDiagrams = FlowRenderer.splitDiagrams(diagrams)
-            if (splitDiagrams.isNotEmpty()) {
-                val flowsDir = File(dir, "flows")
-                flowsDir.mkdirs()
-                for ((name, content) in splitDiagrams) {
-                    val renderer = FlowRenderer(name, content)
-                    File(flowsDir, "$name.md").writeText(renderer.render())
-                }
-            }
-        }
     }
 
     private fun collectIncludedBuildSummaries(

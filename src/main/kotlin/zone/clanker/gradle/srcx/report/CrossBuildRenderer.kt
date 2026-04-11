@@ -5,6 +5,9 @@ import zone.clanker.gradle.srcx.model.AnalysisSummary
 /**
  * Renders the cross-build.md file showing cross-build references grouped by build pair.
  *
+ * Shows a tree per hub class with dependents marked by build origin.
+ * External-build dependents are marked with a link icon.
+ *
  * @property buildEdges dependency edges between builds
  * @property crossBuildAnalysis the cross-build analysis results (hubs, findings)
  */
@@ -52,6 +55,21 @@ internal class CrossBuildRenderer(
             appendLine("| `${hub.name}` | ${hub.filePath}:${hub.line} | ${hub.dependentCount} | ${hub.role} |")
         }
         appendLine()
+        for (hub in hubs.filter { it.dependents.isNotEmpty() }) {
+            appendLine("### ${hub.name}")
+            appendLine()
+            appendLine("```")
+            appendLine("${hub.filePath}:${hub.line} \u2014 ${hub.dependentCount} dependents")
+            val deps = hub.dependents
+            for ((index, dep) in deps.withIndex()) {
+                val isLast = index == deps.lastIndex
+                val connector = if (isLast) "\u2514\u2500\u2500" else "\u251C\u2500\u2500"
+                val externalMarker = if (isExternalBuild(dep.filePath, hub.filePath)) " \uD83D\uDD17" else ""
+                appendLine("$connector ${dep.filePath}:${dep.line}$externalMarker")
+            }
+            appendLine("```")
+            appendLine()
+        }
     }
 
     private fun StringBuilder.appendCrossBuildCycles() {
@@ -63,5 +81,17 @@ internal class CrossBuildRenderer(
             appendLine("- ${cycle.joinToString(" -> ")}")
         }
         appendLine()
+    }
+
+    companion object {
+        /**
+         * Determines if a dependent is from a different build than the hub.
+         * Uses path prefix comparison as a heuristic.
+         */
+        internal fun isExternalBuild(dependentPath: String, hubPath: String): Boolean {
+            val depRoot = dependentPath.substringBefore("/")
+            val hubRoot = hubPath.substringBefore("/")
+            return depRoot != hubRoot && depRoot.isNotEmpty() && hubRoot.isNotEmpty()
+        }
     }
 }

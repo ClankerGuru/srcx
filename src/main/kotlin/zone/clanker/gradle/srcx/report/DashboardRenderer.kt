@@ -18,7 +18,6 @@ internal class DashboardRenderer(
     private val includedBuilds: List<IncludedBuildRef>,
     private val includedBuildSummaries: Map<String, List<ProjectSummary>> = emptyMap(),
     private val buildEdges: List<BuildEdge> = emptyList(),
-    private val classDiagram: String = "",
     private val crossBuildAnalysis: AnalysisSummary? = null,
 ) {
     data class IncludedBuildRef(
@@ -40,7 +39,6 @@ internal class DashboardRenderer(
             appendBuildGraph()
             appendIncludedBuilds()
             appendSplitFileLinks()
-            appendClassGraph()
         }
 
     private fun StringBuilder.appendOverview() {
@@ -54,7 +52,6 @@ internal class DashboardRenderer(
                 } ?: 0
             }
         val subprojects = summaries.flatMap { it.subprojects }.distinct()
-        val packages = summaries.flatMap { s -> s.symbols.map { it.packageName.value } }.distinct().sorted()
 
         appendLine("## Overview")
         appendLine()
@@ -70,9 +67,6 @@ internal class DashboardRenderer(
         }
         if (subprojects.isNotEmpty()) {
             appendLine("- subprojects: ${subprojects.joinToString(", ")}")
-        }
-        if (packages.isNotEmpty()) {
-            appendLine("- packages: ${packages.joinToString(", ")}")
         }
         appendLine()
     }
@@ -137,36 +131,15 @@ internal class DashboardRenderer(
     }
 
     private fun StringBuilder.appendSplitFileLinks() {
-        val hasHubs = crossBuildAnalysis?.hubs?.isNotEmpty() == true
-        val hasFindings =
-            summaries.any { s -> s.analysis?.findings?.isNotEmpty() == true } ||
-                includedBuildSummaries.values.any { projects ->
-                    projects.any { s -> s.analysis?.findings?.isNotEmpty() == true }
-                }
-
-        if (!hasHubs && !hasFindings && buildEdges.isEmpty()) return
-
         appendLine("## Details")
         appendLine()
-        if (hasHubs) {
-            appendLine("- [Hub Classes](hub-classes.md)")
-        }
+        appendLine("- [Hub Classes](hub-classes.md)")
         appendLine("- [Entry Points](entry-points.md)")
-        if (hasFindings) {
-            appendLine("- [Anti-Patterns](anti-patterns.md)")
-        }
+        appendLine("- [Anti-Patterns](anti-patterns.md)")
         appendLine("- [Interfaces](interfaces.md)")
         if (buildEdges.isNotEmpty() || crossBuildAnalysis != null) {
             appendLine("- [Cross-Build References](cross-build.md)")
         }
-        appendLine()
-    }
-
-    private fun StringBuilder.appendClassGraph() {
-        if (classDiagram.isBlank()) return
-        appendLine("## Class Dependencies")
-        appendLine()
-        appendLine(classDiagram)
         appendLine()
     }
 

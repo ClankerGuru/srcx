@@ -43,12 +43,14 @@ class InterfacesRendererTest :
                             packageName = "com.example.repo",
                             implementationCount = 2,
                             hasMock = true,
+                            sourceSet = "main",
                         ),
                         InterfacesRenderer.InterfaceInfo(
                             name = "ILogger",
                             packageName = "com.example.log",
                             implementationCount = 1,
                             hasMock = false,
+                            sourceSet = "main",
                         ),
                     )
                 val renderer = InterfacesRenderer(interfaces)

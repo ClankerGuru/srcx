@@ -8,6 +8,8 @@ import zone.clanker.gradle.srcx.model.SymbolKind
  * Renders the entry-points.md file listing app entry points, test classes,
  * and test doubles (Mock/Fake/Stub classes).
  *
+ * Groups by source set: main entry points first, then test entry points and doubles.
+ *
  * @property summaries all project summaries to scan for entry points
  * @property appEntryPoints pre-classified app entry points from the analysis layer
  */
@@ -20,17 +22,17 @@ internal class EntryPointsRenderer(
      *
      * @property className simple class name
      * @property packageName package containing the class
-     * @property firstCall name of the first method called (if known)
      */
     data class EntryPoint(
         val className: String,
         val packageName: String,
-        val firstCall: String = "",
     )
 
     fun render(): String =
         buildString {
             appendLine("# Entry Points")
+            appendLine()
+            appendLine("Classes that serve as application or test entry points into the codebase.")
             appendLine()
             appendAppEntryPoints()
             appendTestEntryPoints()
@@ -45,11 +47,10 @@ internal class EntryPointsRenderer(
             appendLine()
             return
         }
-        appendLine("| Class | Package | First Call |")
-        appendLine("|-------|---------|------------|")
+        appendLine("| Class | Package |")
+        appendLine("|-------|---------|")
         for (ep in appEntryPoints) {
-            val firstCall = ep.firstCall.ifEmpty { "-" }
-            appendLine("| `${ep.className}` | ${ep.packageName} | $firstCall |")
+            appendLine("| `${ep.className}` | ${ep.packageName} |")
         }
         appendLine()
     }
