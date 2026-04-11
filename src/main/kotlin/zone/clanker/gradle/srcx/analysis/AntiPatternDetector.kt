@@ -37,7 +37,7 @@ data class AntiPattern(
 }
 
 private val FORBIDDEN_PACKAGE_NAMES =
-    setOf("utils", "helpers", "managers", "common", "misc", "base", "shared")
+    setOf("util", "utils", "helper", "helpers", "manager", "managers", "misc", "base")
 
 /** Detect anti-patterns across the classified components and dependency edges. */
 fun detectAntiPatterns(

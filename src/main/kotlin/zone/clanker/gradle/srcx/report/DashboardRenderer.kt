@@ -1,5 +1,6 @@
 package zone.clanker.gradle.srcx.report
 
+import zone.clanker.gradle.srcx.model.AnalysisSummary
 import zone.clanker.gradle.srcx.model.FindingSeverity
 import zone.clanker.gradle.srcx.model.HubClass
 import zone.clanker.gradle.srcx.model.ProjectSummary
@@ -14,6 +15,7 @@ import zone.clanker.gradle.srcx.model.SymbolKind
  * dependencies, build dependency graph (Mermaid), per-project symbols with roles,
  * included build summaries with links, and a problems section.
  */
+@Suppress("LongParameterList")
 internal class DashboardRenderer(
     private val rootName: String,
     private val summaries: List<ProjectSummary>,
@@ -21,6 +23,7 @@ internal class DashboardRenderer(
     private val includedBuildSummaries: Map<String, List<ProjectSummary>> = emptyMap(),
     private val buildEdges: List<BuildEdge> = emptyList(),
     private val classDiagram: String = "",
+    private val crossBuildAnalysis: AnalysisSummary? = null,
 ) {
     data class IncludedBuildRef(
         val name: String,
@@ -41,6 +44,7 @@ internal class DashboardRenderer(
             appendBuildGraph()
             appendIncludedBuilds()
             appendSymbols()
+            appendCrossBuildHubs()
             appendClassGraph()
             appendProblems()
         }
@@ -202,6 +206,30 @@ internal class DashboardRenderer(
         }
     }
 
+    private fun StringBuilder.appendCrossBuildHubs() {
+        val hubs = crossBuildAnalysis?.hubs ?: return
+        if (hubs.isEmpty()) return
+        appendLine("## Hot Classes (cross-build)")
+        appendLine()
+        appendLine("| Class | File | Dependents | Role |")
+        appendLine("|-------|------|------------|------|")
+        for (hub in hubs) {
+            appendLine(
+                "| `${hub.name}` | ${hub.filePath}:${hub.line} " +
+                    "| ${hub.dependentCount} | ${hub.role} |",
+            )
+        }
+        appendLine()
+        for (hub in hubs.filter { it.dependentCount >= HUB_DETAIL_THRESHOLD }) {
+            appendLine("### ${hub.name}")
+            appendLine()
+            for (dep in hub.dependents) {
+                appendLine("- ${dep.name} — ${dep.filePath}:${dep.line}")
+            }
+            appendLine()
+        }
+    }
+
     private fun StringBuilder.appendClassGraph() {
         if (classDiagram.isBlank()) return
         appendLine("## Class Dependencies")
@@ -260,6 +288,8 @@ internal class DashboardRenderer(
     }
 
     companion object {
+        private const val HUB_DETAIL_THRESHOLD = 3
+
         fun projectReportPath(projectPath: String): String {
             val sanitized = projectPath.replace(":", "/").trimStart('/')
             return if (sanitized.isEmpty()) "root/context.md" else "$sanitized/context.md"

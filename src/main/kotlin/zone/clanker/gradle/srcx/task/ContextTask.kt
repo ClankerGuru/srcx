@@ -15,6 +15,8 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import zone.clanker.gradle.srcx.Srcx
+import zone.clanker.gradle.srcx.analysis.ProjectAnalysis
+import zone.clanker.gradle.srcx.analysis.analyzeProject
 import zone.clanker.gradle.srcx.analysis.buildDependencyGraph
 import zone.clanker.gradle.srcx.analysis.classifyAll
 import zone.clanker.gradle.srcx.analysis.generateDependencyDiagram
@@ -128,7 +130,7 @@ abstract class ContextTask : DefaultTask() {
         val includedBuildSummaries = collectIncludedBuildSummaries(builds)
         val buildPairs = builds.map { it.name to it.dir }
         val buildEdges = ReportWriter.computeBuildEdges(buildPairs, includedBuildSummaries)
-        val classDiagram = generateClassDiagram(projects)
+        val crossBuild = analyzeCrossBuild(projects, builds, root)
         val renderer =
             DashboardRenderer(
                 rootName = rootName.get(),
@@ -136,7 +138,8 @@ abstract class ContextTask : DefaultTask() {
                 includedBuilds = includedBuildRefs,
                 includedBuildSummaries = includedBuildSummaries,
                 buildEdges = buildEdges,
-                classDiagram = classDiagram,
+                classDiagram = crossBuild.first,
+                crossBuildAnalysis = crossBuild.second?.toSummary(),
             )
         val dir = File(root, outDir)
         dir.mkdirs()
@@ -155,25 +158,44 @@ abstract class ContextTask : DefaultTask() {
                 }
         }
 
-    private fun generateClassDiagram(projects: Map<String, File>): String {
-        val allDirs =
-            projects.values
-                .flatMap { projectDir ->
-                    ProjectScanner
-                        .discoverSourceSets(projectDir)
-                        .flatMap { ss ->
-                            ProjectScanner.sourceSetDirs(projectDir, ss.value)
-                        }
-                }.filter { it.exists() }
-        if (allDirs.isEmpty()) return ""
+    private fun analyzeCrossBuild(
+        projects: Map<String, File>,
+        builds: List<IncludedBuildInfo>,
+        rootDir: File,
+    ): Pair<String, ProjectAnalysis?> {
+        val allDirs = collectAllSourceDirs(projects, builds)
+        if (allDirs.isEmpty()) return "" to null
         return runCatching {
+            val analysis = analyzeProject(allDirs, rootDir)
             val sources = scanSources(allDirs)
             val components = classifyAll(sources)
             val depEdges = buildDependencyGraph(components)
-            generateDependencyDiagram(components, depEdges)
+            val diagram = generateDependencyDiagram(components, depEdges)
+            diagram to analysis
         }.onFailure { e ->
-            logger.warn("srcx: class diagram generation failed: ${e.message}")
-        }.getOrDefault("")
+            logger.warn("srcx: cross-build analysis failed: ${e.message}")
+        }.getOrDefault("" to null)
+    }
+
+    private fun collectAllSourceDirs(
+        projects: Map<String, File>,
+        builds: List<IncludedBuildInfo>,
+    ): List<File> {
+        val rootDirs =
+            projects.values.flatMap { projectDir ->
+                ProjectScanner
+                    .discoverSourceSets(projectDir)
+                    .flatMap { ss -> ProjectScanner.sourceSetDirs(projectDir, ss.value) }
+            }
+        val includedDirs =
+            builds.flatMap { build ->
+                build.projects.flatMap { (_, dir) ->
+                    ProjectScanner
+                        .discoverSourceSets(dir)
+                        .flatMap { ss -> ProjectScanner.sourceSetDirs(dir, ss.value) }
+                }
+            }
+        return (rootDirs + includedDirs).filter { it.exists() }
     }
 }
 
