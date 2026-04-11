@@ -1,4 +1,4 @@
-@file:Suppress("ktlint:standard:filename")
+@file:Suppress("ktlint:standard:filename", "TooManyFunctions")
 
 package zone.clanker.gradle.srcx.analysis
 
@@ -30,10 +30,14 @@ data class AntiPattern(
     enum class Severity(
         val icon: String,
     ) {
-        WARNING("WARNING"),
-        INFO("INFO"),
+        FORBIDDEN("\uD83D\uDEAB"),
+        WARNING("⚠\uFE0F"),
+        INFO("ℹ\uFE0F"),
     }
 }
+
+private val FORBIDDEN_PACKAGE_NAMES =
+    setOf("utils", "helpers", "managers", "common", "misc", "base", "shared")
 
 /** Detect anti-patterns across the classified components and dependency edges. */
 fun detectAntiPatterns(
@@ -45,10 +49,12 @@ fun detectAntiPatterns(
     val patterns = mutableListOf<AntiPattern>()
 
     patterns.addAll(detectSmellClasses(components, rootDir))
+    patterns.addAll(detectForbiddenNames(components, rootDir))
     patterns.addAll(detectSingleImplInterfaces(components, resolver, rootDir))
     patterns.addAll(detectGodClasses(components, rootDir))
     patterns.addAll(detectDeepInheritance(components, resolver, rootDir))
     patterns.addAll(detectCircularDeps(edges))
+    patterns.addAll(detectDependencyInversionViolations(components, resolver, rootDir))
     patterns.addAll(detectMissingTests(components, rootDir))
 
     return patterns.sortedWith(compareBy({ it.severity }, { it.file.path }))
@@ -85,8 +91,15 @@ private fun detectSmellClasses(
         .filter { it.role in setOf(ComponentRole.MANAGER, ComponentRole.HELPER, ComponentRole.UTIL) }
         .map { c ->
             val roleLabel = c.role.name.lowercase()
+            val lastSegment = c.source.packageName.substringAfterLast(".")
+            val severity =
+                if (lastSegment in FORBIDDEN_PACKAGE_NAMES) {
+                    AntiPattern.Severity.FORBIDDEN
+                } else {
+                    AntiPattern.Severity.WARNING
+                }
             AntiPattern(
-                severity = AntiPattern.Severity.WARNING,
+                severity = severity,
                 message = "`${c.source.simpleName}` is a $roleLabel class",
                 file = c.source.file.relativeTo(rootDir),
                 suggestion =
@@ -94,6 +107,109 @@ private fun detectSmellClasses(
                         "closer to where it's used. Consider moving methods to the classes that actually need them.",
             )
         }
+
+@Suppress("UnusedParameter")
+private fun detectForbiddenNames(
+    components: List<ClassifiedComponent>,
+    rootDir: File,
+): List<AntiPattern> {
+    val patterns = mutableListOf<AntiPattern>()
+
+    // Detect classes in forbidden-named packages
+    val inForbiddenPackages =
+        components.filter { c ->
+            val lastSegment = c.source.packageName.substringAfterLast(".")
+            lastSegment in FORBIDDEN_PACKAGE_NAMES
+        }
+    val packageGroups = inForbiddenPackages.groupBy { it.source.packageName }
+    for ((pkg, _) in packageGroups) {
+        val lastSegment = pkg.substringAfterLast(".")
+        patterns.add(
+            AntiPattern(
+                severity = AntiPattern.Severity.FORBIDDEN,
+                message = "Package `$pkg` uses forbidden name `$lastSegment`",
+                file = File("."),
+                suggestion =
+                    "Rename the package to describe what it actually does " +
+                        "instead of using a generic catch-all name.",
+            ),
+        )
+    }
+
+    return patterns
+}
+
+private fun detectDependencyInversionViolations(
+    components: List<ClassifiedComponent>,
+    resolver: SupertypeResolver,
+    rootDir: File,
+): List<AntiPattern> {
+    val nonTestComponents =
+        components.filter { c ->
+            !c.source.file.path
+                .contains("/test/") &&
+                !c.source.file.path
+                    .contains("\\test\\") &&
+                !c.source.isInterface
+        }
+
+    val patterns = mutableListOf<AntiPattern>()
+
+    nonTestComponents.forEach { c ->
+        patterns.addAll(checkImportsForDiViolations(c, resolver, rootDir))
+    }
+
+    return patterns.distinctBy { it.message }
+}
+
+private fun checkImportsForDiViolations(
+    c: ClassifiedComponent,
+    resolver: SupertypeResolver,
+    rootDir: File,
+): List<AntiPattern> =
+    c.source.imports.mapNotNull { importedFqn ->
+        val importedSimpleName = importedFqn.substringAfterLast(".")
+        val resolved = resolver.resolve(c, importedSimpleName) ?: return@mapNotNull null
+        val isAbstraction = resolved.source.isInterface || resolved.source.isAbstract || resolved.source.isDataClass
+        if (isAbstraction) return@mapNotNull null
+        buildDiViolationPattern(c, resolved, resolver, rootDir)
+    }
+
+private fun buildDiViolationPattern(
+    c: ClassifiedComponent,
+    resolved: ClassifiedComponent,
+    resolver: SupertypeResolver,
+    rootDir: File,
+): AntiPattern {
+    val implementedInterfaces =
+        resolved.source.supertypes
+            .mapNotNull { supertype ->
+                resolver.resolve(resolved, supertype)
+            }.filter { it.source.isInterface }
+
+    return if (implementedInterfaces.isNotEmpty()) {
+        val ifaceName = implementedInterfaces.first().source.simpleName
+        AntiPattern(
+            severity = AntiPattern.Severity.WARNING,
+            message =
+                "Constructor takes concrete `${resolved.source.simpleName}` " +
+                    "instead of interface `$ifaceName`",
+            file = c.source.file.relativeTo(rootDir),
+            suggestion =
+                "Depend on the interface `$ifaceName` instead of the concrete class " +
+                    "to improve testability and flexibility.",
+        )
+    } else {
+        AntiPattern(
+            severity = AntiPattern.Severity.INFO,
+            message =
+                "Dependency on concrete class `${resolved.source.simpleName}` " +
+                    "in `${c.source.simpleName}`",
+            file = c.source.file.relativeTo(rootDir),
+            suggestion = "Consider extracting an interface for `${resolved.source.simpleName}`.",
+        )
+    }
+}
 
 private fun detectSingleImplInterfaces(
     components: List<ClassifiedComponent>,

@@ -23,6 +23,7 @@ data class ProjectAnalysis(
                 zone.clanker.gradle.srcx.model.Finding(
                     severity =
                         when (ap.severity) {
+                            AntiPattern.Severity.FORBIDDEN -> zone.clanker.gradle.srcx.model.FindingSeverity.FORBIDDEN
                             AntiPattern.Severity.WARNING -> zone.clanker.gradle.srcx.model.FindingSeverity.WARNING
                             AntiPattern.Severity.INFO -> zone.clanker.gradle.srcx.model.FindingSeverity.INFO
                         },

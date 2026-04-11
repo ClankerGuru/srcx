@@ -3,7 +3,13 @@ package zone.clanker.gradle.srcx.model
 /**
  * Severity level of an analysis finding.
  */
-enum class FindingSeverity { WARNING, INFO }
+enum class FindingSeverity(
+    val icon: String,
+) {
+    FORBIDDEN("\uD83D\uDEAB"),
+    WARNING("⚠\uFE0F"),
+    INFO("ℹ\uFE0F"),
+}
 
 /**
  * A single finding from code analysis.

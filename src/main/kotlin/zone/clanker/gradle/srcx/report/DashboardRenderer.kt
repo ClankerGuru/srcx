@@ -51,7 +51,9 @@ internal class DashboardRenderer(
                 includedBuildSummaries.values.sumOf { projects -> projects.sumOf { it.symbols.size } }
         val totalWarnings =
             summaries.sumOf { s ->
-                s.analysis?.findings?.count { it.severity == FindingSeverity.WARNING } ?: 0
+                s.analysis?.findings?.count {
+                    it.severity == FindingSeverity.WARNING || it.severity == FindingSeverity.FORBIDDEN
+                } ?: 0
             }
         val subprojects = summaries.flatMap { it.subprojects }.distinct()
         val packages = summaries.flatMap { s -> s.symbols.map { it.packageName.value } }.distinct().sorted()
@@ -87,7 +89,10 @@ internal class DashboardRenderer(
         for (s in summaries) {
             if (s.symbols.isEmpty() && s.dependencies.isEmpty() && s.sourceSets.isEmpty()) continue
             val sets = s.sourceSets.joinToString(", ") { it.name.value }.ifEmpty { "-" }
-            val warnings = s.analysis?.findings?.count { it.severity == FindingSeverity.WARNING } ?: 0
+            val warnings =
+                s.analysis?.findings?.count {
+                    it.severity == FindingSeverity.WARNING || it.severity == FindingSeverity.FORBIDDEN
+                } ?: 0
             appendLine("| ${s.projectPath} | ${s.symbols.size} | $sets | ${s.dependencies.size} | $warnings |")
         }
         appendLine()
@@ -123,7 +128,9 @@ internal class DashboardRenderer(
             val symbolCount = buildSummaries?.sumOf { it.symbols.size } ?: 0
             val warningCount =
                 buildSummaries?.sumOf { s ->
-                    s.analysis?.findings?.count { it.severity == FindingSeverity.WARNING } ?: 0
+                    s.analysis?.findings?.count {
+                        it.severity == FindingSeverity.WARNING || it.severity == FindingSeverity.FORBIDDEN
+                    } ?: 0
                 } ?: 0
             val link = "${ref.relativePath}/.srcx/context.md"
             appendLine("| ${ref.name} | $projectCount | $symbolCount | $warningCount | [view]($link) |")
@@ -218,26 +225,35 @@ internal class DashboardRenderer(
             }
 
         val combined = (allFindings + buildFindings).distinctBy { it.third.message }
+        val forbidden = combined.filter { it.second == FindingSeverity.FORBIDDEN }
         val warnings = combined.filter { it.second == FindingSeverity.WARNING }
         val notes = combined.filter { it.second == FindingSeverity.INFO }
 
-        if (warnings.isEmpty() && notes.isEmpty()) return
+        if (forbidden.isEmpty() && warnings.isEmpty() && notes.isEmpty()) return
 
         appendLine("## Problems")
         appendLine()
+        if (forbidden.isNotEmpty()) {
+            appendLine("### Forbidden")
+            appendLine()
+            for ((source, severity, finding) in forbidden) {
+                appendLine("- ${severity.icon} **$source** — ${finding.message}")
+            }
+            appendLine()
+        }
         if (warnings.isNotEmpty()) {
             appendLine("### Warnings")
             appendLine()
-            for ((source, _, finding) in warnings) {
-                appendLine("- **$source** — ${finding.message}")
+            for ((source, severity, finding) in warnings) {
+                appendLine("- ${severity.icon} **$source** — ${finding.message}")
             }
             appendLine()
         }
         if (notes.isNotEmpty()) {
             appendLine("### Notes")
             appendLine()
-            for ((source, _, finding) in notes) {
-                appendLine("- **$source** — ${finding.message}")
+            for ((source, severity, finding) in notes) {
+                appendLine("- ${severity.icon} **$source** — ${finding.message}")
             }
             appendLine()
         }
