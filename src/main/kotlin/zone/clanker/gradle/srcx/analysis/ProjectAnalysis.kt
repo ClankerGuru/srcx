@@ -65,7 +65,7 @@ fun analyzeProject(
     sourceDirs: List<File>,
     rootDir: File,
     forbiddenPackages: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_PACKAGES,
-    forbiddenClassSuffixes: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_CLASS_SUFFIXES,
+    forbiddenClassPatterns: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_CLASS_PATTERNS,
 ): ProjectAnalysis {
     val sources = scanSources(sourceDirs)
     if (sources.isEmpty()) return ProjectAnalysis(emptyList(), emptyList(), emptyMap(), emptyList())
@@ -73,7 +73,7 @@ fun analyzeProject(
     val components = classifyAll(sources)
     val edges = buildDependencyGraph(components)
 
-    val antiPatterns = detectAntiPatterns(components, edges, rootDir, forbiddenPackages, forbiddenClassSuffixes)
+    val antiPatterns = detectAntiPatterns(components, edges, rootDir, forbiddenPackages, forbiddenClassPatterns)
     val hubs = findHubClasses(components, edges)
     val roles = components.associate { it.source.simpleName to it.role }
     val cycles = findCycles(edges)

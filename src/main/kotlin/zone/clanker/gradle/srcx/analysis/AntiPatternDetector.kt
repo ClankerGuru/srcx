@@ -42,14 +42,14 @@ fun detectAntiPatterns(
     edges: List<ClassDependency>,
     rootDir: File,
     forbiddenPackages: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_PACKAGES,
-    forbiddenClassSuffixes: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_CLASS_SUFFIXES,
+    forbiddenClassPatterns: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_CLASS_PATTERNS,
 ): List<AntiPattern> {
     val resolver = SupertypeResolver(components)
     val patterns = mutableListOf<AntiPattern>()
 
     patterns.addAll(detectSmellClasses(components, rootDir, forbiddenPackages))
     patterns.addAll(detectForbiddenNames(components, rootDir, forbiddenPackages))
-    patterns.addAll(detectForbiddenClassNames(components, rootDir, forbiddenClassSuffixes))
+    patterns.addAll(detectForbiddenClassNames(components, rootDir, forbiddenClassPatterns))
     patterns.addAll(detectSingleImplInterfaces(components, resolver, rootDir))
     patterns.addAll(detectGodClasses(components, rootDir))
     patterns.addAll(detectDeepInheritance(components, resolver, rootDir))
@@ -143,20 +143,20 @@ private fun detectForbiddenNames(
 private fun detectForbiddenClassNames(
     components: List<ClassifiedComponent>,
     rootDir: File,
-    forbiddenSuffixes: Set<String>,
+    forbiddenPatterns: Set<String>,
 ): List<AntiPattern> =
     components
-        .filter { c -> forbiddenSuffixes.any { suffix -> c.source.simpleName.endsWith(suffix) } }
+        .filter { c -> forbiddenPatterns.any { pattern -> c.source.simpleName.contains(pattern) } }
         .filter {
             !it.source.file.path
                 .contains("/test/")
         }.map { c ->
-            val matchedSuffix = forbiddenSuffixes.first { c.source.simpleName.endsWith(it) }
+            val matched = forbiddenPatterns.first { c.source.simpleName.contains(it) }
             AntiPattern(
                 severity = AntiPattern.Severity.WARNING,
-                message = "`${c.source.simpleName}` uses forbidden suffix `$matchedSuffix`",
+                message = "`${c.source.simpleName}` contains forbidden pattern `$matched`",
                 file = c.source.file.relativeTo(rootDir),
-                suggestion = "Rename to describe what the class does instead of using a generic suffix.",
+                suggestion = "Rename to describe what the class does instead of using a generic name.",
             )
         }
 

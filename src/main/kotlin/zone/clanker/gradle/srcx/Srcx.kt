@@ -7,6 +7,7 @@ import org.gradle.api.initialization.Settings
 import org.gradle.api.logging.Logging
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
+import org.gradle.api.tasks.Internal
 import zone.clanker.gradle.srcx.scan.ProjectScanner
 import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import zone.clanker.gradle.srcx.task.CleanTask
@@ -74,20 +75,18 @@ data object Srcx {
     val DEFAULT_FORBIDDEN_PACKAGES: Set<String> =
         setOf("util", "utils", "helper", "helpers", "manager", "managers", "misc", "base")
 
-    val DEFAULT_FORBIDDEN_CLASS_SUFFIXES: Set<String> =
+    val DEFAULT_FORBIDDEN_CLASS_PATTERNS: Set<String> =
         setOf("Helper", "Manager", "Utils", "Util")
 
     /**
      * DSL extension registered as `srcx { }` on the Settings object.
      *
-     * Controls the output directory, auto-generation, and forbidden name patterns.
-     *
      * ```kotlin
      * srcx {
      *     outputDir.set(".srcx")
      *     autoGenerate.set(true)
-     *     forbiddenPackages.add("legacy")
-     *     forbiddenClassSuffixes.add("BaseActivity")
+     *     forbiddenPackages("legacy", "internal", "compat")
+     *     forbiddenClassPatterns("Base", "Impl", "Abstract")
      * }
      * ```
      *
@@ -97,20 +96,23 @@ data object Srcx {
     abstract class SettingsExtension
         @Inject
         constructor() {
-            /** Output directory relative to the root project. */
             abstract val outputDir: Property<String>
-
-            /** When true, compileKotlin/compileJava tasks will finalize with srcx-context. */
             abstract val autoGenerate: Property<Boolean>
-
-            /** Dependency scopes to exclude from scanning. All others are discovered automatically. */
             abstract val excludeDepScopes: SetProperty<String>
 
-            /** Package names to flag as forbidden. Additive on top of defaults. */
-            abstract val forbiddenPackages: SetProperty<String>
+            @get:Internal
+            abstract val forbiddenPackageNames: SetProperty<String>
 
-            /** Class name suffixes to flag as forbidden. Additive on top of defaults. */
-            abstract val forbiddenClassSuffixes: SetProperty<String>
+            @get:Internal
+            abstract val forbiddenClassNamePatterns: SetProperty<String>
+
+            fun forbiddenPackages(vararg names: String) {
+                forbiddenPackageNames.addAll(names.toList())
+            }
+
+            fun forbiddenClassPatterns(vararg patterns: String) {
+                forbiddenClassNamePatterns.addAll(patterns.toList())
+            }
         }
 
     /**
@@ -134,8 +136,8 @@ data object Srcx {
             extension.outputDir.convention(OUTPUT_DIR)
             extension.autoGenerate.convention(false)
             extension.excludeDepScopes.convention(DEFAULT_EXCLUDED_DEP_SCOPES)
-            extension.forbiddenPackages.convention(DEFAULT_FORBIDDEN_PACKAGES)
-            extension.forbiddenClassSuffixes.convention(DEFAULT_FORBIDDEN_CLASS_SUFFIXES)
+            extension.forbiddenPackageNames.convention(DEFAULT_FORBIDDEN_PACKAGES)
+            extension.forbiddenClassNamePatterns.convention(DEFAULT_FORBIDDEN_CLASS_PATTERNS)
 
             settings.gradle.rootProject(
                 Action { rootProject ->
@@ -179,8 +181,8 @@ data object Srcx {
                         task.includedBuildInfos.set(
                             rootProject.provider { collectIncludedBuildInfos(rootProject) },
                         )
-                        task.forbiddenPackages.convention(extension.forbiddenPackages)
-                        task.forbiddenClassSuffixes.convention(extension.forbiddenClassSuffixes)
+                        task.forbiddenPackages.convention(extension.forbiddenPackageNames)
+                        task.forbiddenClassSuffixes.convention(extension.forbiddenClassNamePatterns)
                     }
                 }
             val cleanTask =
