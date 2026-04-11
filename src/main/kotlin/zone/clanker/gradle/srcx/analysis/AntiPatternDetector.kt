@@ -36,20 +36,20 @@ data class AntiPattern(
     }
 }
 
-private val FORBIDDEN_PACKAGE_NAMES =
-    setOf("util", "utils", "helper", "helpers", "manager", "managers", "misc", "base")
-
 /** Detect anti-patterns across the classified components and dependency edges. */
 fun detectAntiPatterns(
     components: List<ClassifiedComponent>,
     edges: List<ClassDependency>,
     rootDir: File,
+    forbiddenPackages: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_PACKAGES,
+    forbiddenClassSuffixes: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_CLASS_SUFFIXES,
 ): List<AntiPattern> {
     val resolver = SupertypeResolver(components)
     val patterns = mutableListOf<AntiPattern>()
 
-    patterns.addAll(detectSmellClasses(components, rootDir))
-    patterns.addAll(detectForbiddenNames(components, rootDir))
+    patterns.addAll(detectSmellClasses(components, rootDir, forbiddenPackages))
+    patterns.addAll(detectForbiddenNames(components, rootDir, forbiddenPackages))
+    patterns.addAll(detectForbiddenClassNames(components, rootDir, forbiddenClassSuffixes))
     patterns.addAll(detectSingleImplInterfaces(components, resolver, rootDir))
     patterns.addAll(detectGodClasses(components, rootDir))
     patterns.addAll(detectDeepInheritance(components, resolver, rootDir))
@@ -86,6 +86,7 @@ private class SupertypeResolver(
 private fun detectSmellClasses(
     components: List<ClassifiedComponent>,
     rootDir: File,
+    forbiddenPackages: Set<String>,
 ): List<AntiPattern> =
     components
         .filter { it.role in setOf(ComponentRole.MANAGER, ComponentRole.HELPER, ComponentRole.UTIL) }
@@ -93,7 +94,7 @@ private fun detectSmellClasses(
             val roleLabel = c.role.name.lowercase()
             val lastSegment = c.source.packageName.substringAfterLast(".")
             val severity =
-                if (lastSegment in FORBIDDEN_PACKAGE_NAMES) {
+                if (lastSegment in forbiddenPackages) {
                     AntiPattern.Severity.FORBIDDEN
                 } else {
                     AntiPattern.Severity.WARNING
@@ -112,14 +113,14 @@ private fun detectSmellClasses(
 private fun detectForbiddenNames(
     components: List<ClassifiedComponent>,
     rootDir: File,
+    forbiddenPackages: Set<String>,
 ): List<AntiPattern> {
     val patterns = mutableListOf<AntiPattern>()
 
-    // Detect classes in forbidden-named packages
     val inForbiddenPackages =
         components.filter { c ->
             val lastSegment = c.source.packageName.substringAfterLast(".")
-            lastSegment in FORBIDDEN_PACKAGE_NAMES
+            lastSegment in forbiddenPackages
         }
     val packageGroups = inForbiddenPackages.groupBy { it.source.packageName }
     for ((pkg, _) in packageGroups) {
@@ -138,6 +139,26 @@ private fun detectForbiddenNames(
 
     return patterns
 }
+
+private fun detectForbiddenClassNames(
+    components: List<ClassifiedComponent>,
+    rootDir: File,
+    forbiddenSuffixes: Set<String>,
+): List<AntiPattern> =
+    components
+        .filter { c -> forbiddenSuffixes.any { suffix -> c.source.simpleName.endsWith(suffix) } }
+        .filter {
+            !it.source.file.path
+                .contains("/test/")
+        }.map { c ->
+            val matchedSuffix = forbiddenSuffixes.first { c.source.simpleName.endsWith(it) }
+            AntiPattern(
+                severity = AntiPattern.Severity.WARNING,
+                message = "`${c.source.simpleName}` uses forbidden suffix `$matchedSuffix`",
+                file = c.source.file.relativeTo(rootDir),
+                suggestion = "Rename to describe what the class does instead of using a generic suffix.",
+            )
+        }
 
 private fun detectDependencyInversionViolations(
     components: List<ClassifiedComponent>,

@@ -61,14 +61,19 @@ data class ProjectAnalysis(
  * Parses source files, classifies components, builds the dependency graph,
  * detects anti-patterns, finds hub classes, and identifies cycles.
  */
-fun analyzeProject(sourceDirs: List<File>, rootDir: File): ProjectAnalysis {
+fun analyzeProject(
+    sourceDirs: List<File>,
+    rootDir: File,
+    forbiddenPackages: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_PACKAGES,
+    forbiddenClassSuffixes: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_CLASS_SUFFIXES,
+): ProjectAnalysis {
     val sources = scanSources(sourceDirs)
     if (sources.isEmpty()) return ProjectAnalysis(emptyList(), emptyList(), emptyMap(), emptyList())
 
     val components = classifyAll(sources)
     val edges = buildDependencyGraph(components)
 
-    val antiPatterns = detectAntiPatterns(components, edges, rootDir)
+    val antiPatterns = detectAntiPatterns(components, edges, rootDir, forbiddenPackages, forbiddenClassSuffixes)
     val hubs = findHubClasses(components, edges)
     val roles = components.associate { it.source.simpleName to it.role }
     val cycles = findCycles(edges)

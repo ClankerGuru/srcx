@@ -88,6 +88,14 @@ abstract class ContextTask : DefaultTask() {
     @get:Internal
     abstract val includedBuildInfos: ListProperty<IncludedBuildInfo>
 
+    /** Package names to flag as forbidden in anti-pattern detection. */
+    @get:Input
+    abstract val forbiddenPackages: SetProperty<String>
+
+    /** Class name suffixes to flag as forbidden in anti-pattern detection. */
+    @get:Input
+    abstract val forbiddenClassSuffixes: SetProperty<String>
+
     init {
         group = Srcx.GROUP
         description = "Generate comprehensive context report"
@@ -166,7 +174,13 @@ abstract class ContextTask : DefaultTask() {
         val allDirs = collectAllSourceDirs(projects, builds)
         if (allDirs.isEmpty()) return "" to null
         return runCatching {
-            val analysis = analyzeProject(allDirs, rootDir)
+            val analysis =
+                analyzeProject(
+                    allDirs,
+                    rootDir,
+                    forbiddenPackages.get(),
+                    forbiddenClassSuffixes.get(),
+                )
             val sources = scanSources(allDirs)
             val components = classifyAll(sources)
             val depEdges = buildDependencyGraph(components)
