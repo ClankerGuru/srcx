@@ -178,9 +178,9 @@ abstract class ContextTask : DefaultTask() {
         crossBuild: Pair<String, ProjectAnalysis?>,
         crossBuildSummary: zone.clanker.gradle.srcx.model.AnalysisSummary?,
     ) {
-        // hot-classes.md
+        // hub-classes.md
         val allHubs = crossBuildSummary?.hubs ?: emptyList()
-        File(dir, "hot-classes.md").writeText(HotClassesRenderer(allHubs).render())
+        File(dir, "hub-classes.md").writeText(HotClassesRenderer(allHubs).render())
 
         // entry-points.md
         val entryPoints = buildEntryPoints(crossBuild.second)

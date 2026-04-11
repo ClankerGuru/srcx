@@ -9,7 +9,7 @@ import zone.clanker.gradle.srcx.model.ProjectSummary
  *
  * Contains the high-level overview: project structure, package groups,
  * dependencies, build dependency graph (Mermaid), included build summaries,
- * and links to split detail files (hot-classes, entry-points, anti-patterns, etc.).
+ * and links to split detail files (hub-classes, entry-points, anti-patterns, etc.).
  */
 @Suppress("LongParameterList")
 internal class DashboardRenderer(
@@ -149,7 +149,7 @@ internal class DashboardRenderer(
         appendLine("## Details")
         appendLine()
         if (hasHubs) {
-            appendLine("- [Hot Classes](hot-classes.md)")
+            appendLine("- [Hub Classes](hub-classes.md)")
         }
         appendLine("- [Entry Points](entry-points.md)")
         if (hasFindings) {

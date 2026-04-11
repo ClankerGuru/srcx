@@ -3,7 +3,7 @@ package zone.clanker.gradle.srcx.report
 import zone.clanker.gradle.srcx.model.HubClass
 
 /**
- * Renders the hot-classes.md file listing hub classes with their dependents.
+ * Renders the hub-classes.md file listing hub classes with their dependents.
  *
  * Hub classes are the most depended-on classes across the codebase.
  * Each hub with [DETAIL_THRESHOLD] or more dependents gets a detailed section.
@@ -15,7 +15,7 @@ internal class HotClassesRenderer(
 ) {
     fun render(): String =
         buildString {
-            appendLine("# Hot Classes")
+            appendLine("# Hub Classes")
             appendLine()
             if (hubs.isEmpty()) {
                 appendLine("No hub classes detected.")

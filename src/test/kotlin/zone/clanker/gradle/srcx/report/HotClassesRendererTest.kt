@@ -16,7 +16,7 @@ class HotClassesRendererTest :
                 val output = renderer.render()
 
                 then("it shows the header and no-data message") {
-                    output shouldContain "# Hot Classes"
+                    output shouldContain "# Hub Classes"
                     output shouldContain "No hub classes detected."
                 }
             }
