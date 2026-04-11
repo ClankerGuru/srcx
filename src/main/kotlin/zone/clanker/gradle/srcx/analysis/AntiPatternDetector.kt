@@ -99,13 +99,13 @@ private fun detectSmellClasses(
                 } else {
                     AntiPattern.Severity.WARNING
                 }
+            val suggestion =
+                "Behavior in $roleLabel classes belongs closer to where it's used."
             AntiPattern(
                 severity = severity,
                 message = "`${c.source.simpleName}` is a $roleLabel class",
                 file = c.source.file.relativeTo(rootDir),
-                suggestion =
-                    "Behavior in $roleLabel classes usually belongs in a specific class " +
-                        "closer to where it's used. Consider moving methods to the classes that actually need them.",
+                suggestion = suggestion,
             )
         }
 
@@ -125,14 +125,14 @@ private fun detectForbiddenNames(
     val packageGroups = inForbiddenPackages.groupBy { it.source.packageName }
     for ((pkg, _) in packageGroups) {
         val lastSegment = pkg.substringAfterLast(".")
+        val suggestion =
+            "Rename the package to describe what it does instead of a generic name."
         patterns.add(
             AntiPattern(
                 severity = AntiPattern.Severity.FORBIDDEN,
                 message = "Package `$pkg` uses forbidden name `$lastSegment`",
                 file = File("."),
-                suggestion =
-                    "Rename the package to describe what it actually does " +
-                        "instead of using a generic catch-all name.",
+                suggestion = suggestion,
             ),
         )
     }
@@ -210,22 +210,19 @@ private fun buildDiViolationPattern(
 
     return if (implementedInterfaces.isNotEmpty()) {
         val ifaceName = implementedInterfaces.first().source.simpleName
+        val concreteName = resolved.source.simpleName
+        val msg =
+            "Constructor takes concrete `$concreteName` instead of interface `$ifaceName`"
         AntiPattern(
             severity = AntiPattern.Severity.WARNING,
-            message =
-                "Constructor takes concrete `${resolved.source.simpleName}` " +
-                    "instead of interface `$ifaceName`",
+            message = msg,
             file = c.source.file.relativeTo(rootDir),
-            suggestion =
-                "Depend on the interface `$ifaceName` instead of the concrete class " +
-                    "to improve testability and flexibility.",
+            suggestion = "Depend on `$ifaceName` instead of the concrete class.",
         )
     } else {
         AntiPattern(
             severity = AntiPattern.Severity.INFO,
-            message =
-                "Dependency on concrete class `${resolved.source.simpleName}` " +
-                    "in `${c.source.simpleName}`",
+            message = "Dependency on concrete class `${resolved.source.simpleName}` in `${c.source.simpleName}`",
             file = c.source.file.relativeTo(rootDir),
             suggestion = "Consider extracting an interface for `${resolved.source.simpleName}`.",
         )
@@ -241,15 +238,15 @@ private fun detectSingleImplInterfaces(
         val impls = resolver.findImplementors(iface)
         if (impls.size == 1) {
             val impl = impls[0]
+            val ifaceName = iface.source.simpleName
+            val implName = impl.source.simpleName
+            val msg =
+                "Interface `$ifaceName` has only one implementation: `$implName`"
             AntiPattern(
                 severity = AntiPattern.Severity.INFO,
-                message =
-                    "Interface `${iface.source.simpleName}` has only one implementation: " +
-                        "`${impl.source.simpleName}`",
+                message = msg,
                 file = iface.source.file.relativeTo(rootDir),
-                suggestion =
-                    "If this interface isn't meant for testing or future extension, " +
-                        "consider using `${impl.source.simpleName}` directly.",
+                suggestion = "Consider using `$implName` directly unless needed for testing.",
             )
         } else {
             null
@@ -268,13 +265,13 @@ private fun detectGodClasses(
         }.filter { it.role != ComponentRole.CONFIGURATION }
         .map { c ->
             val reasons = buildGodClassReasons(c)
+            val suggestion =
+                "Split into smaller, focused classes with a single responsibility."
             AntiPattern(
                 severity = AntiPattern.Severity.WARNING,
                 message = "`${c.source.simpleName}` may be doing too much (${reasons.joinToString(", ")})",
                 file = c.source.file.relativeTo(rootDir),
-                suggestion =
-                    "Consider splitting into smaller, focused classes. " +
-                        "Each class should have a single responsibility.",
+                suggestion = suggestion,
             )
         }
 
@@ -344,9 +341,7 @@ private fun detectCircularDeps(edges: List<ClassDependency>): List<AntiPattern> 
             severity = AntiPattern.Severity.WARNING,
             message = "Circular dependency: ${cycle.joinToString(" -> ")}",
             file = File("."),
-            suggestion =
-                "Break the cycle by extracting a shared interface or " +
-                    "moving shared logic to a separate class.",
+            suggestion = "Break the cycle by extracting a shared interface or moving shared logic to a separate class.",
         )
     }
 }
@@ -379,14 +374,17 @@ private fun detectMissingTests(
             .filter { it.source.simpleName !in testNames }
 
     return if (untested.size > MAX_UNTESTED_BEFORE_SUMMARY) {
+        val preview =
+            untested
+                .take(UNTESTED_PREVIEW_COUNT)
+                .joinToString(", ") { "`${it.source.simpleName}`" }
+        val suggestion = "Consider adding tests for key components, especially: $preview"
         listOf(
             AntiPattern(
                 severity = AntiPattern.Severity.INFO,
                 message = "${untested.size} classes have no corresponding test file",
                 file = File("."),
-                suggestion =
-                    "Consider adding tests for key components, especially: " +
-                        untested.take(UNTESTED_PREVIEW_COUNT).joinToString(", ") { "`${it.source.simpleName}`" },
+                suggestion = suggestion,
             ),
         )
     } else {

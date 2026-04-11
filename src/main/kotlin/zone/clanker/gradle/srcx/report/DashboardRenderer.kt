@@ -214,10 +214,7 @@ internal class DashboardRenderer(
         appendLine("| Class | File | Dependents | Role |")
         appendLine("|-------|------|------------|------|")
         for (hub in hubs) {
-            appendLine(
-                "| `${hub.name}` | ${hub.filePath}:${hub.line} " +
-                    "| ${hub.dependentCount} | ${hub.role} |",
-            )
+            appendLine("| `${hub.name}` | ${hub.filePath}:${hub.line} | ${hub.dependentCount} | ${hub.role} |")
         }
         appendLine()
         for (hub in hubs.filter { it.dependentCount >= HUB_DETAIL_THRESHOLD }) {
