@@ -1,15 +1,9 @@
 pluginManagement {
-    includeBuild("build-logic")
-    repositories {
-        mavenLocal()
-        gradlePluginPortal()
-        mavenCentral()
-    }
+    includeBuild("build-logic") { name = "srcx-build-logic" }
 }
 
 plugins {
     id("clkx-settings")
-    id("zone.clanker.gradle.srcx") version "0.0.0-dev"
 }
 
 rootProject.name = "srcx"
