@@ -41,6 +41,9 @@ data class ProjectAnalysis(
                         zone.clanker.gradle.srcx.model
                             .HubDependentRef(dep.name, dep.filePath, dep.line)
                     }
+                val testFile =
+                    hub.component.source.file.path
+                        .contains("/test/")
                 zone.clanker.gradle.srcx.model.HubClass(
                     name = name,
                     dependentCount = hub.count,
@@ -48,6 +51,7 @@ data class ProjectAnalysis(
                     filePath = hub.component.source.relativePath,
                     line = hub.component.source.declarationLine,
                     dependents = depRefs,
+                    isTest = testFile,
                 )
             }
         return zone.clanker.gradle.srcx.model

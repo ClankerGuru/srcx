@@ -3,12 +3,10 @@ package zone.clanker.gradle.srcx.report
 import zone.clanker.gradle.srcx.model.HubClass
 
 /**
- * Renders the hub-classes.md file listing hub classes with their dependents.
+ * Renders hub-classes.md listing hub classes with their dependents.
  *
- * Hub classes are the most depended-on classes across the codebase.
- * Each hub with [DETAIL_THRESHOLD] or more dependents gets a detailed section.
- *
- * @property hubs the hub classes sorted by dependent count descending
+ * Production classes are listed first, test classes at the end.
+ * Icons: production classes unmarked, test classes prefixed with 🧪.
  */
 internal class HotClassesRenderer(
     private val hubs: List<HubClass>,
@@ -22,14 +20,20 @@ internal class HotClassesRenderer(
                 appendLine()
                 return@buildString
             }
-            appendLine("| Class | File | Dependents | Role |")
-            appendLine("|-------|------|------------|------|")
-            for (hub in hubs) {
-                appendLine("| `${hub.name}` | ${hub.filePath}:${hub.line} | ${hub.dependentCount} | ${hub.role} |")
+            val production = hubs.filter { !it.isTest }
+            val test = hubs.filter { it.isTest }
+
+            if (production.isNotEmpty()) {
+                appendHubTable(production)
             }
-            appendLine()
+            if (test.isNotEmpty()) {
+                appendLine("### Test")
+                appendLine()
+                appendHubTable(test, prefix = "\uD83E\uDDEA ")
+            }
             for (hub in hubs.filter { it.dependentCount >= DETAIL_THRESHOLD }) {
-                appendLine("## ${hub.name}")
+                val icon = if (hub.isTest) "\uD83E\uDDEA " else ""
+                appendLine("## $icon${hub.name}")
                 appendLine()
                 for (dep in hub.dependents) {
                     appendLine("- ${dep.name} — ${dep.filePath}:${dep.line}")
@@ -37,6 +41,18 @@ internal class HotClassesRenderer(
                 appendLine()
             }
         }
+
+    private fun StringBuilder.appendHubTable(
+        hubList: List<HubClass>,
+        prefix: String = "",
+    ) {
+        appendLine("| Class | File | Dependents | Role |")
+        appendLine("|-------|------|------------|------|")
+        for (hub in hubList) {
+            appendLine("| $prefix`${hub.name}` | ${hub.filePath}:${hub.line} | ${hub.dependentCount} | ${hub.role} |")
+        }
+        appendLine()
+    }
 
     companion object {
         private const val DETAIL_THRESHOLD = 3

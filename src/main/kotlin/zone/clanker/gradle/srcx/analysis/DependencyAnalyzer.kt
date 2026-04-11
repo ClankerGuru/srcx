@@ -71,12 +71,21 @@ private fun addSamePackageEdges(
     if (pkg.isEmpty()) return
     val sourceText = runCatching { component.source.file.readText() }.getOrDefault("")
     if (sourceText.isEmpty()) return
+    val codeOnly = stripComments(sourceText)
 
     allComponents
         .filter { it !== component && it.source.packageName == pkg && it.source.simpleName.length >= 2 }
         .filter { candidate ->
-            Regex("\\b${Regex.escape(candidate.source.simpleName)}\\b").containsMatchIn(sourceText)
+            Regex("\\b${Regex.escape(candidate.source.simpleName)}\\b").containsMatchIn(codeOnly)
         }.forEach { edges.add(ClassDependency(component, it)) }
+}
+
+private fun stripComments(source: String): String {
+    val noBlockComments = source.replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
+    return noBlockComments
+        .lines()
+        .filter { !it.trimStart().startsWith("//") }
+        .joinToString("\n")
 }
 
 private fun resolveSupertypeTarget(
@@ -158,6 +167,7 @@ fun findHubClasses(
 fun findCycles(edges: List<ClassDependency>): List<List<String>> {
     val adjacency = mutableMapOf<String, MutableSet<String>>()
     for (edge in edges) {
+        if (edge.from.source.qualifiedName == edge.to.source.qualifiedName) continue
         adjacency
             .getOrPut(edge.from.source.qualifiedName) { mutableSetOf() }
             .add(edge.to.source.qualifiedName)

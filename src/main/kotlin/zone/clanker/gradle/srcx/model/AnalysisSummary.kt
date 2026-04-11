@@ -54,6 +54,7 @@ data class HubClass(
     val filePath: String = "",
     val line: Int = 0,
     val dependents: List<HubDependentRef> = emptyList(),
+    val isTest: Boolean = false,
 )
 
 /**
