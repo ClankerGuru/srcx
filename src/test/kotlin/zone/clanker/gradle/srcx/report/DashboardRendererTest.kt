@@ -196,9 +196,8 @@ class DashboardRendererTest :
                 val output =
                     DashboardRenderer("test", summaries, emptyList()).render()
 
-                then("it shows hub with dependents count") {
-                    output shouldContain "(3 dependents)"
-                    output shouldContain "[service]"
+                then("it shows the project in the projects table") {
+                    output shouldContain "| :app |"
                 }
             }
         }

@@ -19,11 +19,19 @@ import zone.clanker.gradle.srcx.analysis.ProjectAnalysis
 import zone.clanker.gradle.srcx.analysis.analyzeProject
 import zone.clanker.gradle.srcx.analysis.buildDependencyGraph
 import zone.clanker.gradle.srcx.analysis.classifyAll
+import zone.clanker.gradle.srcx.analysis.findEntryPoints
 import zone.clanker.gradle.srcx.analysis.generateDependencyDiagram
+import zone.clanker.gradle.srcx.analysis.generateSequenceDiagrams
 import zone.clanker.gradle.srcx.analysis.scanSources
 import zone.clanker.gradle.srcx.model.DependencyEntry
 import zone.clanker.gradle.srcx.model.ProjectSummary
+import zone.clanker.gradle.srcx.report.AntiPatternsRenderer
+import zone.clanker.gradle.srcx.report.CrossBuildRenderer
 import zone.clanker.gradle.srcx.report.DashboardRenderer
+import zone.clanker.gradle.srcx.report.EntryPointsRenderer
+import zone.clanker.gradle.srcx.report.FlowRenderer
+import zone.clanker.gradle.srcx.report.HotClassesRenderer
+import zone.clanker.gradle.srcx.report.InterfacesRenderer
 import zone.clanker.gradle.srcx.report.ReportWriter
 import zone.clanker.gradle.srcx.scan.ProjectScanner
 import zone.clanker.gradle.srcx.scan.SymbolExtractor
@@ -102,12 +110,12 @@ abstract class ContextTask : DefaultTask() {
     }
 
     /**
-     * Generate per-project symbol reports and the dashboard context file.
+     * Generate per-project symbol reports, the dashboard, and split detail files.
      *
      * 1. Run parallel symbol extraction, writing per-project reports
      * 2. Generate included build reports
      * 3. Build the dashboard with summaries, build edges, and class diagram
-     * 4. Write `context.md` and `.gitignore`
+     * 4. Write `context.md`, split files, and `.gitignore`
      */
     @TaskAction
     fun generate() {
@@ -139,6 +147,7 @@ abstract class ContextTask : DefaultTask() {
         val buildPairs = builds.map { it.name to it.dir }
         val buildEdges = ReportWriter.computeBuildEdges(buildPairs, includedBuildSummaries)
         val crossBuild = analyzeCrossBuild(projects, builds, root)
+        val crossBuildSummary = crossBuild.second?.toSummary()
         val renderer =
             DashboardRenderer(
                 rootName = rootName.get(),
@@ -147,13 +156,95 @@ abstract class ContextTask : DefaultTask() {
                 includedBuildSummaries = includedBuildSummaries,
                 buildEdges = buildEdges,
                 classDiagram = crossBuild.first,
-                crossBuildAnalysis = crossBuild.second?.toSummary(),
+                crossBuildAnalysis = crossBuildSummary,
             )
         val dir = File(root, outDir)
         dir.mkdirs()
         File(dir, "context.md").writeText(renderer.render())
+
+        // Split detail files
+        writeSplitFiles(dir, summaryList, includedBuildSummaries, buildEdges, crossBuild, crossBuildSummary)
+
         ReportWriter.writeGitignore(root, outDir)
         logger.lifecycle("srcx: context written to $outDir/context.md")
+    }
+
+    @Suppress("LongParameterList")
+    private fun writeSplitFiles(
+        dir: File,
+        summaryList: List<ProjectSummary>,
+        includedBuildSummaries: Map<String, List<ProjectSummary>>,
+        buildEdges: List<DashboardRenderer.BuildEdge>,
+        crossBuild: Pair<String, ProjectAnalysis?>,
+        crossBuildSummary: zone.clanker.gradle.srcx.model.AnalysisSummary?,
+    ) {
+        // hot-classes.md
+        val allHubs = crossBuildSummary?.hubs ?: emptyList()
+        File(dir, "hot-classes.md").writeText(HotClassesRenderer(allHubs).render())
+
+        // entry-points.md
+        val entryPoints = buildEntryPoints(crossBuild.second)
+        File(dir, "entry-points.md").writeText(
+            EntryPointsRenderer(summaryList, entryPoints).render(),
+        )
+
+        // anti-patterns.md
+        File(dir, "anti-patterns.md").writeText(
+            AntiPatternsRenderer(summaryList, includedBuildSummaries).render(),
+        )
+
+        // interfaces.md
+        val allSummaries = summaryList + includedBuildSummaries.values.flatten()
+        val interfaceInfos = InterfacesRenderer.fromSummaries(allSummaries)
+        File(dir, "interfaces.md").writeText(InterfacesRenderer(interfaceInfos).render())
+
+        // cross-build.md
+        File(dir, "cross-build.md").writeText(
+            CrossBuildRenderer(buildEdges, crossBuildSummary).render(),
+        )
+
+        // flows/
+        writeFlowFiles(dir, crossBuild.second)
+    }
+
+    private fun buildEntryPoints(analysis: ProjectAnalysis?): List<EntryPointsRenderer.EntryPoint> {
+        if (analysis == null) return emptyList()
+        val allDirs = collectAllSourceDirs(projectDirs.get(), includedBuildInfos.get())
+        if (allDirs.isEmpty()) return emptyList()
+        return runCatching {
+            val sources = scanSources(allDirs)
+            val components = classifyAll(sources)
+            val depEdges = buildDependencyGraph(components)
+            val entryPoints = findEntryPoints(components, depEdges)
+            entryPoints.map { ep ->
+                EntryPointsRenderer.EntryPoint(
+                    className = ep.source.simpleName,
+                    packageName = ep.source.packageName,
+                    firstCall = ep.source.methods.firstOrNull() ?: "",
+                )
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun writeFlowFiles(dir: File, analysis: ProjectAnalysis?) {
+        if (analysis == null) return
+        val allDirs = collectAllSourceDirs(projectDirs.get(), includedBuildInfos.get())
+        if (allDirs.isEmpty()) return
+        runCatching {
+            val sources = scanSources(allDirs)
+            val components = classifyAll(sources)
+            val depEdges = buildDependencyGraph(components)
+            val diagrams = generateSequenceDiagrams(components, depEdges)
+            val splitDiagrams = FlowRenderer.splitDiagrams(diagrams)
+            if (splitDiagrams.isNotEmpty()) {
+                val flowsDir = File(dir, "flows")
+                flowsDir.mkdirs()
+                for ((name, content) in splitDiagrams) {
+                    val renderer = FlowRenderer(name, content)
+                    File(flowsDir, "$name.md").writeText(renderer.render())
+                }
+            }
+        }
     }
 
     private fun collectIncludedBuildSummaries(

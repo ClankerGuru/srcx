@@ -294,12 +294,9 @@ class BuildEdgesTest :
                     )
                 val output = renderer.render()
 
-                then("it has a problems section") {
-                    output shouldContain "## Problems"
-                    output shouldContain "### Warnings"
-                    output shouldContain "`AppHelper` is a helper class"
-                    output shouldContain "### Notes"
-                    output shouldContain "`App` has no test"
+                then("it links to anti-patterns split file") {
+                    output shouldContain "## Details"
+                    output shouldContain "[Anti-Patterns](anti-patterns.md)"
                 }
             }
         }

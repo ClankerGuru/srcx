@@ -1,6 +1,128 @@
 package zone.clanker.gradle.srcx.analysis
 
 /**
+ * Architectural layer of a package based on its last segment.
+ */
+enum class ArchitecturalLayer {
+    PRESENTATION,
+    DOMAIN,
+    DATA,
+    MODEL,
+    INFRASTRUCTURE,
+    TEST,
+    OTHER,
+}
+
+/**
+ * Detect the architectural layer for a given package name.
+ * Uses the last segment of the package to determine the layer.
+ */
+fun detectLayer(packageName: String, isTest: Boolean): ArchitecturalLayer {
+    if (isTest) return ArchitecturalLayer.TEST
+
+    val lastSegment = packageName.split(".").lastOrNull()?.lowercase() ?: return ArchitecturalLayer.OTHER
+
+    return when (lastSegment) {
+        "task", "ui", "screen", "view", "route", "controller", "activity", "fragment" ->
+            ArchitecturalLayer.PRESENTATION
+        "usecase", "interactor", "service", "workflow" ->
+            ArchitecturalLayer.DOMAIN
+        "repository", "datasource", "api", "db", "cache", "dao" ->
+            ArchitecturalLayer.DATA
+        "model", "entity", "dto", "domain" ->
+            ArchitecturalLayer.MODEL
+        "config", "configuration", "di", "injection", "plugin" ->
+            ArchitecturalLayer.INFRASTRUCTURE
+        "test", "mock", "fake", "stub", "fixture" ->
+            ArchitecturalLayer.TEST
+        else -> ArchitecturalLayer.OTHER
+    }
+}
+
+/**
+ * Detect architectural layers for all classified components.
+ * Returns a mapping from package name to its detected layer.
+ */
+fun detectLayers(components: List<ClassifiedComponent>): Map<String, ArchitecturalLayer> =
+    components
+        .map { it.source.packageName }
+        .distinct()
+        .associateWith { pkg ->
+            detectLayer(pkg, isTest = false)
+        }
+
+/**
+ * The kind of entry point a component represents.
+ */
+enum class EntryPointKind {
+    APP,
+    TEST,
+    MOCK,
+}
+
+/**
+ * A classified entry point with its component and kind.
+ */
+data class ClassifiedEntryPoint(
+    val component: ClassifiedComponent,
+    val kind: EntryPointKind,
+)
+
+/**
+ * Classify entry points by their kind: APP, TEST, or MOCK.
+ *
+ * - TEST: file path contains "/test/" or class name ends with "Test" or "Spec"
+ * - MOCK: class name contains "Mock", "Fake", or "Stub"
+ * - APP: main() functions, controllers, Plugin.apply(), or graph roots
+ */
+fun classifyEntryPoints(
+    components: List<ClassifiedComponent>,
+    edges: List<ClassDependency> = emptyList(),
+): List<ClassifiedEntryPoint> {
+    val result = components.mapNotNull { classifySingleEntryPoint(it) }
+    if (result.isNotEmpty()) return result.distinctBy { it.component.source.qualifiedName }
+
+    // Fall back to graph roots
+    val roots = findGraphRoots(components, edges)
+    return roots.map { ClassifiedEntryPoint(it, EntryPointKind.APP) }
+}
+
+private fun classifySingleEntryPoint(component: ClassifiedComponent): ClassifiedEntryPoint? {
+    val name = component.source.simpleName
+    val filePath = component.source.file.path
+    val isTestClass =
+        filePath.contains("/test/") || name.endsWith("Test") || name.endsWith("Spec")
+    val isMockClass =
+        name.contains("Mock") || name.contains("Fake") || name.contains("Stub")
+    val isPlugin =
+        "apply" in component.source.methods &&
+            component.source.supertypes.any { it.contains("Plugin") }
+
+    return when {
+        isTestClass -> ClassifiedEntryPoint(component, EntryPointKind.TEST)
+        isMockClass -> ClassifiedEntryPoint(component, EntryPointKind.MOCK)
+        "main" in component.source.methods -> ClassifiedEntryPoint(component, EntryPointKind.APP)
+        component.role == ComponentRole.CONTROLLER -> ClassifiedEntryPoint(component, EntryPointKind.APP)
+        isPlugin -> ClassifiedEntryPoint(component, EntryPointKind.APP)
+        else -> null
+    }
+}
+
+private fun findGraphRoots(
+    components: List<ClassifiedComponent>,
+    edges: List<ClassDependency>,
+): List<ClassifiedComponent> {
+    if (edges.isEmpty()) return emptyList()
+    val hasInbound = edges.map { it.to.source.qualifiedName }.toSet()
+    val hasOutbound = edges.map { it.from.source.qualifiedName }.toSet()
+    return components.filter {
+        it.source.qualifiedName in hasOutbound &&
+            it.source.qualifiedName !in hasInbound &&
+            !it.source.isDataClass
+    }
+}
+
+/**
  * What we can objectively observe about a source file's role.
  * Detected from annotations only -- naming is unreliable.
  * When nothing is detected, we just say OTHER and let the graph speak.
