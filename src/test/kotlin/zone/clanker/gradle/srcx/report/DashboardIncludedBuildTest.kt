@@ -79,8 +79,8 @@ class DashboardIncludedBuildTest :
                 }
 
                 then("it links to the build's own .srcx directory") {
-                    output shouldContain "[view](../libs/codec/.srcx/context.md)"
-                    output shouldContain "[view](../libs/http-core/.srcx/context.md)"
+                    output shouldContain "[view](../../libs/codec/.srcx/context.md)"
+                    output shouldContain "[view](../../libs/http-core/.srcx/context.md)"
                 }
 
                 then("it has the correct table headers") {

@@ -119,9 +119,9 @@ class DashboardRendererTest :
                 then("it contains the included builds section") {
                     output shouldContain "## Included Builds"
                     output shouldContain "| gort |"
-                    output shouldContain "[view](../gort/.srcx/context.md)"
+                    output shouldContain "[view](../../gort/.srcx/context.md)"
                     output shouldContain "| wrkx |"
-                    output shouldContain "[view](../wrkx/.srcx/context.md)"
+                    output shouldContain "[view](../../wrkx/.srcx/context.md)"
                 }
             }
 

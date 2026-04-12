@@ -124,7 +124,7 @@ internal class DashboardRenderer(
                         it.severity == FindingSeverity.WARNING || it.severity == FindingSeverity.FORBIDDEN
                     } ?: 0
                 } ?: 0
-            val link = "${ref.relativePath}/.srcx/context.md"
+            val link = "../${ref.relativePath}/.srcx/context.md"
             appendLine("| ${ref.name} | $projectCount | $symbolCount | $warningCount | [view]($link) |")
         }
         appendLine()
