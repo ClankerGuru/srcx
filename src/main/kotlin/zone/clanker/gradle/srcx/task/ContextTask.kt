@@ -15,11 +15,12 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import zone.clanker.gradle.srcx.Srcx
+import zone.clanker.gradle.srcx.analysis.EntryPointKind
 import zone.clanker.gradle.srcx.analysis.ProjectAnalysis
 import zone.clanker.gradle.srcx.analysis.analyzeProject
 import zone.clanker.gradle.srcx.analysis.buildDependencyGraph
 import zone.clanker.gradle.srcx.analysis.classifyAll
-import zone.clanker.gradle.srcx.analysis.findEntryPoints
+import zone.clanker.gradle.srcx.analysis.classifyEntryPoints
 import zone.clanker.gradle.srcx.analysis.generateDependencyDiagram
 import zone.clanker.gradle.srcx.analysis.scanSources
 import zone.clanker.gradle.srcx.model.DependencyEntry
@@ -182,7 +183,7 @@ abstract class ContextTask : DefaultTask() {
         // entry-points.md
         val entryPoints = buildEntryPoints(crossBuild.second)
         File(dir, "entry-points.md").writeText(
-            EntryPointsRenderer(summaryList, entryPoints).render(),
+            EntryPointsRenderer(entryPoints).render(),
         )
 
         // anti-patterns.md
@@ -201,7 +202,7 @@ abstract class ContextTask : DefaultTask() {
         )
     }
 
-    private fun buildEntryPoints(analysis: ProjectAnalysis?): List<EntryPointsRenderer.EntryPoint> {
+    private fun buildEntryPoints(analysis: ProjectAnalysis?): List<EntryPointsRenderer.ClassifiedEntry> {
         if (analysis == null) return emptyList()
         val allDirs = collectAllSourceDirs(projectDirs.get(), includedBuildInfos.get())
         if (allDirs.isEmpty()) return emptyList()
@@ -209,15 +210,23 @@ abstract class ContextTask : DefaultTask() {
             val sources = scanSources(allDirs)
             val components = classifyAll(sources)
             val depEdges = buildDependencyGraph(components)
-            val entryPoints = findEntryPoints(components, depEdges)
-            entryPoints.map { ep ->
-                EntryPointsRenderer.EntryPoint(
-                    className = ep.source.simpleName,
-                    packageName = ep.source.packageName,
+            val classified = classifyEntryPoints(components, depEdges)
+            classified.map { ep ->
+                EntryPointsRenderer.ClassifiedEntry(
+                    className = ep.component.source.simpleName,
+                    packageName = ep.component.source.packageName,
+                    kind = ep.kind.toEntryKind(),
                 )
             }
         }.getOrDefault(emptyList())
     }
+
+    private fun EntryPointKind.toEntryKind(): EntryPointsRenderer.EntryKind =
+        when (this) {
+            EntryPointKind.APP -> EntryPointsRenderer.EntryKind.APP
+            EntryPointKind.TEST -> EntryPointsRenderer.EntryKind.TEST
+            EntryPointKind.MOCK -> EntryPointsRenderer.EntryKind.MOCK
+        }
 
     private fun collectIncludedBuildSummaries(
         builds: List<IncludedBuildInfo>,
