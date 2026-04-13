@@ -52,7 +52,7 @@ object SymbolExtractor {
                 throw e
             }
             else -> {
-                logger.warn("srcx: Analysis failed for '$projectName': ${e.message}")
+                logger.warn("srcx: Analysis failed for '$projectName': ${e.message}", e)
                 return null
             }
         }
@@ -83,6 +83,8 @@ object SymbolExtractor {
                     parser.extractDeclarations(file).map { symbol ->
                         symbol.toEntry(sourceDir)
                     }
+                }.onFailure { e ->
+                    logger.warn("srcx: Symbol extraction failed for '${file.name}': ${e.message}", e)
                 }.getOrDefault(emptyList())
             }
         }
