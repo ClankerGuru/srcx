@@ -157,6 +157,8 @@ abstract class ContextTask : DefaultTask() {
         writeSplitFiles(dir, summaryList, includedBuildSummaries, buildEdges, aggregatedSummary)
 
         ReportWriter.writeGitignore(root, outDir)
+        zone.clanker.gradle.srcx.parse.PsiEnvironment
+            .closeShared()
         logger.lifecycle("srcx: context written to $outDir/context.md")
     }
 
