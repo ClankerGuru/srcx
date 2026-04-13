@@ -241,7 +241,7 @@ abstract class ContextTask : DefaultTask() {
                 }
         }
 
-    private fun aggregateAnalysis(
+    internal fun aggregateAnalysis(
         summaryList: List<ProjectSummary>,
         includedBuildSummaries: Map<String, List<ProjectSummary>>,
     ): zone.clanker.gradle.srcx.model.AnalysisSummary? {
