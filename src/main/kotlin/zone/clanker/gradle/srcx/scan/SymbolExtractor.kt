@@ -52,7 +52,7 @@ object SymbolExtractor {
                 throw e
             }
             else -> {
-                logger.warn("srcx: Analysis failed for '$projectName': ${e.message}")
+                logger.warn("srcx: Analysis failed for '$projectName': ${e.message}", e)
                 return null
             }
         }
@@ -74,7 +74,8 @@ object SymbolExtractor {
                 }
         if (sourceFiles.isEmpty()) return emptyList()
 
-        return PsiEnvironment().use { env ->
+        val env = PsiEnvironment.shared() ?: return emptyList()
+        return synchronized(env) {
             val parser = PsiParser(env)
             sourceFiles.flatMap { file ->
                 val sourceDir = dirs.first { file.startsWith(it) }
@@ -82,6 +83,8 @@ object SymbolExtractor {
                     parser.extractDeclarations(file).map { symbol ->
                         symbol.toEntry(sourceDir)
                     }
+                }.onFailure { e ->
+                    logger.warn("srcx: Symbol extraction failed for '${file.name}': ${e.message}", e)
                 }.getOrDefault(emptyList())
             }
         }
@@ -287,9 +290,10 @@ object SymbolExtractor {
                 ?: File(projectDir, "build.gradle").takeIf { it.exists() }
                 ?: return emptyList()
 
-        return PsiEnvironment().use { env ->
+        val env = PsiEnvironment.shared() ?: return emptyList()
+        return synchronized(env) {
             val vf = LightVirtualFile(buildFile.name, KotlinFileType.INSTANCE, buildFile.readText())
-            val ktFile = env.psiManager.findFile(vf) as? KtFile ?: return@use emptyList()
+            val ktFile = env.psiManager.findFile(vf) as? KtFile ?: return@synchronized emptyList()
 
             ktFile
                 .collectDescendantsOfType<KtCallExpression>()
