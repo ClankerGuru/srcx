@@ -179,12 +179,12 @@ class AntiPatternDetectorTest :
                 then("it detects the dependency inversion violation") {
                     val dipViolation =
                         patterns.filter {
-                            it.message.contains("Constructor takes concrete")
+                            it.message.contains("Dependency on concrete")
                         }
                     dipViolation shouldHaveSize 1
                     dipViolation[0].severity shouldBe AntiPattern.Severity.WARNING
                     dipViolation[0].message shouldBe
-                        "Constructor takes concrete `AgentDispatcher` instead of interface `Dispatcher`"
+                        "Dependency on concrete `AgentDispatcher` instead of interface `Dispatcher`"
                 }
             }
 

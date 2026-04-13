@@ -149,7 +149,9 @@ private fun detectForbiddenClassNames(
         .filter { c -> forbiddenPatterns.any { pattern -> c.source.simpleName.contains(pattern) } }
         .filter {
             !it.source.file.path
-                .contains("/test/")
+                .contains("/test/") &&
+                !it.source.file.path
+                    .contains("\\test\\")
         }.map { c ->
             val matched = forbiddenPatterns.first { c.source.simpleName.contains(it) }
             AntiPattern(
@@ -212,7 +214,7 @@ private fun buildDiViolationPattern(
         val ifaceName = implementedInterfaces.first().source.simpleName
         val concreteName = resolved.source.simpleName
         val msg =
-            "Constructor takes concrete `$concreteName` instead of interface `$ifaceName`"
+            "Dependency on concrete `$concreteName` instead of interface `$ifaceName`"
         AntiPattern(
             severity = AntiPattern.Severity.WARNING,
             message = msg,

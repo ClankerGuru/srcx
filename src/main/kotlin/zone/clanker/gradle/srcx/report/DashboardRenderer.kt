@@ -50,7 +50,14 @@ internal class DashboardRenderer(
                 s.analysis?.findings?.count {
                     it.severity == FindingSeverity.WARNING || it.severity == FindingSeverity.FORBIDDEN
                 } ?: 0
-            }
+            } +
+                includedBuildSummaries.values.sumOf { projects ->
+                    projects.sumOf { s ->
+                        s.analysis?.findings?.count {
+                            it.severity == FindingSeverity.WARNING || it.severity == FindingSeverity.FORBIDDEN
+                        } ?: 0
+                    }
+                }
         val subprojects = summaries.flatMap { it.subprojects }.distinct()
 
         appendLine("## Overview")

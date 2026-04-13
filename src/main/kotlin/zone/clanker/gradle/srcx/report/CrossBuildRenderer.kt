@@ -27,6 +27,7 @@ internal class CrossBuildRenderer(
             appendBuildEdges()
             appendCrossBuildHubs()
             appendCrossBuildCycles()
+            appendNoAnalysisData()
         }
 
     private fun StringBuilder.appendBuildEdges() {
@@ -81,6 +82,16 @@ internal class CrossBuildRenderer(
             appendLine("- ${cycle.joinToString(" -> ")}")
         }
         appendLine()
+    }
+
+    private fun StringBuilder.appendNoAnalysisData() {
+        if (crossBuildAnalysis == null) return
+        val hubs = crossBuildAnalysis.hubs
+        val cycles = crossBuildAnalysis.cycles
+        if (hubs.isEmpty() && cycles.isEmpty()) {
+            appendLine("No shared hubs or cycles detected in cross-build analysis.")
+            appendLine()
+        }
     }
 
     companion object {

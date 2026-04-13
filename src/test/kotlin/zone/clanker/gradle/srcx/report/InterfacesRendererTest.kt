@@ -147,7 +147,7 @@ class InterfacesRendererTest :
 
                 then("it detects the interface by Service suffix") {
                     val userSvc = result.first { it.name == "UserService" }
-                    userSvc.implementationCount shouldBe 2
+                    userSvc.implementationCount shouldBe 1
                     userSvc.hasMock shouldBe true
                 }
             }
@@ -199,7 +199,7 @@ class InterfacesRendererTest :
                 then("it detects the I-prefixed interface with impl count and mock") {
                     result shouldHaveSize 1
                     result[0].name shouldBe "ILogger"
-                    result[0].implementationCount shouldBe 2
+                    result[0].implementationCount shouldBe 1
                     result[0].hasMock shouldBe true
                 }
             }

@@ -165,6 +165,7 @@ internal class InterfacesRenderer(
             val baseName = interfaceName.removePrefix("I")
             return classNames.count { cn ->
                 cn != interfaceName &&
+                    !isMockOrFake(cn) &&
                     (
                         cn == "${baseName}Impl" ||
                             cn == "Default$interfaceName" ||
@@ -172,6 +173,16 @@ internal class InterfacesRenderer(
                             (cn.endsWith(baseName) && cn != baseName)
                     )
             }
+        }
+
+        private fun isMockOrFake(className: String): Boolean {
+            val lower = className.lowercase()
+            return lower.startsWith("mock") ||
+                lower.startsWith("fake") ||
+                lower.startsWith("stub") ||
+                lower.endsWith("mock") ||
+                lower.endsWith("fake") ||
+                lower.endsWith("stub")
         }
 
         private val INTERFACE_PATTERN = Regex("""Interface `(\w+)` has""")
