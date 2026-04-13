@@ -2,6 +2,7 @@ package zone.clanker.gradle.srcx.analysis
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import java.io.File
 
@@ -18,6 +19,7 @@ class AntiPatternDetectorTest :
             val methods: List<String> = emptyList(),
             val lineCount: Int = 50,
             val isInterface: Boolean = false,
+            val isAbstract: Boolean = false,
             val isDataClass: Boolean = false,
             val supertypes: List<String> = emptyList(),
         )
@@ -33,7 +35,7 @@ class AntiPatternDetectorTest :
                     annotations = config.annotations,
                     supertypes = config.supertypes,
                     isInterface = config.isInterface,
-                    isAbstract = false,
+                    isAbstract = config.isAbstract,
                     isObject = false,
                     isDataClass = config.isDataClass,
                     language = SourceFileMetadata.Language.KOTLIN,
@@ -101,6 +103,131 @@ class AntiPatternDetectorTest :
 
                 then("it detects the single-impl interface") {
                     patterns.any { it.message.contains("only one implementation") } shouldBe true
+                }
+            }
+
+            `when`("class is in a forbidden-named package") {
+                val helper =
+                    component(
+                        ComponentConfig(
+                            simpleName = "StringHelper",
+                            packageName = "com.example.helpers",
+                        ),
+                    )
+                val patterns = detectAntiPatterns(listOf(helper), emptyList(), rootDir)
+
+                then("it detects forbidden package name") {
+                    val forbidden =
+                        patterns.filter { it.severity == AntiPattern.Severity.FORBIDDEN }
+                    forbidden.any { it.message.contains("forbidden name") } shouldBe true
+                    forbidden.any { it.message.contains("helpers") } shouldBe true
+                }
+
+                then("smell class in forbidden package gets FORBIDDEN severity") {
+                    val smellPatterns =
+                        patterns.filter { it.message.contains("helper class") }
+                    smellPatterns shouldHaveSize 1
+                    smellPatterns[0].severity shouldBe AntiPattern.Severity.FORBIDDEN
+                }
+            }
+
+            `when`("class is in a normal package with smell name") {
+                val helper =
+                    component(
+                        ComponentConfig(
+                            simpleName = "StringHelper",
+                            packageName = "com.example.text",
+                        ),
+                    )
+                val patterns = detectAntiPatterns(listOf(helper), emptyList(), rootDir)
+
+                then("smell class gets WARNING severity") {
+                    val smellPatterns =
+                        patterns.filter { it.message.contains("helper class") }
+                    smellPatterns shouldHaveSize 1
+                    smellPatterns[0].severity shouldBe AntiPattern.Severity.WARNING
+                }
+
+                then("no forbidden package name detected") {
+                    patterns.none { it.message.contains("forbidden name") } shouldBe true
+                }
+            }
+
+            `when`("dependency inversion is violated") {
+                val iface =
+                    component(
+                        ComponentConfig("Dispatcher", isInterface = true),
+                    )
+                val concrete =
+                    component(
+                        ComponentConfig(
+                            simpleName = "AgentDispatcher",
+                            supertypes = listOf("Dispatcher"),
+                        ),
+                    )
+                val consumer =
+                    component(
+                        ComponentConfig(
+                            simpleName = "WorkflowEngine",
+                            imports = listOf("com.example.AgentDispatcher"),
+                        ),
+                    )
+                val components = listOf(iface, concrete, consumer)
+                val edges = buildDependencyGraph(components)
+                val patterns = detectAntiPatterns(components, edges, rootDir)
+
+                then("it detects the dependency inversion violation") {
+                    val dipViolation =
+                        patterns.filter {
+                            it.message.contains("Dependency on concrete")
+                        }
+                    dipViolation shouldHaveSize 1
+                    dipViolation[0].severity shouldBe AntiPattern.Severity.WARNING
+                    dipViolation[0].message shouldBe
+                        "Dependency on concrete `AgentDispatcher` instead of interface `Dispatcher`"
+                }
+            }
+
+            `when`("dependency is on concrete class without interface") {
+                val concrete =
+                    component(
+                        ComponentConfig(simpleName = "EmailSender"),
+                    )
+                val consumer =
+                    component(
+                        ComponentConfig(
+                            simpleName = "NotificationService",
+                            annotations = listOf("Service"),
+                            imports = listOf("com.example.EmailSender"),
+                        ),
+                    )
+                val components = listOf(concrete, consumer)
+                val edges = buildDependencyGraph(components)
+                val patterns = detectAntiPatterns(components, edges, rootDir)
+
+                then("it suggests extracting an interface") {
+                    val suggestions =
+                        patterns.filter {
+                            it.message.contains("Dependency on concrete class")
+                        }
+                    suggestions shouldHaveSize 1
+                    suggestions[0].severity shouldBe AntiPattern.Severity.INFO
+                    suggestions[0].suggestion shouldBe
+                        "Consider extracting an interface for `EmailSender`."
+                }
+            }
+
+            `when`("severity FORBIDDEN has the correct icon") {
+                then("FORBIDDEN icon is the no-entry emoji") {
+                    AntiPattern.Severity.FORBIDDEN.icon shouldBe "\uD83D\uDEAB"
+                }
+
+                then("WARNING icon is the warning emoji") {
+                    AntiPattern.Severity.WARNING.icon shouldBe "⚠\uFE0F"
+                }
+
+                then("INFO icon is the info emoji") {
+                    AntiPattern.Severity.INFO.icon shouldBe "ℹ\uFE0F"
                 }
             }
         }

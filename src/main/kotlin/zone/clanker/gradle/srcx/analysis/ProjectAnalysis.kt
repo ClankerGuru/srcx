@@ -23,6 +23,7 @@ data class ProjectAnalysis(
                 zone.clanker.gradle.srcx.model.Finding(
                     severity =
                         when (ap.severity) {
+                            AntiPattern.Severity.FORBIDDEN -> zone.clanker.gradle.srcx.model.FindingSeverity.FORBIDDEN
                             AntiPattern.Severity.WARNING -> zone.clanker.gradle.srcx.model.FindingSeverity.WARNING
                             AntiPattern.Severity.INFO -> zone.clanker.gradle.srcx.model.FindingSeverity.INFO
                         },
@@ -40,6 +41,9 @@ data class ProjectAnalysis(
                         zone.clanker.gradle.srcx.model
                             .HubDependentRef(dep.name, dep.filePath, dep.line)
                     }
+                val testFile =
+                    hub.component.source.file.path
+                        .contains("/test/")
                 zone.clanker.gradle.srcx.model.HubClass(
                     name = name,
                     dependentCount = hub.count,
@@ -47,6 +51,7 @@ data class ProjectAnalysis(
                     filePath = hub.component.source.relativePath,
                     line = hub.component.source.declarationLine,
                     dependents = depRefs,
+                    isTest = testFile,
                 )
             }
         return zone.clanker.gradle.srcx.model
@@ -60,14 +65,19 @@ data class ProjectAnalysis(
  * Parses source files, classifies components, builds the dependency graph,
  * detects anti-patterns, finds hub classes, and identifies cycles.
  */
-fun analyzeProject(sourceDirs: List<File>, rootDir: File): ProjectAnalysis {
+fun analyzeProject(
+    sourceDirs: List<File>,
+    rootDir: File,
+    forbiddenPackages: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_PACKAGES,
+    forbiddenClassPatterns: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_CLASS_PATTERNS,
+): ProjectAnalysis {
     val sources = scanSources(sourceDirs)
     if (sources.isEmpty()) return ProjectAnalysis(emptyList(), emptyList(), emptyMap(), emptyList())
 
     val components = classifyAll(sources)
     val edges = buildDependencyGraph(components)
 
-    val antiPatterns = detectAntiPatterns(components, edges, rootDir)
+    val antiPatterns = detectAntiPatterns(components, edges, rootDir, forbiddenPackages, forbiddenClassPatterns)
     val hubs = findHubClasses(components, edges)
     val roles = components.associate { it.source.simpleName to it.role }
     val cycles = findCycles(edges)

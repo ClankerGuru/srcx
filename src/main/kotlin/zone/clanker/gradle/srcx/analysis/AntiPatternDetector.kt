@@ -1,4 +1,4 @@
-@file:Suppress("ktlint:standard:filename")
+@file:Suppress("ktlint:standard:filename", "TooManyFunctions")
 
 package zone.clanker.gradle.srcx.analysis
 
@@ -30,8 +30,9 @@ data class AntiPattern(
     enum class Severity(
         val icon: String,
     ) {
-        WARNING("WARNING"),
-        INFO("INFO"),
+        FORBIDDEN("\uD83D\uDEAB"),
+        WARNING("⚠\uFE0F"),
+        INFO("ℹ\uFE0F"),
     }
 }
 
@@ -40,15 +41,20 @@ fun detectAntiPatterns(
     components: List<ClassifiedComponent>,
     edges: List<ClassDependency>,
     rootDir: File,
+    forbiddenPackages: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_PACKAGES,
+    forbiddenClassPatterns: Set<String> = zone.clanker.gradle.srcx.Srcx.DEFAULT_FORBIDDEN_CLASS_PATTERNS,
 ): List<AntiPattern> {
     val resolver = SupertypeResolver(components)
     val patterns = mutableListOf<AntiPattern>()
 
-    patterns.addAll(detectSmellClasses(components, rootDir))
+    patterns.addAll(detectSmellClasses(components, rootDir, forbiddenPackages))
+    patterns.addAll(detectForbiddenNames(components, rootDir, forbiddenPackages))
+    patterns.addAll(detectForbiddenClassNames(components, rootDir, forbiddenClassPatterns))
     patterns.addAll(detectSingleImplInterfaces(components, resolver, rootDir))
     patterns.addAll(detectGodClasses(components, rootDir))
     patterns.addAll(detectDeepInheritance(components, resolver, rootDir))
     patterns.addAll(detectCircularDeps(edges))
+    patterns.addAll(detectDependencyInversionViolations(components, resolver, rootDir))
     patterns.addAll(detectMissingTests(components, rootDir))
 
     return patterns.sortedWith(compareBy({ it.severity }, { it.file.path }))
@@ -80,20 +86,150 @@ private class SupertypeResolver(
 private fun detectSmellClasses(
     components: List<ClassifiedComponent>,
     rootDir: File,
+    forbiddenPackages: Set<String>,
 ): List<AntiPattern> =
     components
         .filter { it.role in setOf(ComponentRole.MANAGER, ComponentRole.HELPER, ComponentRole.UTIL) }
         .map { c ->
             val roleLabel = c.role.name.lowercase()
+            val lastSegment = c.source.packageName.substringAfterLast(".")
+            val severity =
+                if (lastSegment in forbiddenPackages) {
+                    AntiPattern.Severity.FORBIDDEN
+                } else {
+                    AntiPattern.Severity.WARNING
+                }
+            val suggestion =
+                "Behavior in $roleLabel classes belongs closer to where it's used."
             AntiPattern(
-                severity = AntiPattern.Severity.WARNING,
+                severity = severity,
                 message = "`${c.source.simpleName}` is a $roleLabel class",
                 file = c.source.file.relativeTo(rootDir),
-                suggestion =
-                    "Behavior in $roleLabel classes usually belongs in a specific class " +
-                        "closer to where it's used. Consider moving methods to the classes that actually need them.",
+                suggestion = suggestion,
             )
         }
+
+@Suppress("UnusedParameter")
+private fun detectForbiddenNames(
+    components: List<ClassifiedComponent>,
+    rootDir: File,
+    forbiddenPackages: Set<String>,
+): List<AntiPattern> {
+    val patterns = mutableListOf<AntiPattern>()
+
+    val inForbiddenPackages =
+        components.filter { c ->
+            val lastSegment = c.source.packageName.substringAfterLast(".")
+            lastSegment in forbiddenPackages
+        }
+    val packageGroups = inForbiddenPackages.groupBy { it.source.packageName }
+    for ((pkg, _) in packageGroups) {
+        val lastSegment = pkg.substringAfterLast(".")
+        val suggestion =
+            "Rename the package to describe what it does instead of a generic name."
+        patterns.add(
+            AntiPattern(
+                severity = AntiPattern.Severity.FORBIDDEN,
+                message = "Package `$pkg` uses forbidden name `$lastSegment`",
+                file = File("."),
+                suggestion = suggestion,
+            ),
+        )
+    }
+
+    return patterns
+}
+
+private fun detectForbiddenClassNames(
+    components: List<ClassifiedComponent>,
+    rootDir: File,
+    forbiddenPatterns: Set<String>,
+): List<AntiPattern> =
+    components
+        .filter { c -> forbiddenPatterns.any { pattern -> c.source.simpleName.contains(pattern) } }
+        .filter {
+            !it.source.file.path
+                .contains("/test/") &&
+                !it.source.file.path
+                    .contains("\\test\\")
+        }.map { c ->
+            val matched = forbiddenPatterns.first { c.source.simpleName.contains(it) }
+            AntiPattern(
+                severity = AntiPattern.Severity.WARNING,
+                message = "`${c.source.simpleName}` contains forbidden pattern `$matched`",
+                file = c.source.file.relativeTo(rootDir),
+                suggestion = "Rename to describe what the class does instead of using a generic name.",
+            )
+        }
+
+private fun detectDependencyInversionViolations(
+    components: List<ClassifiedComponent>,
+    resolver: SupertypeResolver,
+    rootDir: File,
+): List<AntiPattern> {
+    val nonTestComponents =
+        components.filter { c ->
+            !c.source.file.path
+                .contains("/test/") &&
+                !c.source.file.path
+                    .contains("\\test\\") &&
+                !c.source.isInterface
+        }
+
+    val patterns = mutableListOf<AntiPattern>()
+
+    nonTestComponents.forEach { c ->
+        patterns.addAll(checkImportsForDiViolations(c, resolver, rootDir))
+    }
+
+    return patterns.distinctBy { it.message }
+}
+
+private fun checkImportsForDiViolations(
+    c: ClassifiedComponent,
+    resolver: SupertypeResolver,
+    rootDir: File,
+): List<AntiPattern> =
+    c.source.imports.mapNotNull { importedFqn ->
+        val importedSimpleName = importedFqn.substringAfterLast(".")
+        val resolved = resolver.resolve(c, importedSimpleName) ?: return@mapNotNull null
+        val isAbstraction = resolved.source.isInterface || resolved.source.isAbstract || resolved.source.isDataClass
+        if (isAbstraction) return@mapNotNull null
+        buildDiViolationPattern(c, resolved, resolver, rootDir)
+    }
+
+private fun buildDiViolationPattern(
+    c: ClassifiedComponent,
+    resolved: ClassifiedComponent,
+    resolver: SupertypeResolver,
+    rootDir: File,
+): AntiPattern {
+    val implementedInterfaces =
+        resolved.source.supertypes
+            .mapNotNull { supertype ->
+                resolver.resolve(resolved, supertype)
+            }.filter { it.source.isInterface }
+
+    return if (implementedInterfaces.isNotEmpty()) {
+        val ifaceName = implementedInterfaces.first().source.simpleName
+        val concreteName = resolved.source.simpleName
+        val msg =
+            "Dependency on concrete `$concreteName` instead of interface `$ifaceName`"
+        AntiPattern(
+            severity = AntiPattern.Severity.WARNING,
+            message = msg,
+            file = c.source.file.relativeTo(rootDir),
+            suggestion = "Depend on `$ifaceName` instead of the concrete class.",
+        )
+    } else {
+        AntiPattern(
+            severity = AntiPattern.Severity.INFO,
+            message = "Dependency on concrete class `${resolved.source.simpleName}` in `${c.source.simpleName}`",
+            file = c.source.file.relativeTo(rootDir),
+            suggestion = "Consider extracting an interface for `${resolved.source.simpleName}`.",
+        )
+    }
+}
 
 private fun detectSingleImplInterfaces(
     components: List<ClassifiedComponent>,
@@ -104,15 +240,15 @@ private fun detectSingleImplInterfaces(
         val impls = resolver.findImplementors(iface)
         if (impls.size == 1) {
             val impl = impls[0]
+            val ifaceName = iface.source.simpleName
+            val implName = impl.source.simpleName
+            val msg =
+                "Interface `$ifaceName` has only one implementation: `$implName`"
             AntiPattern(
                 severity = AntiPattern.Severity.INFO,
-                message =
-                    "Interface `${iface.source.simpleName}` has only one implementation: " +
-                        "`${impl.source.simpleName}`",
+                message = msg,
                 file = iface.source.file.relativeTo(rootDir),
-                suggestion =
-                    "If this interface isn't meant for testing or future extension, " +
-                        "consider using `${impl.source.simpleName}` directly.",
+                suggestion = "Consider using `$implName` directly unless needed for testing.",
             )
         } else {
             null
@@ -131,13 +267,13 @@ private fun detectGodClasses(
         }.filter { it.role != ComponentRole.CONFIGURATION }
         .map { c ->
             val reasons = buildGodClassReasons(c)
+            val suggestion =
+                "Split into smaller, focused classes with a single responsibility."
             AntiPattern(
                 severity = AntiPattern.Severity.WARNING,
                 message = "`${c.source.simpleName}` may be doing too much (${reasons.joinToString(", ")})",
                 file = c.source.file.relativeTo(rootDir),
-                suggestion =
-                    "Consider splitting into smaller, focused classes. " +
-                        "Each class should have a single responsibility.",
+                suggestion = suggestion,
             )
         }
 
@@ -207,9 +343,7 @@ private fun detectCircularDeps(edges: List<ClassDependency>): List<AntiPattern> 
             severity = AntiPattern.Severity.WARNING,
             message = "Circular dependency: ${cycle.joinToString(" -> ")}",
             file = File("."),
-            suggestion =
-                "Break the cycle by extracting a shared interface or " +
-                    "moving shared logic to a separate class.",
+            suggestion = "Break the cycle by extracting a shared interface or moving shared logic to a separate class.",
         )
     }
 }
@@ -242,14 +376,17 @@ private fun detectMissingTests(
             .filter { it.source.simpleName !in testNames }
 
     return if (untested.size > MAX_UNTESTED_BEFORE_SUMMARY) {
+        val preview =
+            untested
+                .take(UNTESTED_PREVIEW_COUNT)
+                .joinToString(", ") { "`${it.source.simpleName}`" }
+        val suggestion = "Consider adding tests for key components, especially: $preview"
         listOf(
             AntiPattern(
                 severity = AntiPattern.Severity.INFO,
                 message = "${untested.size} classes have no corresponding test file",
                 file = File("."),
-                suggestion =
-                    "Consider adding tests for key components, especially: " +
-                        untested.take(UNTESTED_PREVIEW_COUNT).joinToString(", ") { "`${it.source.simpleName}`" },
+                suggestion = suggestion,
             ),
         )
     } else {

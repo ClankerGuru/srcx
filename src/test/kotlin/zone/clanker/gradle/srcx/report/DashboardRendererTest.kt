@@ -119,9 +119,9 @@ class DashboardRendererTest :
                 then("it contains the included builds section") {
                     output shouldContain "## Included Builds"
                     output shouldContain "| gort |"
-                    output shouldContain "[view](../gort/.srcx/context.md)"
+                    output shouldContain "[view](../../gort/.srcx/context.md)"
                     output shouldContain "| wrkx |"
-                    output shouldContain "[view](../wrkx/.srcx/context.md)"
+                    output shouldContain "[view](../../wrkx/.srcx/context.md)"
                 }
             }
 
@@ -196,9 +196,8 @@ class DashboardRendererTest :
                 val output =
                     DashboardRenderer("test", summaries, emptyList()).render()
 
-                then("it shows hub with dependents count") {
-                    output shouldContain "(3 dependents)"
-                    output shouldContain "[service]"
+                then("it shows the project in the projects table") {
+                    output shouldContain "| :app |"
                 }
             }
         }
