@@ -228,7 +228,7 @@ private fun resolveJavaTypeInfo(javaFile: PsiJavaFile, fallbackName: String): Ja
     val text = javaFile.text
     return JavaTypeInfo(
         className = cls.name ?: fallbackName,
-        annotations = cls.annotations.mapNotNull { it.qualifiedName?.substringAfterLast('.') },
+        annotations = cls.annotations.mapNotNull { it.nameReferenceElement?.referenceName },
         supertypes = superList,
         isInterface = cls.isInterface,
         isAbstract = cls.hasModifierProperty(PsiModifier.ABSTRACT),
@@ -237,38 +237,46 @@ private fun resolveJavaTypeInfo(javaFile: PsiJavaFile, fallbackName: String): Ja
     )
 }
 
+private val javaParseLogger =
+    org.gradle.api.logging.Logging
+        .getLogger("zone.clanker.gradle.srcx.analysis.SourceFileMetadata")
+
 private fun parseJavaFile(file: File, psiManager: PsiManager): SourceFileMetadata? {
     val vf = LightVirtualFile(file.name, JavaFileType.INSTANCE, file.readText())
     val javaFile = psiManager.findFile(vf) as? PsiJavaFile ?: return null
 
-    val packageName = javaFile.packageName
-    val imports =
-        javaFile.importList
-            ?.importStatements
-            ?.mapNotNull { it.qualifiedName }
-            ?.filter { fqn -> PLATFORM_PREFIXES.none { fqn.startsWith(it) } }
-            ?: emptyList()
+    return runCatching {
+        val packageName = javaFile.packageName
+        val imports =
+            javaFile.importList
+                ?.importStatements
+                ?.mapNotNull { it.qualifiedName }
+                ?.filter { fqn -> PLATFORM_PREFIXES.none { fqn.startsWith(it) } }
+                ?: emptyList()
 
-    val info = resolveJavaTypeInfo(javaFile, file.nameWithoutExtension)
-    val qualifiedName = if (packageName.isNotEmpty()) "$packageName.${info.className}" else info.className
+        val info = resolveJavaTypeInfo(javaFile, file.nameWithoutExtension)
+        val qualifiedName = if (packageName.isNotEmpty()) "$packageName.${info.className}" else info.className
 
-    return SourceFileMetadata(
-        file = file,
-        packageName = packageName,
-        qualifiedName = qualifiedName,
-        simpleName = info.className,
-        imports = imports,
-        annotations = info.annotations,
-        supertypes = info.supertypes,
-        isInterface = info.isInterface,
-        isAbstract = info.isAbstract,
-        isObject = false,
-        isDataClass = false,
-        language = SourceFileMetadata.Language.JAVA,
-        lineCount = countCodeLines(file.readLines()),
-        methods = info.methods,
-        declarationLine = info.declarationLine,
-    )
+        SourceFileMetadata(
+            file = file,
+            packageName = packageName,
+            qualifiedName = qualifiedName,
+            simpleName = info.className,
+            imports = imports,
+            annotations = info.annotations,
+            supertypes = info.supertypes,
+            isInterface = info.isInterface,
+            isAbstract = info.isAbstract,
+            isObject = false,
+            isDataClass = false,
+            language = SourceFileMetadata.Language.JAVA,
+            lineCount = countCodeLines(file.readLines()),
+            methods = info.methods,
+            declarationLine = info.declarationLine,
+        )
+    }.onFailure { e ->
+        javaParseLogger.warn("srcx: Failed to parse Java file '${file.name}': ${e.message}", e)
+    }.getOrNull()
 }
 
 private fun countCodeLines(lines: List<String>): Int {
