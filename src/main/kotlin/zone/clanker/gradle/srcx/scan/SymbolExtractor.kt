@@ -34,9 +34,24 @@ import java.io.File
  * and dependencies from build files or the Gradle configuration API.
  */
 object SymbolExtractor {
+    private val logger =
+        org.gradle.api.logging.Logging
+            .getLogger(SymbolExtractor::class.java)
+
     /** Dependency scopes excluded from scanning by default. */
     internal val DEFAULT_EXCLUDED_DEP_SCOPES =
         Srcx.DEFAULT_EXCLUDED_DEP_SCOPES
+
+    private fun handleAnalysisFailure(e: Throwable, projectName: String) {
+        when (e) {
+            is OutOfMemoryError ->
+                logger.error(
+                    "srcx: Out of memory analyzing '$projectName'. " +
+                        "Increase heap with org.gradle.jvmargs=-Xmx8g in gradle.properties",
+                )
+            else -> logger.warn("srcx: Analysis failed for '$projectName': ${e.message}")
+        }
+    }
 
     /** Minimum number of colon-separated parts in a Maven coordinate (group:artifact:version). */
     private const val MIN_COORDINATE_PARTS = 3
@@ -121,6 +136,8 @@ object SymbolExtractor {
         val projectAnalysis =
             runCatching {
                 analyzeProject(allDirs, project.projectDir).toSummary()
+            }.onFailure { e ->
+                handleAnalysisFailure(e, project.name)
             }.getOrNull()
 
         return ProjectSummary(
@@ -167,6 +184,8 @@ object SymbolExtractor {
         val projectAnalysis =
             runCatching {
                 analyzeProject(allDirs, projectDir).toSummary()
+            }.onFailure { e ->
+                handleAnalysisFailure(e, projectDir.name)
             }.getOrNull()
 
         return ProjectSummary(
@@ -229,6 +248,8 @@ object SymbolExtractor {
         val projectAnalysis =
             runCatching {
                 analyzeProject(allDirs, projectDir).toSummary()
+            }.onFailure { e ->
+                handleAnalysisFailure(e, projectDir.name)
             }.getOrNull()
 
         return ProjectSummary(
