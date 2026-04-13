@@ -42,14 +42,19 @@ object SymbolExtractor {
     internal val DEFAULT_EXCLUDED_DEP_SCOPES =
         Srcx.DEFAULT_EXCLUDED_DEP_SCOPES
 
-    private fun handleAnalysisFailure(e: Throwable, projectName: String) {
+    internal fun handleAnalysisFailure(e: Throwable, projectName: String): Nothing? {
         when (e) {
-            is OutOfMemoryError ->
+            is OutOfMemoryError -> {
                 logger.error(
                     "srcx: Out of memory analyzing '$projectName'. " +
                         "Increase heap with org.gradle.jvmargs=-Xmx8g in gradle.properties",
                 )
-            else -> logger.warn("srcx: Analysis failed for '$projectName': ${e.message}")
+                throw e
+            }
+            else -> {
+                logger.warn("srcx: Analysis failed for '$projectName': ${e.message}")
+                return null
+            }
         }
     }
 
@@ -136,9 +141,7 @@ object SymbolExtractor {
         val projectAnalysis =
             runCatching {
                 analyzeProject(allDirs, project.projectDir).toSummary()
-            }.onFailure { e ->
-                handleAnalysisFailure(e, project.name)
-            }.getOrNull()
+            }.getOrElse { e -> handleAnalysisFailure(e, project.name) }
 
         return ProjectSummary(
             projectPath = ProjectPath(project.path),
@@ -184,9 +187,7 @@ object SymbolExtractor {
         val projectAnalysis =
             runCatching {
                 analyzeProject(allDirs, projectDir).toSummary()
-            }.onFailure { e ->
-                handleAnalysisFailure(e, projectDir.name)
-            }.getOrNull()
+            }.getOrElse { e -> handleAnalysisFailure(e, projectDir.name) }
 
         return ProjectSummary(
             projectPath = ProjectPath(projectPath),
@@ -248,9 +249,7 @@ object SymbolExtractor {
         val projectAnalysis =
             runCatching {
                 analyzeProject(allDirs, projectDir).toSummary()
-            }.onFailure { e ->
-                handleAnalysisFailure(e, projectDir.name)
-            }.getOrNull()
+            }.getOrElse { e -> handleAnalysisFailure(e, projectDir.name) }
 
         return ProjectSummary(
             projectPath = ProjectPath(projectPath),

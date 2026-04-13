@@ -221,11 +221,9 @@ abstract class ContextTask : DefaultTask() {
                                 when {
                                     isMock -> EntryPointsRenderer.EntryKind.MOCK
                                     isTest -> EntryPointsRenderer.EntryKind.TEST
-                                    else -> null
+                                    else -> EntryPointsRenderer.EntryKind.APP
                                 }
-                            kind?.let {
-                                EntryPointsRenderer.ClassifiedEntry(name, symbol.packageName.value, it)
-                            }
+                            EntryPointsRenderer.ClassifiedEntry(name, symbol.packageName.value, kind)
                         }
                 }
             }.distinctBy { "${it.packageName}.${it.className}" }
@@ -252,8 +250,10 @@ abstract class ContextTask : DefaultTask() {
         val allHubs =
             allAnalyses
                 .flatMap { it.hubs }
-                .sortedByDescending { it.dependentCount }
-                .take(HUB_LIMIT)
+                .sortedWith(
+                    compareByDescending<zone.clanker.gradle.srcx.model.HubClass> { it.dependentCount }
+                        .thenBy { it.name },
+                ).take(HUB_LIMIT)
 
         val allCycles = allAnalyses.flatMap { it.cycles }.distinct()
 
