@@ -15,14 +15,6 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import zone.clanker.gradle.srcx.Srcx
-import zone.clanker.gradle.srcx.analysis.EntryPointKind
-import zone.clanker.gradle.srcx.analysis.ProjectAnalysis
-import zone.clanker.gradle.srcx.analysis.analyzeProject
-import zone.clanker.gradle.srcx.analysis.buildDependencyGraph
-import zone.clanker.gradle.srcx.analysis.classifyAll
-import zone.clanker.gradle.srcx.analysis.classifyEntryPoints
-import zone.clanker.gradle.srcx.analysis.generateDependencyDiagram
-import zone.clanker.gradle.srcx.analysis.scanSources
 import zone.clanker.gradle.srcx.model.DependencyEntry
 import zone.clanker.gradle.srcx.model.ProjectSummary
 import zone.clanker.gradle.srcx.report.AntiPatternsRenderer
@@ -32,7 +24,6 @@ import zone.clanker.gradle.srcx.report.EntryPointsRenderer
 import zone.clanker.gradle.srcx.report.HotClassesRenderer
 import zone.clanker.gradle.srcx.report.InterfacesRenderer
 import zone.clanker.gradle.srcx.report.ReportWriter
-import zone.clanker.gradle.srcx.scan.ProjectScanner
 import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import java.io.File
 
@@ -145,8 +136,10 @@ abstract class ContextTask : DefaultTask() {
         val includedBuildSummaries = collectIncludedBuildSummaries(builds)
         val buildPairs = builds.map { it.name to it.dir }
         val buildEdges = ReportWriter.computeBuildEdges(buildPairs, includedBuildSummaries)
-        val crossBuild = analyzeCrossBuild(projects, builds, root)
-        val crossBuildSummary = crossBuild.second?.toSummary()
+
+        // Aggregate analysis from per-build summaries (robust, works on large repos)
+        val aggregatedSummary = aggregateAnalysis(summaryList, includedBuildSummaries)
+
         val renderer =
             DashboardRenderer(
                 rootName = rootName.get(),
@@ -154,34 +147,32 @@ abstract class ContextTask : DefaultTask() {
                 includedBuilds = includedBuildRefs,
                 includedBuildSummaries = includedBuildSummaries,
                 buildEdges = buildEdges,
-                crossBuildAnalysis = crossBuildSummary,
+                crossBuildAnalysis = aggregatedSummary,
             )
         val dir = File(root, outDir)
         dir.mkdirs()
         File(dir, "context.md").writeText(renderer.render())
 
         // Split detail files
-        writeSplitFiles(dir, summaryList, includedBuildSummaries, buildEdges, crossBuild, crossBuildSummary)
+        writeSplitFiles(dir, summaryList, includedBuildSummaries, buildEdges, aggregatedSummary)
 
         ReportWriter.writeGitignore(root, outDir)
         logger.lifecycle("srcx: context written to $outDir/context.md")
     }
 
-    @Suppress("LongParameterList")
     private fun writeSplitFiles(
         dir: File,
         summaryList: List<ProjectSummary>,
         includedBuildSummaries: Map<String, List<ProjectSummary>>,
         buildEdges: List<DashboardRenderer.BuildEdge>,
-        crossBuild: Pair<String, ProjectAnalysis?>,
-        crossBuildSummary: zone.clanker.gradle.srcx.model.AnalysisSummary?,
+        aggregatedSummary: zone.clanker.gradle.srcx.model.AnalysisSummary?,
     ) {
-        // hub-classes.md
-        val allHubs = crossBuildSummary?.hubs ?: emptyList()
+        // hub-classes.md — from aggregated per-build analysis
+        val allHubs = aggregatedSummary?.hubs ?: emptyList()
         File(dir, "hub-classes.md").writeText(HotClassesRenderer(allHubs).render())
 
-        // entry-points.md
-        val entryPoints = buildEntryPoints(crossBuild.second)
+        // entry-points.md — from aggregated per-build analysis
+        val entryPoints = buildEntryPointsFromSummaries(summaryList, includedBuildSummaries)
         File(dir, "entry-points.md").writeText(
             EntryPointsRenderer(entryPoints).render(),
         )
@@ -198,35 +189,47 @@ abstract class ContextTask : DefaultTask() {
 
         // cross-build.md
         File(dir, "cross-build.md").writeText(
-            CrossBuildRenderer(buildEdges, crossBuildSummary).render(),
+            CrossBuildRenderer(buildEdges, aggregatedSummary).render(),
         )
     }
 
-    private fun buildEntryPoints(analysis: ProjectAnalysis?): List<EntryPointsRenderer.ClassifiedEntry> {
-        if (analysis == null) return emptyList()
-        val allDirs = collectAllSourceDirs(projectDirs.get(), includedBuildInfos.get())
-        if (allDirs.isEmpty()) return emptyList()
-        return runCatching {
-            val sources = scanSources(allDirs)
-            val components = classifyAll(sources)
-            val depEdges = buildDependencyGraph(components)
-            val classified = classifyEntryPoints(components, depEdges)
-            classified.map { ep ->
-                EntryPointsRenderer.ClassifiedEntry(
-                    className = ep.component.source.simpleName,
-                    packageName = ep.component.source.packageName,
-                    kind = ep.kind.toEntryKind(),
-                )
-            }
-        }.getOrDefault(emptyList())
+    private fun buildEntryPointsFromSummaries(
+        summaryList: List<ProjectSummary>,
+        includedBuildSummaries: Map<String, List<ProjectSummary>>,
+    ): List<EntryPointsRenderer.ClassifiedEntry> {
+        val allSummaries = summaryList + includedBuildSummaries.values.flatten()
+        return allSummaries
+            .flatMap { summary ->
+                summary.sourceSets.flatMap { ss ->
+                    val isTestSourceSet = ss.name.value.contains("test", ignoreCase = true)
+                    ss.symbols
+                        .filter { it.kind == zone.clanker.gradle.srcx.model.SymbolKind.CLASS }
+                        .mapNotNull { symbol ->
+                            val name = symbol.name.value
+                            val isTest =
+                                isTestSourceSet ||
+                                    name.endsWith("Test") ||
+                                    name.endsWith("Spec")
+                            val isMock =
+                                name.startsWith("Mock") ||
+                                    name.endsWith("Mock") ||
+                                    name.startsWith("Fake") ||
+                                    name.endsWith("Fake") ||
+                                    name.startsWith("Stub") ||
+                                    name.endsWith("Stub")
+                            val kind =
+                                when {
+                                    isMock -> EntryPointsRenderer.EntryKind.MOCK
+                                    isTest -> EntryPointsRenderer.EntryKind.TEST
+                                    else -> null
+                                }
+                            kind?.let {
+                                EntryPointsRenderer.ClassifiedEntry(name, symbol.packageName.value, it)
+                            }
+                        }
+                }
+            }.distinctBy { "${it.packageName}.${it.className}" }
     }
-
-    private fun EntryPointKind.toEntryKind(): EntryPointsRenderer.EntryKind =
-        when (this) {
-            EntryPointKind.APP -> EntryPointsRenderer.EntryKind.APP
-            EntryPointKind.TEST -> EntryPointsRenderer.EntryKind.TEST
-            EntryPointKind.MOCK -> EntryPointsRenderer.EntryKind.MOCK
-        }
 
     private fun collectIncludedBuildSummaries(
         builds: List<IncludedBuildInfo>,
@@ -238,50 +241,31 @@ abstract class ContextTask : DefaultTask() {
                 }
         }
 
-    private fun analyzeCrossBuild(
-        projects: Map<String, File>,
-        builds: List<IncludedBuildInfo>,
-        rootDir: File,
-    ): Pair<String, ProjectAnalysis?> {
-        val allDirs = collectAllSourceDirs(projects, builds)
-        if (allDirs.isEmpty()) return "" to null
-        return runCatching {
-            val analysis =
-                analyzeProject(
-                    allDirs,
-                    rootDir,
-                    forbiddenPackages.get(),
-                    forbiddenClassSuffixes.get(),
-                )
-            val sources = scanSources(allDirs)
-            val components = classifyAll(sources)
-            val depEdges = buildDependencyGraph(components)
-            val diagram = generateDependencyDiagram(components, depEdges)
-            diagram to analysis
-        }.onFailure { e ->
-            logger.warn("srcx: cross-build analysis failed: ${e.message}")
-        }.getOrDefault("" to null)
+    private fun aggregateAnalysis(
+        summaryList: List<ProjectSummary>,
+        includedBuildSummaries: Map<String, List<ProjectSummary>>,
+    ): zone.clanker.gradle.srcx.model.AnalysisSummary? {
+        val allSummaries = summaryList + includedBuildSummaries.values.flatten()
+        val allAnalyses = allSummaries.mapNotNull { it.analysis }
+        if (allAnalyses.isEmpty()) return null
+
+        val allHubs =
+            allAnalyses
+                .flatMap { it.hubs }
+                .sortedByDescending { it.dependentCount }
+                .take(HUB_LIMIT)
+
+        val allCycles = allAnalyses.flatMap { it.cycles }.distinct()
+
+        return zone.clanker.gradle.srcx.model.AnalysisSummary(
+            findings = allAnalyses.flatMap { it.findings }.distinctBy { it.message },
+            hubs = allHubs,
+            cycles = allCycles,
+        )
     }
 
-    private fun collectAllSourceDirs(
-        projects: Map<String, File>,
-        builds: List<IncludedBuildInfo>,
-    ): List<File> {
-        val rootDirs =
-            projects.values.flatMap { projectDir ->
-                ProjectScanner
-                    .discoverSourceSets(projectDir)
-                    .flatMap { ss -> ProjectScanner.sourceSetDirs(projectDir, ss.value) }
-            }
-        val includedDirs =
-            builds.flatMap { build ->
-                build.projects.flatMap { (_, dir) ->
-                    ProjectScanner
-                        .discoverSourceSets(dir)
-                        .flatMap { ss -> ProjectScanner.sourceSetDirs(dir, ss.value) }
-                }
-            }
-        return (rootDirs + includedDirs).filter { it.exists() }
+    companion object {
+        private const val HUB_LIMIT = 30
     }
 }
 
