@@ -98,9 +98,9 @@ fun parseSourceFile(file: File, psiManager: PsiManager): SourceFileMetadata? {
  * Prefer the overload that accepts a [PsiManager] for batch parsing.
  */
 fun parseSourceFile(file: File): SourceFileMetadata? {
-    if (!file.isFile) return null
-    if (file.extension != "kt" && file.extension != "java") return null
-    return PsiEnvironment().use { env -> parseSourceFile(file, env.psiManager) }
+    if (!file.isFile || file.extension !in setOf("kt", "java")) return null
+    val env = PsiEnvironment.shared() ?: return null
+    return synchronized(env) { parseSourceFile(file, env.psiManager) }
 }
 
 /** Resolved type-level info from the first class/object in a Kotlin file. */
@@ -303,8 +303,8 @@ fun scanSources(srcDirs: List<File>): List<SourceFileMetadata> {
             }
     if (files.isEmpty()) return emptyList()
 
-    return PsiEnvironment().use { env ->
-        val psiManager = env.psiManager
-        files.mapNotNull { file -> parseSourceFile(file, psiManager) }
+    val env = PsiEnvironment.shared() ?: return emptyList()
+    return synchronized(env) {
+        files.mapNotNull { file -> parseSourceFile(file, env.psiManager) }
     }
 }
