@@ -68,6 +68,7 @@ class PsiEnvironment : AutoCloseable {
                         logger.error(
                             "srcx: PSI environment initialization failed: ${e.message}. " +
                                 "Hub classes and entry points will not be available.",
+                            e,
                         )
                     }.getOrNull()
             }
