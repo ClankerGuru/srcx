@@ -74,7 +74,8 @@ object SymbolExtractor {
                 }
         if (sourceFiles.isEmpty()) return emptyList()
 
-        return PsiEnvironment().use { env ->
+        val env = PsiEnvironment.shared() ?: return emptyList()
+        return synchronized(env) {
             val parser = PsiParser(env)
             sourceFiles.flatMap { file ->
                 val sourceDir = dirs.first { file.startsWith(it) }
@@ -287,9 +288,10 @@ object SymbolExtractor {
                 ?: File(projectDir, "build.gradle").takeIf { it.exists() }
                 ?: return emptyList()
 
-        return PsiEnvironment().use { env ->
+        val env = PsiEnvironment.shared() ?: return emptyList()
+        return synchronized(env) {
             val vf = LightVirtualFile(buildFile.name, KotlinFileType.INSTANCE, buildFile.readText())
-            val ktFile = env.psiManager.findFile(vf) as? KtFile ?: return@use emptyList()
+            val ktFile = env.psiManager.findFile(vf) as? KtFile ?: return@synchronized emptyList()
 
             ktFile
                 .collectDescendantsOfType<KtCallExpression>()
