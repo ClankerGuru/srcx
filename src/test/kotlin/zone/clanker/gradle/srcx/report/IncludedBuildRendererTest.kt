@@ -124,7 +124,7 @@ class IncludedBuildRendererTest :
 
                 then("it contains problems") {
                     output shouldContain "## Problems"
-                    output shouldContain "**WARNING** `Codec` may be doing too much"
+                    output shouldContain "**⚠\uFE0F** `Codec` may be doing too much"
                 }
 
                 then("it does not show projects table for single project") {

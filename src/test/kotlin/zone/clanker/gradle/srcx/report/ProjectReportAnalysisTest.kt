@@ -87,9 +87,9 @@ class ProjectReportAnalysisTest :
 
                 then("it contains findings section") {
                     output shouldContain "## Findings"
-                    output shouldContain "**WARNING** `FooHelper` is a helper class"
+                    output shouldContain "**⚠\uFE0F** `FooHelper` is a helper class"
                     output shouldContain "Move methods closer"
-                    output shouldContain "**INFO** `Bar` has no test"
+                    output shouldContain "**ℹ\uFE0F** `Bar` has no test"
                 }
 
                 then("it contains cycles section") {

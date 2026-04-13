@@ -34,7 +34,9 @@ internal class IncludedBuildRenderer(
         val totalSymbols = summaries.sumOf { it.symbols.size }
         val totalWarnings =
             summaries.sumOf { s ->
-                s.analysis?.findings?.count { it.severity == FindingSeverity.WARNING } ?: 0
+                s.analysis?.findings?.count {
+                    it.severity == FindingSeverity.WARNING || it.severity == FindingSeverity.FORBIDDEN
+                } ?: 0
             }
         val packages =
             summaries
@@ -155,31 +157,22 @@ internal class IncludedBuildRenderer(
         appendLine()
     }
 
+    @Suppress("CyclomaticComplexMethod")
     private fun StringBuilder.appendProblems() {
         val allFindings =
             summaries
                 .flatMap { s -> s.analysis?.findings ?: emptyList() }
                 .distinctBy { it.message }
-        val warnings = allFindings.filter { it.severity == FindingSeverity.WARNING }
-        val notes = allFindings.filter { it.severity == FindingSeverity.INFO }
         val allCycles =
             summaries.flatMap { s -> s.analysis?.cycles ?: emptyList() }
 
-        if (warnings.isEmpty() && notes.isEmpty() && allCycles.isEmpty()) return
+        if (allFindings.isEmpty() && allCycles.isEmpty()) return
 
         appendLine("## Problems")
         appendLine()
-        if (warnings.isNotEmpty()) {
-            for (f in warnings) {
-                appendLine("- **WARNING** ${f.message}")
-                appendLine("  - ${f.suggestion}")
-            }
-        }
-        if (notes.isNotEmpty()) {
-            for (f in notes) {
-                appendLine("- **INFO** ${f.message}")
-                appendLine("  - ${f.suggestion}")
-            }
+        for (f in allFindings.sortedBy { it.severity }) {
+            appendLine("- **${f.severity.icon}** ${f.message}")
+            appendLine("  - ${f.suggestion}")
         }
         if (allCycles.isNotEmpty()) {
             appendLine()

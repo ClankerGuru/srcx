@@ -86,18 +86,23 @@ internal class ProjectReportRenderer(
             }
         }
 
+        val forbidden = analysis.findings.filter { it.severity == FindingSeverity.FORBIDDEN }
         val warnings = analysis.findings.filter { it.severity == FindingSeverity.WARNING }
         val infos = analysis.findings.filter { it.severity == FindingSeverity.INFO }
 
-        if (warnings.isNotEmpty() || infos.isNotEmpty()) {
+        if (forbidden.isNotEmpty() || warnings.isNotEmpty() || infos.isNotEmpty()) {
             appendLine("## Findings")
             appendLine()
+            for (f in forbidden) {
+                appendLine("- **${f.severity.icon}** ${f.message}")
+                appendLine("  - ${f.suggestion}")
+            }
             for (f in warnings) {
-                appendLine("- **WARNING** ${f.message}")
+                appendLine("- **${f.severity.icon}** ${f.message}")
                 appendLine("  - ${f.suggestion}")
             }
             for (f in infos) {
-                appendLine("- **INFO** ${f.message}")
+                appendLine("- **${f.severity.icon}** ${f.message}")
                 appendLine("  - ${f.suggestion}")
             }
             appendLine()

@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.1.20")
+    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
 }
 
 gradlePlugin {
