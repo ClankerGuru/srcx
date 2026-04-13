@@ -34,9 +34,29 @@ import java.io.File
  * and dependencies from build files or the Gradle configuration API.
  */
 object SymbolExtractor {
+    private val logger =
+        org.gradle.api.logging.Logging
+            .getLogger(SymbolExtractor::class.java)
+
     /** Dependency scopes excluded from scanning by default. */
     internal val DEFAULT_EXCLUDED_DEP_SCOPES =
         Srcx.DEFAULT_EXCLUDED_DEP_SCOPES
+
+    internal fun handleAnalysisFailure(e: Throwable, projectName: String): Nothing? {
+        when (e) {
+            is OutOfMemoryError -> {
+                logger.error(
+                    "srcx: Out of memory analyzing '$projectName'. " +
+                        "Increase heap with org.gradle.jvmargs=-Xmx8g in gradle.properties",
+                )
+                throw e
+            }
+            else -> {
+                logger.warn("srcx: Analysis failed for '$projectName': ${e.message}")
+                return null
+            }
+        }
+    }
 
     /** Minimum number of colon-separated parts in a Maven coordinate (group:artifact:version). */
     private const val MIN_COORDINATE_PARTS = 3
@@ -121,7 +141,7 @@ object SymbolExtractor {
         val projectAnalysis =
             runCatching {
                 analyzeProject(allDirs, project.projectDir).toSummary()
-            }.getOrNull()
+            }.getOrElse { e -> handleAnalysisFailure(e, project.name) }
 
         return ProjectSummary(
             projectPath = ProjectPath(project.path),
@@ -167,7 +187,7 @@ object SymbolExtractor {
         val projectAnalysis =
             runCatching {
                 analyzeProject(allDirs, projectDir).toSummary()
-            }.getOrNull()
+            }.getOrElse { e -> handleAnalysisFailure(e, projectDir.name) }
 
         return ProjectSummary(
             projectPath = ProjectPath(projectPath),
@@ -229,7 +249,7 @@ object SymbolExtractor {
         val projectAnalysis =
             runCatching {
                 analyzeProject(allDirs, projectDir).toSummary()
-            }.getOrNull()
+            }.getOrElse { e -> handleAnalysisFailure(e, projectDir.name) }
 
         return ProjectSummary(
             projectPath = ProjectPath(projectPath),
