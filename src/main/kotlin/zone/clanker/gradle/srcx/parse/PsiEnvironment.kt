@@ -41,4 +41,44 @@ class PsiEnvironment : AutoCloseable {
     override fun close() {
         Disposer.dispose(disposable)
     }
+
+    companion object {
+        private val logger =
+            org.gradle.api.logging.Logging
+                .getLogger(PsiEnvironment::class.java)
+
+        @Volatile
+        private var shared: PsiEnvironment? = null
+        private val lock = Any()
+
+        /**
+         * Get or create a shared PsiEnvironment instance.
+         *
+         * The IntelliJ platform's ApplicationManager is not thread-safe,
+         * so we create exactly one instance and reuse it across all
+         * analysis calls. The lock ensures only one thread initializes.
+         */
+        fun shared(): PsiEnvironment? {
+            shared?.let { return it }
+            synchronized(lock) {
+                shared?.let { return it }
+                return runCatching { PsiEnvironment() }
+                    .onSuccess { shared = it }
+                    .onFailure { e ->
+                        logger.error(
+                            "srcx: PSI environment initialization failed: ${e.message}. " +
+                                "Hub classes and entry points will not be available.",
+                        )
+                    }.getOrNull()
+            }
+        }
+
+        /** Release the shared instance. Call once when all analysis is done. */
+        fun closeShared() {
+            synchronized(lock) {
+                shared?.close()
+                shared = null
+            }
+        }
+    }
 }
