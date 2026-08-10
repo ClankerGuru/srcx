@@ -86,6 +86,10 @@ abstract class ContextTask : DefaultTask() {
     @get:Internal
     abstract val includedBuildInfos: ListProperty<IncludedBuildInfo>
 
+    /** Included build identities and paths, used to invalidate reports when a worktree changes. */
+    @get:Input
+    abstract val includedBuildPaths: ListProperty<String>
+
     /** Package names to flag as forbidden in anti-pattern detection. */
     @get:Input
     abstract val forbiddenPackages: SetProperty<String>
