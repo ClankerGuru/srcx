@@ -141,6 +141,7 @@ class DashboardRendererTest :
                 then("it shows the header and overview") {
                     output shouldContain "# test-workspace"
                     output shouldContain "## Overview"
+                    output shouldContain "[Potentially Unused Classes](unused.md)"
                 }
             }
 

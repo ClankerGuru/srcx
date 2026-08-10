@@ -136,6 +136,25 @@ class SymbolIndexTest :
             }
         }
 
+        given("ambiguous simple names in different packages") {
+            val callerFile = File("/tmp/test/Caller.kt")
+            val appFile = File("/tmp/test/app/User.kt")
+            val libraryFile = File("/tmp/test/library/User.kt")
+            val symbols =
+                listOf(
+                    Symbol("Caller", "com.app.Caller", SymbolDetailKind.CLASS, callerFile, 1, "com.app"),
+                    Symbol("User", "com.app.User", SymbolDetailKind.CLASS, appFile, 1, "com.app"),
+                    Symbol("User", "com.lib.User", SymbolDetailKind.CLASS, libraryFile, 1, "com.lib"),
+                )
+            val reference = Reference("User", null, ReferenceKind.TYPE_REF, callerFile, 3, "val user: User")
+            val index = SymbolIndex(symbols, listOf(reference))
+
+            then("the caller package disambiguates the target") {
+                index.resolve(reference)?.qualifiedName shouldBe "com.app.User"
+                index.usedQualifiedNames() shouldBe setOf("com.app.User")
+            }
+        }
+
         given("findUsages") {
             val fileA = File("/tmp/test/A.kt")
             val fileB = File("/tmp/test/B.kt")

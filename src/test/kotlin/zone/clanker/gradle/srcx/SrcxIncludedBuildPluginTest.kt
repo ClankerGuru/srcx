@@ -46,6 +46,13 @@ class SrcxIncludedBuildPluginTest :
                 }
                 """.trimIndent(),
             )
+            libSrc.resolve("UnusedLib.kt").writeText(
+                """
+                package com.example.lib
+
+                class UnusedLib
+                """.trimIndent(),
+            )
             val libTestSrc = File(libDir, "src/test/kotlin/com/example/lib")
             libTestSrc.mkdirs()
             libTestSrc.resolve("LibTest.kt").writeText(
@@ -84,8 +91,10 @@ class SrcxIncludedBuildPluginTest :
                 """
                 package com.example.app
 
+                import com.example.lib.Lib
+
                 class App {
-                    fun run(): String = "running"
+                    fun run(): String = Lib().greet()
                 }
                 """.trimIndent(),
             )
@@ -172,6 +181,11 @@ class SrcxIncludedBuildPluginTest :
                     content shouldContain "## Included Builds"
                     content shouldContain "lib-build"
                     content shouldContain "| Build | Projects | Symbols | Warnings | Context |"
+                    content shouldContain "[Potentially Unused Classes](unused.md)"
+
+                    val unused = projectDir.resolve(".srcx/unused.md")
+                    unused.shouldExist()
+                    unused.readText() shouldContain "com.example.lib.UnusedLib"
                 }
             }
         }
