@@ -181,6 +181,7 @@ data object Srcx {
                         task.includedBuildInfos.set(
                             rootProject.provider { collectIncludedBuildInfos(rootProject) },
                         )
+                        task.includedBuildPaths.set(rootProject.provider { collectIncludedBuildPaths(rootProject) })
                         task.forbiddenPackages.convention(extension.forbiddenPackageNames)
                         task.forbiddenClassSuffixes.convention(extension.forbiddenClassNamePatterns)
                     }
@@ -219,6 +220,11 @@ data object Srcx {
                     relPath = relPath,
                     projects = ProjectScanner.discoverIncludedBuildProjects(build),
                 )
+            }
+
+        private fun collectIncludedBuildPaths(rootProject: Project): List<String> =
+            rootProject.gradle.includedBuilds.map { build ->
+                "${build.name}:${build.projectDir.canonicalPath}"
             }
 
         private fun collectSourceTrees(rootProject: Project): List<Any> {
