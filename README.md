@@ -43,6 +43,18 @@ srcx {
 
 Reports are aggregated from per-build analysis — works reliably on large repos with many included builds.
 
+## wrkx worktree integration
+
+`srcx` scans the included builds selected by Gradle, including branch worktrees managed by `wrkx`:
+
+```bash
+./gradlew wrkx-worktree -Pwrkx.branch=feature/example-name
+./gradlew build srcx-context -Pwrkx.branch=feature/example-name
+```
+
+The included-build name and canonical directory are task inputs. Switching the same repository from one worktree path
+to another invalidates `srcx-context`, regenerates reports in the selected worktrees, and updates dashboard links.
+
 ## DSL reference
 
 ```kotlin
