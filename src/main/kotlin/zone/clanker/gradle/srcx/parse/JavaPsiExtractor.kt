@@ -1,7 +1,9 @@
 package zone.clanker.gradle.srcx.parse
 
 import org.jetbrains.kotlin.com.intellij.psi.PsiClass
+import org.jetbrains.kotlin.com.intellij.psi.PsiJavaCodeReferenceElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiJavaFile
+import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
 import zone.clanker.gradle.srcx.model.Reference
 import zone.clanker.gradle.srcx.model.ReferenceKind
 import zone.clanker.gradle.srcx.model.Symbol
@@ -25,7 +27,8 @@ internal class JavaPsiExtractor {
         val results = mutableListOf<Reference>()
         extractImports(javaFile, file, results)
         extractSupertypes(javaFile, file, results)
-        return results
+        extractCodeReferences(javaFile, file, results)
+        return results.distinctBy { listOf(it.targetName, it.kind, it.line, it.context) }
     }
 
     private fun extractClass(
@@ -111,5 +114,33 @@ internal class JavaPsiExtractor {
                 )
             }
         }
+    }
+
+    private fun extractCodeReferences(
+        javaFile: PsiJavaFile,
+        file: File,
+        results: MutableList<Reference>,
+    ) {
+        val imports =
+            javaFile.importList
+                ?.importStatements
+                ?.mapNotNull { it.qualifiedName }
+                ?.associateBy { it.substringAfterLast('.') }
+                ?: emptyMap()
+        PsiTreeUtil
+            .collectElementsOfType(javaFile, PsiJavaCodeReferenceElement::class.java)
+            .forEach { reference ->
+                val name = reference.referenceName ?: return@forEach
+                results.add(
+                    Reference(
+                        name,
+                        imports[name],
+                        ReferenceKind.TYPE_REF,
+                        file,
+                        lineOf(reference),
+                        reference.text,
+                    ),
+                )
+            }
     }
 }

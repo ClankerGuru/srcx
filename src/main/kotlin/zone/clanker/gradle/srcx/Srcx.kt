@@ -146,6 +146,7 @@ data object Srcx {
             )
         }
 
+        @Suppress("LongMethod")
         internal fun registerTasks(
             rootProject: Project,
             extension: SettingsExtension,
@@ -182,6 +183,7 @@ data object Srcx {
                             rootProject.provider { collectIncludedBuildInfos(rootProject) },
                         )
                         task.includedBuildPaths.set(rootProject.provider { collectIncludedBuildPaths(rootProject) })
+                        task.projectIdentities.set(rootProject.provider { collectProjectIdentities(rootProject) })
                         task.forbiddenPackages.convention(extension.forbiddenPackageNames)
                         task.forbiddenClassSuffixes.convention(extension.forbiddenClassNamePatterns)
                     }
@@ -226,6 +228,16 @@ data object Srcx {
             rootProject.gradle.includedBuilds.map { build ->
                 "${build.name}:${build.projectDir.canonicalPath}"
             }
+
+        private fun collectProjectIdentities(rootProject: Project): List<String> =
+            rootProject.allprojects.map { project ->
+                "${rootProject.name}:${project.path}:${project.projectDir.canonicalPath}"
+            } +
+                rootProject.gradle.includedBuilds.flatMap { build ->
+                    ProjectScanner.discoverIncludedBuildProjects(build).map { (path, directory) ->
+                        "${build.name}:$path:${directory.canonicalPath}"
+                    }
+                }
 
         private fun collectSourceTrees(rootProject: Project): List<Any> {
             val trees = mutableListOf<Any>()

@@ -17,12 +17,22 @@ import java.io.File
  * @property symbols all declarations found across the analyzed source files
  * @property references all references found across the analyzed source files
  */
+@Suppress("TooManyFunctions")
 class SymbolIndex(
     val symbols: List<Symbol>,
     val references: List<Reference>,
 ) {
     private val byQualifiedName: Map<String, Symbol> = symbols.associateBy { it.qualifiedName }
     private val bySimpleName: Map<String, List<Symbol>> = symbols.groupBy { it.name.substringAfterLast('.') }
+    private val packageByFile: Map<String, String> =
+        symbols.associate { it.file.absolutePath to it.packageName }
+    private val importsByFile: Map<String, Map<String, String>> =
+        references
+            .filter { it.kind == ReferenceKind.IMPORT && it.targetQualifiedName != null }
+            .groupBy { it.file.absolutePath }
+            .mapValues { (_, imports) ->
+                imports.associate { it.targetName to requireNotNull(it.targetQualifiedName) }
+            }
 
     /**
      * Resolve a reference to its target symbol.
@@ -35,19 +45,17 @@ class SymbolIndex(
 
         val candidates = bySimpleName[ref.targetName] ?: return null
         if (candidates.size == 1) return candidates.first()
+        val samePackage =
+            packageByFile[ref.file.absolutePath]?.let { packageName ->
+                candidates.filter { it.packageName == packageName }.singleOrNull()
+            }
+        if (samePackage != null) return samePackage
         return resolveViaImports(ref)
     }
 
     private fun resolveViaImports(ref: Reference): Symbol? {
-        val fileImports =
-            references.filter {
-                it.file == ref.file && it.kind == ReferenceKind.IMPORT
-            }
-        val matchingImport =
-            fileImports.firstOrNull {
-                it.targetName == ref.targetName && it.targetQualifiedName != null
-            }
-        return matchingImport?.targetQualifiedName?.let { byQualifiedName[it] }
+        val qualifiedName = importsByFile[ref.file.absolutePath]?.get(ref.targetName)
+        return qualifiedName?.let { byQualifiedName[it] }
     }
 
     /** Find all usages of a symbol by its qualified name. */
@@ -72,6 +80,10 @@ class SymbolIndex(
             }
         return matchingSymbols.map { sym -> sym to findUsages(sym.qualifiedName) }
     }
+
+    /** Resolve all inbound references once for workspace-wide usage analysis. */
+    fun usedQualifiedNames(): Set<String> =
+        references.mapNotNull(::resolve).mapTo(mutableSetOf(), Symbol::qualifiedName)
 
     /** Get all symbols in a specific file. */
     fun symbolsInFile(file: File): List<Symbol> =
