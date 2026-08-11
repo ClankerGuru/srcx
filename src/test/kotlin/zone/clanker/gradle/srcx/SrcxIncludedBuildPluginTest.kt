@@ -181,11 +181,6 @@ class SrcxIncludedBuildPluginTest :
                     content shouldContain "## Included Builds"
                     content shouldContain "lib-build"
                     content shouldContain "| Build | Projects | Symbols | Warnings | Context |"
-                    content shouldContain "[Potentially Unused Classes](unused.md)"
-
-                    val unused = projectDir.resolve(".srcx/unused.md")
-                    unused.shouldExist()
-                    unused.readText() shouldContain "com.example.lib.UnusedLib"
                 }
             }
         }

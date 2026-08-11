@@ -47,7 +47,6 @@ The default `.srcx/` directory contains:
 | `anti-patterns.md` | Structural smells, cycles, forbidden names, and DI findings |
 | `interfaces.md` | Naming-based interface, implementation, and test-double candidates |
 | `cross-build.md` | Heuristic artifact-name edges plus concatenated per-project hubs and cycles; these are not semantic cross-build reference analysis |
-| `unused.md` | Production classes with no visible source references |
 | `root/context.md` | Detailed root-project context |
 | `<project>/context.md` | Detailed subproject context |
 
@@ -59,8 +58,6 @@ Each included build also receives its own configured output directory with a das
 - Prioritize hub classes when assessing high-impact changes, but verify references in source.
 - Do not treat `entry-points.md`, `interfaces.md`, or `cross-build.md` as authoritative semantic analysis; each uses
   naming or dependency-coordinate heuristics and can contain omissions or false positives.
-- Verify every `unused.md` candidate before deletion. Reflection, generated code, framework registration, external
-  consumers, and dynamic loading may not appear in source references.
 - Treat anti-pattern findings as review prompts. Inspect the cited source before changing architecture.
 - A missing WRKX repository is expected when it is disabled and therefore absent from the Gradle composite.
 
