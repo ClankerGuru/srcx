@@ -25,7 +25,7 @@ pluginManagement {
 }
 
 plugins {
-    id("zone.clanker.gradle.srcx") version "<version>"
+    id("zone.clanker.gradle.srcx") version "0.47.0"
 }
 
 srcx {
@@ -35,7 +35,7 @@ srcx {
 }
 ```
 
-Replace `<version>` with a published SRCX version from Maven Central.
+Version `0.47.0` is published on Maven Central.
 
 ## Configuration
 

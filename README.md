@@ -18,7 +18,7 @@ Scans your codebase — including all included builds in a workspace — and gen
 ```kotlin
 // settings.gradle.kts
 plugins {
-    id("zone.clanker.gradle.srcx") version "latest"
+    id("zone.clanker.gradle.srcx") version "0.47.0"
 }
 
 srcx {
