@@ -10,12 +10,15 @@
 
 Scans your codebase — including all included builds in a workspace — and generates structured Markdown reports: hub classes, entry points, anti-patterns, interfaces, and cross-build dependencies. Designed for AI agents that need codebase context.
 
+> **Recommended skill:** Use the plugin and task guides in [`skills/`](skills/README.md) when generating or consuming
+> SRCX context from an AI coding agent.
+
 ## Quick start
 
 ```kotlin
 // settings.gradle.kts
 plugins {
-    id("zone.clanker.gradle.srcx") version "latest"
+    id("zone.clanker.gradle.srcx") version "0.47.0"
 }
 
 srcx {
@@ -40,8 +43,31 @@ srcx {
 | `anti-patterns.md` | Code smells: god classes, circular deps, forbidden names, DI violations |
 | `interfaces.md` | Interface coverage: implementations, missing mocks |
 | `cross-build.md` | Shared classes referenced across build boundaries |
+| `unused.md` | Potentially unused production classes with build, project, source-set, and source locations |
 
-Reports are aggregated from per-build analysis — works reliably on large repos with many included builds.
+Reports are aggregated from per-build analysis — works reliably on large repos with many included builds. The unused
+report is conservative source analysis: verify candidates before deletion because reflection, generated code, external
+consumers, and framework registration may not be visible.
+
+## wrkx worktree integration
+
+`srcx` scans the included builds selected by Gradle, including branch worktrees managed by `wrkx`:
+
+```bash
+./gradlew wrkx-worktree -Pwrkx.branch=feature/example-name
+./gradlew build srcx-context -Pwrkx.branch=feature/example-name
+```
+
+When WRKX enables only a subset of its repository catalog, SRCX scans only that enabled subset because only those
+repositories are included in the Gradle composite. Disabled repositories may retain bare clones, but they do not need
+worktrees and do not appear in the root SRCX workspace report.
+
+Use `wrkx-worktree` to prepare those included builds; WRKX has no separate checkout alias. It fetches first and creates
+a missing local base branch from its remote counterpart, or from the fetched remote default when the base is absent on
+both sides. The new local base is not pushed.
+
+The included-build name and canonical directory are task inputs. Switching the same repository from one worktree path
+to another invalidates `srcx-context`, regenerates reports in the selected worktrees, and updates dashboard links.
 
 ## DSL reference
 

@@ -15,6 +15,7 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import zone.clanker.gradle.srcx.Srcx
+import zone.clanker.gradle.srcx.analysis.UnusedClassDetector
 import zone.clanker.gradle.srcx.model.DependencyEntry
 import zone.clanker.gradle.srcx.model.ProjectSummary
 import zone.clanker.gradle.srcx.report.AntiPatternsRenderer
@@ -24,6 +25,7 @@ import zone.clanker.gradle.srcx.report.EntryPointsRenderer
 import zone.clanker.gradle.srcx.report.HotClassesRenderer
 import zone.clanker.gradle.srcx.report.InterfacesRenderer
 import zone.clanker.gradle.srcx.report.ReportWriter
+import zone.clanker.gradle.srcx.report.UnusedClassesRenderer
 import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import java.io.File
 
@@ -86,6 +88,14 @@ abstract class ContextTask : DefaultTask() {
     @get:Internal
     abstract val includedBuildInfos: ListProperty<IncludedBuildInfo>
 
+    /** Included build identities and paths, used to invalidate reports when a worktree changes. */
+    @get:Input
+    abstract val includedBuildPaths: ListProperty<String>
+
+    /** Root and included project identities used to invalidate ownership-sensitive reports. */
+    @get:Input
+    abstract val projectIdentities: ListProperty<String>
+
     /** Package names to flag as forbidden in anti-pattern detection. */
     @get:Input
     abstract val forbiddenPackages: SetProperty<String>
@@ -139,6 +149,12 @@ abstract class ContextTask : DefaultTask() {
 
         // Aggregate analysis from per-build summaries (robust, works on large repos)
         val aggregatedSummary = aggregateAnalysis(summaryList, includedBuildSummaries)
+        val unusedClasses =
+            UnusedClassDetector.detect(
+                sourceFiles = sourceFiles.files.toList(),
+                workspaceRoot = root,
+                scopes = projectScopes(projects, builds),
+            )
 
         val renderer =
             DashboardRenderer(
@@ -154,7 +170,7 @@ abstract class ContextTask : DefaultTask() {
         File(dir, "context.md").writeText(renderer.render())
 
         // Split detail files
-        writeSplitFiles(dir, summaryList, includedBuildSummaries, buildEdges, aggregatedSummary)
+        writeSplitFiles(dir, summaryList, includedBuildSummaries, buildEdges, aggregatedSummary, unusedClasses)
 
         ReportWriter.writeGitignore(root, outDir)
         zone.clanker.gradle.srcx.parse.PsiEnvironment
@@ -162,12 +178,14 @@ abstract class ContextTask : DefaultTask() {
         logger.lifecycle("srcx: context written to $outDir/context.md")
     }
 
+    @Suppress("LongParameterList")
     private fun writeSplitFiles(
         dir: File,
         summaryList: List<ProjectSummary>,
         includedBuildSummaries: Map<String, List<ProjectSummary>>,
         buildEdges: List<DashboardRenderer.BuildEdge>,
         aggregatedSummary: zone.clanker.gradle.srcx.model.AnalysisSummary?,
+        unusedClasses: List<zone.clanker.gradle.srcx.model.UnusedClass>,
     ) {
         // hub-classes.md — from aggregated per-build analysis
         val allHubs = aggregatedSummary?.hubs ?: emptyList()
@@ -193,7 +211,22 @@ abstract class ContextTask : DefaultTask() {
         File(dir, "cross-build.md").writeText(
             CrossBuildRenderer(buildEdges, aggregatedSummary).render(),
         )
+
+        File(dir, "unused.md").writeText(UnusedClassesRenderer(unusedClasses).render())
     }
+
+    private fun projectScopes(
+        projects: Map<String, File>,
+        builds: List<IncludedBuildInfo>,
+    ): List<UnusedClassDetector.ProjectScope> =
+        projects.map { (path, directory) ->
+            UnusedClassDetector.ProjectScope(rootName.get(), path, directory)
+        } +
+            builds.flatMap { build ->
+                build.projects.map { (path, directory) ->
+                    UnusedClassDetector.ProjectScope(build.name, path, directory)
+                }
+            }
 
     private fun buildEntryPointsFromSummaries(
         summaryList: List<ProjectSummary>,

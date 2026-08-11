@@ -3,12 +3,14 @@ package zone.clanker.gradle.srcx.parse
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtObjectDeclaration
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtSuperTypeCallEntry
 import org.jetbrains.kotlin.psi.KtSuperTypeEntry
 import org.jetbrains.kotlin.psi.KtSuperTypeListEntry
+import org.jetbrains.kotlin.psi.KtUserType
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import zone.clanker.gradle.srcx.model.Reference
 import zone.clanker.gradle.srcx.model.ReferenceKind
@@ -35,12 +37,17 @@ internal class KotlinPsiExtractor {
         val results = mutableListOf<Reference>()
         val importMap =
             ktFile.importDirectives
-                .mapNotNull { it.importedFqName?.asString() }
-                .associateBy { it.substringAfterLast('.') }
+                .mapNotNull { directive ->
+                    directive.importedFqName?.asString()?.let { qualifiedName ->
+                        (directive.aliasName ?: qualifiedName.substringAfterLast('.')) to qualifiedName
+                    }
+                }.toMap()
         extractImports(ktFile, file, results)
         extractSupertypes(ktFile, file, importMap, results)
         extractCalls(ktFile, file, importMap, results)
-        return results
+        extractTypeReferences(ktFile, file, importMap, results)
+        extractNameReferences(ktFile, file, importMap, results)
+        return results.distinctBy { listOf(it.targetName, it.kind, it.line, it.context) }
     }
 
     // --- Declarations ---
@@ -179,6 +186,49 @@ internal class KotlinPsiExtractor {
                             .take(CONTEXT_MAX_LEN),
                     ),
                 )
+        }
+    }
+
+    private fun extractTypeReferences(
+        ktFile: KtFile,
+        file: File,
+        importMap: Map<String, String>,
+        results: MutableList<Reference>,
+    ) {
+        for (type in ktFile.collectDescendantsOfType<KtUserType>()) {
+            val name = type.referencedName ?: continue
+            results.add(
+                Reference(
+                    name,
+                    importMap[name],
+                    ReferenceKind.TYPE_REF,
+                    file,
+                    lineOf(ktFile.text, type.textOffset),
+                    type.text.take(CONTEXT_MAX_LEN),
+                ),
+            )
+        }
+    }
+
+    private fun extractNameReferences(
+        ktFile: KtFile,
+        file: File,
+        importMap: Map<String, String>,
+        results: MutableList<Reference>,
+    ) {
+        for (reference in ktFile.collectDescendantsOfType<KtNameReferenceExpression>()) {
+            val name = reference.getReferencedName()
+            if (name.firstOrNull()?.isUpperCase() != true) continue
+            results.add(
+                Reference(
+                    name,
+                    importMap[name],
+                    ReferenceKind.NAME_REF,
+                    file,
+                    lineOf(ktFile.text, reference.textOffset),
+                    reference.text.take(CONTEXT_MAX_LEN),
+                ),
+            )
         }
     }
 
