@@ -62,6 +62,10 @@ When WRKX enables only a subset of its repository catalog, SRCX scans only that 
 repositories are included in the Gradle composite. Disabled repositories may retain bare clones, but they do not need
 worktrees and do not appear in the root SRCX workspace report.
 
+Use `wrkx-worktree` to prepare those included builds; WRKX has no separate checkout alias. It fetches first and creates
+a missing local base branch from its remote counterpart, or from the fetched remote default when the base is absent on
+both sides. The new local base is not pushed.
+
 The included-build name and canonical directory are task inputs. Switching the same repository from one worktree path
 to another invalidates `srcx-context`, regenerates reports in the selected worktrees, and updates dashboard links.
 

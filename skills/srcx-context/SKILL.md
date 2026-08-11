@@ -20,6 +20,9 @@ With WRKX-selected worktrees:
 ```
 
 The branch property belongs to WRKX. SRCX analyzes whichever included builds Gradle selects for that invocation.
+Use `wrkx-worktree`; there is no separate checkout alias. Before creating worktrees, WRKX fetches and creates a missing
+local base from `origin/<baseBranch>`, or from the fetched remote default when that base is absent remotely too. It does
+not push the new local base.
 
 ## Behavior
 
