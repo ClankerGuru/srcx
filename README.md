@@ -10,6 +10,9 @@
 
 Scans your codebase — including all included builds in a workspace — and generates structured Markdown reports: hub classes, entry points, anti-patterns, interfaces, and cross-build dependencies. Designed for AI agents that need codebase context.
 
+> **Recommended skill:** Use the plugin and task guides in [`skills/`](skills/README.md) when generating or consuming
+> SRCX context from an AI coding agent.
+
 ## Quick start
 
 ```kotlin
