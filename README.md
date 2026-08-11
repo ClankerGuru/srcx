@@ -55,6 +55,10 @@ consumers, and framework registration may not be visible.
 ./gradlew build srcx-context -Pwrkx.branch=feature/example-name
 ```
 
+When WRKX enables only a subset of its repository catalog, SRCX scans only that enabled subset because only those
+repositories are included in the Gradle composite. Disabled repositories may retain bare clones, but they do not need
+worktrees and do not appear in the root SRCX workspace report.
+
 The included-build name and canonical directory are task inputs. Switching the same repository from one worktree path
 to another invalidates `srcx-context`, regenerates reports in the selected worktrees, and updates dashboard links.
 
