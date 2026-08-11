@@ -144,7 +144,6 @@ internal class DashboardRenderer(
         appendLine("- [Entry Points](entry-points.md)")
         appendLine("- [Anti-Patterns](anti-patterns.md)")
         appendLine("- [Interfaces](interfaces.md)")
-        appendLine("- [Potentially Unused Classes](unused.md)")
         if (buildEdges.isNotEmpty() || crossBuildAnalysis != null) {
             appendLine("- [Cross-Build References](cross-build.md)")
         }

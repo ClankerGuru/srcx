@@ -43,11 +43,8 @@ srcx {
 | `anti-patterns.md` | Code smells: god classes, circular deps, forbidden names, DI violations |
 | `interfaces.md` | Interface coverage: implementations, missing mocks |
 | `cross-build.md` | Shared classes referenced across build boundaries |
-| `unused.md` | Potentially unused production classes with build, project, source-set, and source locations |
 
-Reports are aggregated from per-build analysis — works reliably on large repos with many included builds. The unused
-report is conservative source analysis: verify candidates before deletion because reflection, generated code, external
-consumers, and framework registration may not be visible.
+Reports are aggregated from per-build analysis and work reliably on large repos with many included builds.
 
 ## wrkx worktree integration
 
