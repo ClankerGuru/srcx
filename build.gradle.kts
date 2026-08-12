@@ -4,6 +4,9 @@ plugins {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
+    implementation("org.webjars.npm:d3:7.9.0") {
+        isTransitive = false
+    }
 }
 
 gradlePlugin {

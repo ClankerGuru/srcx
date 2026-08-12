@@ -133,6 +133,29 @@ class SourceFileMetadataTest :
                 file.delete()
             }
 
+            `when`("kotlin enum contains nested enum entries") {
+                val file =
+                    tempFile(
+                        "Severity", "kt",
+                        """
+                        package com.example
+
+                        enum class Severity {
+                            WARNING,
+                            FORBIDDEN,
+                        }
+                        """.trimIndent(),
+                    )
+
+                val metadata = parseSourceFile(file)
+
+                then("the top-level enum is the component") {
+                    metadata?.simpleName shouldBe "Severity"
+                }
+
+                file.delete()
+            }
+
             `when`("java file") {
                 val file =
                     tempFile(

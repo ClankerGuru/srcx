@@ -133,6 +133,8 @@ enum class SymbolDetailKind(
  * @property file the file containing this reference
  * @property line the 1-based line number
  * @property context a snippet of the source line for display
+ * @property sourceQualifiedName the qualified containing declaration, when PSI ownership is deterministic
+ * @property evidence how strongly the extracted fact identifies its target
  */
 data class Reference(
     val targetName: String,
@@ -141,6 +143,14 @@ data class Reference(
     val file: File,
     val line: Int,
     val context: String,
+    val sourceQualifiedName: String? = null,
+    val evidence: ReferenceEvidence = ReferenceEvidence.DIRECT,
+)
+
+/** Declarations and references extracted from one parsed source file. */
+data class FileFacts(
+    val declarations: List<Symbol>,
+    val references: List<Reference>,
 )
 
 /**
@@ -157,6 +167,9 @@ enum class ReferenceKind(
     SUPERTYPE("extends/implements"),
     TYPE_REF("type"),
     CONSTRUCTOR("constructor"),
+    PROPERTY_TYPE("property type"),
+    PARAMETER_TYPE("parameter type"),
+    RETURN_TYPE("return type"),
 }
 
 /**

@@ -1,0 +1,105 @@
+<article class="srcx-theme srcx-page srcx-dashboard" aria-label="{{workspaceName}} SRCX source documentation">
+    {{mastheadHtml}}
+
+    <section class="srcx-dashboard__hero" id="top">
+        <div class="srcx-dashboard__hero-copy">
+            <div>
+                <p class="srcx-dashboard__overline">SRCX / Workspace source documentation</p>
+                <h1>Source <strong>model.</strong></h1>
+            </div>
+            <div class="srcx-dashboard__hero-summary">
+                <div class="srcx-dashboard__hero-tags">{{heroTagsHtml}}</div>
+                <p class="srcx-dashboard__dek">
+                    Structure, analysis, and architecture rendered directly from the typed WorkspaceReport,
+                    with every record attached to its modeled build and project scope.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    {{metricStripHtml}}
+
+    <nav class="srcx-dashboard__nav" aria-label="Documentation sections">
+        <a href="#architecture"><span>01</span>Architecture</a>
+        <a href="#builds"><span>02</span>Builds</a>
+        <a href="#health"><span>03</span>Health</a>
+        <a href="#model"><span>04</span>Model</a>
+        <a href="#findings"><span>05</span>Findings</a>
+    </nav>
+
+    <section class="srcx-dashboard__section" id="architecture">
+        {{architectureHeadingHtml}}
+        {{architectureSummaryHtml}}
+        {{architectureGraphHtml}}
+        {{architectureEvidenceHtml}}
+    </section>
+
+    <section class="srcx-dashboard__section" id="builds">
+        {{buildsHeadingHtml}}
+        <div class="srcx-dashboard__build-comparison">
+            {{buildTableHtml}}
+            <div class="srcx-dashboard__build-edges">
+                <strong>Build edges</strong>
+                <div>{{buildEdgesHtml}}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="srcx-dashboard__section" id="health">
+        {{healthHeadingHtml}}
+        <div class="srcx-dashboard__chart-grid">
+            <article class="srcx-dashboard__chart srcx-dashboard__chart--wide">
+                <header><span>Symbol ownership</span><strong>By build</strong></header>
+                {{symbolOwnershipHtml}}
+            </article>
+
+            <article class="srcx-dashboard__chart srcx-dashboard__chart--severity">
+                <header><span>Finding severity</span><strong>Project-scoped</strong></header>
+                {{severityHtml}}
+            </article>
+
+            <details class="srcx-dashboard__chart srcx-dashboard__chart--hubs srcx-dashboard__hub-chart">
+                <summary><span>Production hubs</span><strong>{{productionHubCount}} / expand</strong></summary>
+                <div class="srcx-dashboard__hub-chart-body">
+                    <div class="srcx-dashboard__hub-bars">{{hubBarsHtml}}</div>
+                </div>
+            </details>
+
+            <article class="srcx-dashboard__chart srcx-dashboard__chart--coverage">
+                <header><span>Source coverage</span><strong>Typed records</strong></header>
+                {{coverageHtml}}
+            </article>
+        </div>
+    </section>
+
+    <section class="srcx-dashboard__section srcx-dashboard__section--model" id="model">
+        {{modelHeadingHtml}}
+        <details class="srcx-disclosure srcx-dashboard__model-disclosure">
+            <summary><span>WorkspaceReport fields and rendering provenance</span><strong>Expand</strong></summary>
+            <div class="srcx-disclosure__body srcx-dashboard__model-grid">
+                <article>
+                    <p class="srcx-dashboard__catalog-label">Typed model coverage</p>
+                    {{modelCoverageHtml}}
+                </article>
+                <article>
+                    <p class="srcx-dashboard__catalog-label">Rendering provenance</p>
+                    {{provenanceHtml}}
+                </article>
+            </div>
+        </details>
+    </section>
+
+    <section class="srcx-dashboard__section srcx-dashboard__section--finding" id="findings">
+        {{findingsHeadingHtml}}
+        {{findingsHtml}}
+    </section>
+
+    <footer class="srcx-dashboard__footer">
+        {{sourceNoteHtml}}
+        <div class="srcx-dashboard__footer-line">
+            <span>Generated directly from the SRCX WorkspaceReport</span>
+            <a href="#top">Back to top</a>
+        </div>
+    </footer>
+</article>
+{{scriptsHtml}}

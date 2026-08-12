@@ -19,6 +19,7 @@ internal class DashboardRenderer(
     private val includedBuildSummaries: Map<String, List<ProjectSummary>> = emptyMap(),
     private val buildEdges: List<BuildEdge> = emptyList(),
     private val crossBuildAnalysis: AnalysisSummary? = null,
+    private val workspaceRelationships: WorkspaceRelationshipsRenderer.RenderedWorkspaceRelationships? = null,
 ) {
     data class IncludedBuildRef(
         val name: String,
@@ -39,6 +40,7 @@ internal class DashboardRenderer(
             appendBuildGraph()
             appendIncludedBuilds()
             appendSplitFileLinks()
+            workspaceRelationships?.let { append(it.contextSectionMarkdown) }
         }
 
     private fun StringBuilder.appendOverview() {
@@ -144,6 +146,9 @@ internal class DashboardRenderer(
         appendLine("- [Entry Points](entry-points.md)")
         appendLine("- [Anti-Patterns](anti-patterns.md)")
         appendLine("- [Interfaces](interfaces.md)")
+        if (workspaceRelationships != null) {
+            appendLine("- [Workspace Relationships](relationships/index.md)")
+        }
         if (buildEdges.isNotEmpty() || crossBuildAnalysis != null) {
             appendLine("- [Cross-Build References](cross-build.md)")
         }

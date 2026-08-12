@@ -2,7 +2,6 @@ package zone.clanker.gradle.srcx.report
 
 import org.gradle.api.logging.Logging
 import zone.clanker.gradle.srcx.model.ProjectSummary
-import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import java.io.File
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
@@ -44,20 +43,46 @@ object ReportWriter {
         writeGitignoreAt(dir)
     }
 
-    /** Generate included build reports from pre-computed data. */
-    internal fun generateIncludedBuildReportsFromData(
-        builds: List<zone.clanker.gradle.srcx.task.IncludedBuildInfo>,
+    /** Write included-build reports from the summaries already used by the workspace report. */
+    internal fun writeIncludedBuildReports(
+        buildDirectories: Map<String, File>,
+        summariesByBuild: Map<String, List<ProjectSummary>>,
         outputDir: String,
     ) {
-        for (info in builds) {
-            val summaries =
-                info.projects.map { (path, dir) ->
-                    SymbolExtractor.extractStandaloneProjectSummary(dir, path)
-                }
-            writeBuildReports(info.name, info.dir, summaries, outputDir)
+        for ((buildName, buildDirectory) in buildDirectories) {
+            val summaries = summariesByBuild[buildName].orEmpty()
+            writeBuildReports(buildName, buildDirectory, summaries, outputDir)
         }
-        if (builds.isNotEmpty()) {
-            logger.lifecycle("srcx: generated reports for ${builds.size} included build(s)")
+        if (buildDirectories.isNotEmpty()) {
+            logger.lifecycle("srcx: generated reports for ${buildDirectories.size} included build(s)")
+        }
+    }
+
+    /** Replace the complete root relationship subtree so removed symbols cannot leave stale pages. */
+    internal fun writeWorkspaceRelationshipReports(
+        outputDirectory: File,
+        rendered: WorkspaceRelationshipsRenderer.RenderedWorkspaceRelationships,
+    ) {
+        val pages = rendered.pages.sortedBy { it.fileName }
+        require(pages.map { it.fileName }.distinct().size == pages.size) {
+            "relationship page filenames must be unique"
+        }
+        require(pages.all { it.fileName == File(it.fileName).name && it.fileName.endsWith(".md") }) {
+            "relationship page filenames must be safe Markdown filenames"
+        }
+        check(outputDirectory.isDirectory || outputDirectory.mkdirs()) {
+            "Unable to create srcx output directory: ${outputDirectory.absolutePath}"
+        }
+        val relationshipDirectory = File(outputDirectory, "relationships")
+        check(!relationshipDirectory.exists() || relationshipDirectory.deleteRecursively()) {
+            "Unable to delete stale relationship directory: ${relationshipDirectory.absolutePath}"
+        }
+        check(relationshipDirectory.mkdir()) {
+            "Unable to create relationship directory: ${relationshipDirectory.absolutePath}"
+        }
+        File(relationshipDirectory, "index.md").writeText(rendered.indexMarkdown)
+        pages.forEach { page ->
+            File(relationshipDirectory, page.fileName).writeText(page.markdown)
         }
     }
 

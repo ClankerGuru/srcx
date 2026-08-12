@@ -242,14 +242,16 @@ class SymbolEntryTest :
                 then("all fields are accessible") {
                     ref.targetName shouldBe "MyService"
                     ref.kind shouldBe ReferenceKind.IMPORT
+                    ref.sourceQualifiedName shouldBe null
+                    ref.evidence shouldBe ReferenceEvidence.DIRECT
                 }
             }
         }
 
         given("ReferenceKind enum") {
             `when`("listing all values") {
-                then("there are six kinds") {
-                    ReferenceKind.entries.size shouldBe 6
+                then("there are nine kinds") {
+                    ReferenceKind.entries.size shouldBe 9
                 }
             }
 
@@ -261,6 +263,9 @@ class SymbolEntryTest :
                     ReferenceKind.TYPE_REF.label shouldBe "type"
                     ReferenceKind.CONSTRUCTOR.label shouldBe "constructor"
                     ReferenceKind.NAME_REF.label shouldBe "reference"
+                    ReferenceKind.PROPERTY_TYPE.label shouldBe "property type"
+                    ReferenceKind.PARAMETER_TYPE.label shouldBe "parameter type"
+                    ReferenceKind.RETURN_TYPE.label shouldBe "return type"
                 }
             }
         }

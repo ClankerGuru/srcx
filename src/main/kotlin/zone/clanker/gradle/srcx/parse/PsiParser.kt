@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiJavaFile
 import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.KtFile
+import zone.clanker.gradle.srcx.model.FileFacts
 import zone.clanker.gradle.srcx.model.Reference
 import zone.clanker.gradle.srcx.model.Symbol
 import java.io.File
@@ -22,19 +23,29 @@ class PsiParser(
     private val kotlinExtractor = KotlinPsiExtractor()
     private val javaExtractor = JavaPsiExtractor()
 
-    fun extractDeclarations(file: File): List<Symbol> =
+    fun extractFacts(file: File): FileFacts =
         when (file.extension) {
-            "kt", "kts" -> parseKtFile(file)?.let { kotlinExtractor.declarations(it, file) } ?: emptyList()
-            "java" -> parseJavaFile(file)?.let { javaExtractor.declarations(it, file) } ?: emptyList()
-            else -> emptyList()
+            "kt", "kts" ->
+                parseKtFile(file)?.let { ktFile ->
+                    FileFacts(
+                        declarations = kotlinExtractor.declarations(ktFile, file),
+                        references = kotlinExtractor.references(ktFile, file),
+                    )
+                } ?: FileFacts(emptyList(), emptyList())
+            "java" ->
+                parseJavaFile(file)?.let { javaFile ->
+                    FileFacts(
+                        declarations = javaExtractor.declarations(javaFile, file),
+                        references = javaExtractor.references(javaFile, file),
+                    )
+                } ?: FileFacts(emptyList(), emptyList())
+            else -> FileFacts(emptyList(), emptyList())
         }
 
+    fun extractDeclarations(file: File): List<Symbol> = extractFacts(file).declarations
+
     fun extractReferences(file: File): List<Reference> =
-        when (file.extension) {
-            "kt", "kts" -> parseKtFile(file)?.let { kotlinExtractor.references(it, file) } ?: emptyList()
-            "java" -> parseJavaFile(file)?.let { javaExtractor.references(it, file) } ?: emptyList()
-            else -> emptyList()
-        }
+        extractFacts(file).references
 
     private fun parseKtFile(file: File): KtFile? {
         val vf = LightVirtualFile(file.name, KotlinFileType.INSTANCE, file.readText())

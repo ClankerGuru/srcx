@@ -175,6 +175,21 @@ class SrcxPluginTest :
                 }
             }
 
+            `when`("srcx-context renders static documentation") {
+                val projectDir = tempProject().withMultiProject()
+
+                then("the standalone page and notebook fragment come from the workspace model") {
+                    projectDir.gradle(Srcx.TASK_CONTEXT).build()
+                    val standalone = projectDir.resolve(".srcx/site/index.html")
+                    val fragment = projectDir.resolve(".srcx/site/report.html")
+                    standalone.shouldExist()
+                    fragment.shouldExist()
+                    standalone.readText() shouldContain "<!doctype html>"
+                    standalone.readText() shouldContain "test-workspace"
+                    fragment.readText() shouldContain "data-srcx-theme=\"gort\""
+                }
+            }
+
             `when`("symbols are extracted from source") {
                 val projectDir = tempProject().withMultiProject()
 
@@ -221,6 +236,20 @@ class SrcxPluginTest :
                     result.task(":${Srcx.TASK_CONTEXT}")?.outcome shouldBe TaskOutcome.UP_TO_DATE
                     val secondContent = projectDir.resolve(".srcx/core/context.md").readText()
                     secondContent shouldBe firstContent
+                }
+            }
+
+            `when`("the generated static page is deleted") {
+                val projectDir = tempProject().withMultiProject()
+
+                then("srcx-context regenerates the complete output directory") {
+                    projectDir.gradle(Srcx.TASK_CONTEXT).build()
+                    val standalone = projectDir.resolve(".srcx/site/index.html")
+                    standalone.delete()
+
+                    val result = projectDir.gradle(Srcx.TASK_CONTEXT).build()
+                    result.task(":${Srcx.TASK_CONTEXT}")?.outcome shouldBe TaskOutcome.SUCCESS
+                    standalone.shouldExist()
                 }
             }
         }

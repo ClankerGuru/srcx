@@ -3,6 +3,7 @@ package zone.clanker.gradle.srcx.parse
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import zone.clanker.gradle.srcx.model.ReferenceEvidence
 import zone.clanker.gradle.srcx.model.ReferenceKind
 import zone.clanker.gradle.srcx.model.SymbolDetailKind
 import java.io.File
@@ -185,6 +186,91 @@ class PsiParserTest :
                     refs.any { it.kind == ReferenceKind.CALL && it.targetName == "println" } shouldBe true
                 }
             }
+
+            `when`("parsing declaration-owned references and types") {
+                val file =
+                    tempFile(
+                        "Owned.kt",
+                        """
+                        package com.example
+
+                        import sample.Parent
+                        import sample.Input
+                        import sample.Output
+                        import sample.State
+
+                        class Owned : Parent {
+                            val state: State = State()
+
+                            fun execute(input: Input): Output {
+                                input as State
+                                consume(input)
+                                return Output()
+                            }
+                        }
+                        """.trimIndent(),
+                    )
+                val facts = parser.extractFacts(file)
+                val refs = facts.references
+
+                then("extractFacts returns declarations and references together") {
+                    facts.declarations.any { it.qualifiedName == "com.example.Owned.execute" } shouldBe true
+                    refs.isNotEmpty() shouldBe true
+                }
+
+                then("the existing extraction APIs remain compatible") {
+                    parser.extractDeclarations(file) shouldBe facts.declarations
+                    parser.extractReferences(file) shouldBe facts.references
+                }
+
+                then("supertypes retain their containing class") {
+                    val reference = refs.first { it.kind == ReferenceKind.SUPERTYPE && it.targetName == "Parent" }
+                    reference.sourceQualifiedName shouldBe "com.example.Owned"
+                }
+
+                then("property, parameter, and return types are precise") {
+                    refs
+                        .first { it.kind == ReferenceKind.PROPERTY_TYPE && it.targetName == "State" }
+                        .sourceQualifiedName shouldBe "com.example.Owned.state"
+                    refs
+                        .first { it.kind == ReferenceKind.PARAMETER_TYPE && it.targetName == "Input" }
+                        .sourceQualifiedName shouldBe "com.example.Owned.execute"
+                    refs
+                        .first { it.kind == ReferenceKind.RETURN_TYPE && it.targetName == "Output" }
+                        .sourceQualifiedName shouldBe "com.example.Owned.execute"
+                }
+
+                then("calls and heuristic constructors retain their containing function") {
+                    refs
+                        .first { it.kind == ReferenceKind.CALL && it.targetName == "consume" }
+                        .sourceQualifiedName shouldBe "com.example.Owned.execute"
+                    val constructor = refs.first { it.kind == ReferenceKind.CONSTRUCTOR && it.targetName == "Output" }
+                    constructor.sourceQualifiedName shouldBe "com.example.Owned.execute"
+                    constructor.evidence shouldBe ReferenceEvidence.HEURISTIC
+                }
+
+                then("property constructors and name references retain their nearest declaration") {
+                    refs
+                        .first { it.kind == ReferenceKind.CONSTRUCTOR && it.targetName == "State" }
+                        .sourceQualifiedName shouldBe "com.example.Owned.state"
+                    refs
+                        .first {
+                            it.kind == ReferenceKind.NAME_REF &&
+                                it.targetName == "Output" &&
+                                it.sourceQualifiedName != null
+                        }.sourceQualifiedName shouldBe "com.example.Owned.execute"
+                }
+
+                then("types outside declaration signatures preserve the generic type kind") {
+                    refs
+                        .first { it.kind == ReferenceKind.TYPE_REF && it.targetName == "State" }
+                        .sourceQualifiedName shouldBe "com.example.Owned.execute"
+                }
+
+                then("imports have no source declaration") {
+                    refs.filter { it.kind == ReferenceKind.IMPORT }.all { it.sourceQualifiedName == null } shouldBe true
+                }
+            }
         }
 
         given("Java file parsing") {
@@ -257,6 +343,80 @@ class PsiParserTest :
                     refs.any { it.kind == ReferenceKind.SUPERTYPE && it.targetName == "Runnable" } shouldBe true
                 }
             }
+
+            `when`("parsing Java calls, constructors, and declaration types") {
+                val file =
+                    tempFile(
+                        "JavaOwned.java",
+                        """
+                        package com.example;
+
+                        import sample.Contract;
+                        import sample.Input;
+                        import sample.Result;
+                        import sample.State;
+                        import static sample.Worker.run;
+
+                        class JavaOwned implements Contract {
+                            private State state;
+
+                            Result execute(Input input) {
+                                State local = state;
+                                run();
+                                return new Result();
+                            }
+                        }
+                        """.trimIndent(),
+                    )
+                val refs = parser.extractFacts(file).references
+
+                then("Java type positions retain precise owning declarations") {
+                    refs
+                        .first { it.kind == ReferenceKind.PROPERTY_TYPE && it.targetName == "State" }
+                        .sourceQualifiedName shouldBe "com.example.JavaOwned.state"
+                    refs
+                        .first { it.kind == ReferenceKind.PARAMETER_TYPE && it.targetName == "Input" }
+                        .sourceQualifiedName shouldBe "com.example.JavaOwned.execute"
+                    refs
+                        .first { it.kind == ReferenceKind.RETURN_TYPE && it.targetName == "Result" }
+                        .sourceQualifiedName shouldBe "com.example.JavaOwned.execute"
+                }
+
+                then("Java method calls and new expressions are direct PSI facts") {
+                    val call = refs.first { it.kind == ReferenceKind.CALL && it.targetName == "run" }
+                    call.targetQualifiedName shouldBe "sample.Worker.run"
+                    call.sourceQualifiedName shouldBe "com.example.JavaOwned.execute"
+                    val constructor = refs.first { it.kind == ReferenceKind.CONSTRUCTOR && it.targetName == "Result" }
+                    constructor.targetQualifiedName shouldBe "sample.Result"
+                    constructor.sourceQualifiedName shouldBe "com.example.JavaOwned.execute"
+                    constructor.evidence shouldBe ReferenceEvidence.DIRECT
+                }
+
+                then("Java name references retain their containing method") {
+                    refs
+                        .first { it.kind == ReferenceKind.NAME_REF && it.targetName == "state" }
+                        .sourceQualifiedName shouldBe "com.example.JavaOwned.execute"
+                }
+
+                then("Java local variable types preserve the generic type kind") {
+                    refs
+                        .first {
+                            it.kind == ReferenceKind.TYPE_REF &&
+                                it.targetName == "State" &&
+                                it.sourceQualifiedName != null
+                        }.sourceQualifiedName shouldBe "com.example.JavaOwned.execute"
+                }
+
+                then("Java supertypes retain their containing class") {
+                    refs
+                        .first { it.kind == ReferenceKind.SUPERTYPE && it.targetName == "Contract" }
+                        .sourceQualifiedName shouldBe "com.example.JavaOwned"
+                }
+
+                then("Java imports have no source declaration") {
+                    refs.filter { it.kind == ReferenceKind.IMPORT }.all { it.sourceQualifiedName == null } shouldBe true
+                }
+            }
         }
 
         given("gradle.kts file parsing") {
@@ -293,6 +453,8 @@ class PsiParserTest :
                 then("it returns empty") {
                     parser.extractDeclarations(file).shouldBeEmpty()
                     parser.extractReferences(file).shouldBeEmpty()
+                    parser.extractFacts(file).declarations.shouldBeEmpty()
+                    parser.extractFacts(file).references.shouldBeEmpty()
                 }
             }
         }

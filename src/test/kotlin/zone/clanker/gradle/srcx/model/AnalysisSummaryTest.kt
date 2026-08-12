@@ -15,6 +15,7 @@ class AnalysisSummaryTest :
                     finding.severity shouldBe FindingSeverity.WARNING
                     finding.message shouldBe "bad code"
                     finding.suggestion shouldBe "fix it"
+                    finding.filePath shouldBe null
                 }
             }
         }

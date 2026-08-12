@@ -8,7 +8,9 @@
 
 **Source symbol extraction, architecture analysis, and LLM-ready context generation for Gradle projects.**
 
-Scans your codebase — including all included builds in a workspace — and generates structured Markdown reports: hub classes, entry points, anti-patterns, interfaces, and cross-build dependencies. Designed for AI agents that need codebase context.
+Scans your codebase — including all included builds in a workspace — and generates structured Markdown plus a
+self-contained static dashboard from the same typed workspace model. Designed for humans and AI agents that need
+current codebase context.
 
 > **Recommended skill:** Use the plugin and task guides in [`skills/`](skills/README.md) when generating or consuming
 > SRCX context from an AI coding agent.
@@ -42,9 +44,46 @@ srcx {
 | `entry-points.md` | App, test, and mock entry points classified by kind |
 | `anti-patterns.md` | Code smells: god classes, circular deps, forbidden names, DI violations |
 | `interfaces.md` | Interface coverage: implementations, missing mocks |
-| `cross-build.md` | Shared classes referenced across build boundaries |
+| `cross-build.md` | Resolved source relationships and build edges across active builds |
+| `relationships/index.md` | Important symbols ranked by cumulative workspace relationships |
+| `relationships/<symbol>-<scope-hash>.md` | Evidence-backed incoming and outgoing relationships for one important symbol |
+| `site/index.html` | Self-contained static workspace dashboard with an interactive D3 relationship graph |
+| `site/report.html` | Scoped HTML fragment for Kotlin notebooks or an existing page |
 
-Reports are aggregated from per-build analysis and work reliably on large repos with many included builds.
+Project scans remain independent and bounded, but the root task resolves their raw declarations and references together.
+The root report is therefore authoritative for cumulative usage across the active workspace.
+Open `.srcx/site/index.html` directly or serve the `.srcx/site/` directory from an authenticated static host.
+
+## Workspace-cumulative relationships
+
+`srcx-context` follows one deterministic pipeline:
+
+```text
+source -> extracted PSI facts -> workspace symbol resolution -> derived relationships -> reports
+```
+
+Each declaration and reference retains build, project, source set, project-relative file, and line ownership. The root
+index resolves references only when source evidence and workspace scope identify one declaration. Duplicate or
+ambiguous targets remain unresolved rather than being assigned arbitrarily.
+
+Relationship pages distinguish:
+
+- **Local inbound**: resolved consumers in the declaration's own build and Gradle project.
+- **Workspace inbound**: resolved consumers across every active root and included-build project.
+- **Cross-build inbound**: resolved consumers owned by another Gradle build.
+
+A declaration with zero local inbound and non-zero workspace inbound is workspace-used. Conversely, zero resolved
+workspace inbound is not proof of semantic unusedness: generated code, reflection, dependency injection, and runtime
+lookup may be invisible to static PSI analysis.
+
+SRCX selects a bounded set of important symbols with one documented policy. Cross-build inbound is the strongest
+signal, followed by high connectivity, multiple interface implementations, exact entry-point/cycle evidence, and
+other cumulative graph signals. The default limit is 100 relationship pages. The HTML atlas shows at most 42 files
+and 42 symbols. It opens in the file lens and provides symbol, exact-problem, and resolved-cycle lenses; selecting a
+node or edge reveals declarations, findings, source evidence, and an inbound/outbound flow without shrinking the map.
+
+Evidence labels are explicit: `DIRECT` for source facts, `DERIVED` for deterministic resolution composed from direct
+facts, and `HEURISTIC` where syntax alone is approximate. Import facts are retained but do not count as usage.
 
 ## wrkx worktree integration
 
@@ -71,7 +110,7 @@ to another invalidates `srcx-context`, regenerates reports in the selected workt
 ```kotlin
 srcx {
     outputDir.set(".srcx")                    // output directory (default: .srcx)
-    autoGenerate.set(true)                    // regenerate on every compile
+    autoGenerate.set(true)                    // make assemble depend on srcx-context
     excludeDepScopes.add("kotlinScriptDef")   // dependency scopes to skip
     forbiddenPackages("utils", "helpers")      // additional forbidden package names
     forbiddenClassPatterns("Helper", "Mgr")    // additional forbidden class suffixes
@@ -86,7 +125,8 @@ srcx {
 
 ### `model/`
 
-Data types: value classes with validation (`SymbolName`, `PackageName`, `FilePath`, `ProjectPath`), extraction types (`SymbolEntry`, `DependencyEntry`, `ProjectSummary`), and analysis summaries (`AnalysisSummary`, `HubClass`, `Finding`).
+Data types include scoped workspace symbols/references, resolved relationships, cumulative usage, important-symbol
+reasons, project summaries, and analysis summaries.
 
 ### `parse/`
 
@@ -95,7 +135,7 @@ PSI-based source parsing using the Kotlin compiler embeddable.
 - **PsiEnvironment** — manages a shared `KotlinCoreEnvironment` instance. Thread-safe singleton — the IntelliJ platform is initialized exactly once and reused across all analysis calls.
 - **PsiParser** — extracts declarations and references from `.kt`, `.java`, and `.gradle.kts` files.
 - **SourceScanner** — discovers source directories across Java, Kotlin JVM, and KMP projects.
-- **SymbolIndex** — cross-referenced index of all symbols and references.
+- **SymbolIndex** — reusable PSI symbol/reference infrastructure.
 
 ### `analysis/`
 
@@ -116,6 +156,8 @@ Markdown report generators.
 - **EntryPointsRenderer** — app/test/mock entry point classification.
 - **AntiPatternsRenderer** — per-build anti-pattern findings grouped by severity.
 - **CrossBuildRenderer** — shared hub classes and cycles across build boundaries.
+- **WorkspaceRelationshipsRenderer** — root relationship index and collision-safe important-symbol pages.
+- **WorkspaceArchitectureGraphRenderer** — bounded D3 graph data from the cumulative relationship index.
 - **InterfacesRenderer** — interface coverage with implementation counts (excludes mocks).
 - **ProjectReportRenderer** — per-project symbol and dependency tables.
 - **IncludedBuildRenderer** — per-build context for included builds.
@@ -125,27 +167,30 @@ Markdown report generators.
 Gradle model integration.
 
 - **ProjectScanner** — discovers source sets and projects using the Gradle API.
-- **SymbolExtractor** — extracts symbols and dependencies from Gradle project data. Runs `analyzeProject()` per build with OOM error handling.
+- **SymbolExtractor** — extracts deterministic per-project summaries plus raw, owned PSI facts.
+- **WorkspaceIndexBuilder** — resolves all active project facts into one cumulative workspace index.
 
 ### `task/`
 
-- **ContextTask** — generates all reports. Aggregates hub classes and entry points from per-build analysis (no monolithic cross-build parse). Cleans up PSI environment when done.
+- **ContextTask** — orchestrates project scans, cumulative resolution, important-symbol selection, and all root reports.
 - **CleanTask** — deletes all `.srcx` output directories.
 
 ## How it works
 
 1. Plugin reads DSL configuration at settings evaluation time
-2. `ContextTask` runs symbol extraction per project in parallel
-3. Per-build analysis runs `analyzeProject()` (PSI parsing → component classification → dependency graph → anti-patterns → hub classes)
-4. Results aggregated at workspace level — hub classes merged and ranked across all builds
-5. Split detail files written alongside the dashboard
-6. PSI environment shared as a thread-safe singleton (one init, reused, closed at end)
+2. `ContextTask` extracts declarations, references, and compatible project summaries per project
+3. The root task resolves all active project facts in one ownership-aware workspace index
+4. Cumulative usage, build edges, hubs, and important symbols derive from resolved workspace relationships
+5. Relationship Markdown and the D3 graph render from that same typed evidence
+6. Existing project/build reports and the root HTML/Markdown dashboard are written
+7. The shared PSI environment is closed after generation
 
 Analysis failures (OOM, classpath conflicts) log actionable errors instead of silently returning empty results.
 
 ## Dependencies
 
 - `org.jetbrains.kotlin:kotlin-compiler-embeddable` — PSI parsing for Kotlin, Java, and Gradle scripts
+- `org.webjars.npm:d3` — bundled D3 runtime in self-contained generated HTML; no CDN request
 - Kotest 5.9.1 + Konsist 0.17.3 — testing and architecture enforcement
 - Kover — 95% minimum line coverage enforcement
 

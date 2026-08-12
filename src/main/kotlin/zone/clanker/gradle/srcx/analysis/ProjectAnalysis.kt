@@ -1,5 +1,16 @@
 package zone.clanker.gradle.srcx.analysis
 
+import zone.clanker.gradle.srcx.model.AnalysisSummary
+import zone.clanker.gradle.srcx.model.ArchitectureComponent
+import zone.clanker.gradle.srcx.model.ArchitectureDependency
+import zone.clanker.gradle.srcx.model.ArchitectureEntryPoint
+import zone.clanker.gradle.srcx.model.ArchitectureEntryPointKind
+import zone.clanker.gradle.srcx.model.ArchitectureLayer
+import zone.clanker.gradle.srcx.model.ArchitectureSummary
+import zone.clanker.gradle.srcx.model.Finding
+import zone.clanker.gradle.srcx.model.FindingSeverity
+import zone.clanker.gradle.srcx.model.HubClass
+import zone.clanker.gradle.srcx.model.HubDependentRef
 import java.io.File
 
 /**
@@ -9,54 +20,100 @@ import java.io.File
  * @property hubs most-depended-on classes with inbound counts
  * @property roles component role classifications
  * @property cycles detected circular dependencies
+ * @property components classified source components used to build the graph
+ * @property dependencies directional dependencies between source components
  */
 data class ProjectAnalysis(
     val antiPatterns: List<AntiPattern>,
     val hubs: List<HubResult>,
     val roles: Map<String, ComponentRole>,
     val cycles: List<List<String>>,
+    val components: List<ClassifiedComponent> = emptyList(),
+    val dependencies: List<ClassDependency> = emptyList(),
 ) {
-    /** Convert to a model-layer [zone.clanker.gradle.srcx.model.AnalysisSummary]. */
-    fun toSummary(): zone.clanker.gradle.srcx.model.AnalysisSummary {
-        val findings =
-            antiPatterns.map { ap ->
-                zone.clanker.gradle.srcx.model.Finding(
-                    severity =
-                        when (ap.severity) {
-                            AntiPattern.Severity.FORBIDDEN -> zone.clanker.gradle.srcx.model.FindingSeverity.FORBIDDEN
-                            AntiPattern.Severity.WARNING -> zone.clanker.gradle.srcx.model.FindingSeverity.WARNING
-                            AntiPattern.Severity.INFO -> zone.clanker.gradle.srcx.model.FindingSeverity.INFO
-                        },
-                    message = ap.message,
-                    suggestion = ap.suggestion,
-                )
-            }
-        val hubClasses =
-            hubs.map { hub ->
-                val name = hub.component.source.simpleName
-                val role = roles[name]
-                val roleLabel = if (role != null && role != ComponentRole.OTHER) role.name.lowercase() else ""
-                val depRefs =
-                    hub.dependents.map { dep ->
-                        zone.clanker.gradle.srcx.model
-                            .HubDependentRef(dep.name, dep.filePath, dep.line)
-                    }
-                val testFile =
-                    hub.component.source.file.path
-                        .contains("/test/")
-                zone.clanker.gradle.srcx.model.HubClass(
-                    name = name,
-                    dependentCount = hub.count,
-                    role = roleLabel,
-                    filePath = hub.component.source.relativePath,
-                    line = hub.component.source.declarationLine,
-                    dependents = depRefs,
-                    isTest = testFile,
-                )
-            }
-        return zone.clanker.gradle.srcx.model
-            .AnalysisSummary(findings, hubClasses, cycles)
-    }
+    /** Convert analysis internals to a report-safe model. */
+    fun toSummary(): AnalysisSummary =
+        AnalysisSummary(
+            findings = antiPatterns.map(AntiPattern::toFinding),
+            hubs = hubs.map { it.toHubClass(roles) },
+            cycles = cycles,
+            architecture = toArchitectureSummary(),
+        )
+}
+
+private fun AntiPattern.toFinding(): Finding =
+    Finding(
+        severity =
+            when (severity) {
+                AntiPattern.Severity.FORBIDDEN -> FindingSeverity.FORBIDDEN
+                AntiPattern.Severity.WARNING -> FindingSeverity.WARNING
+                AntiPattern.Severity.INFO -> FindingSeverity.INFO
+            },
+        message = message,
+        suggestion = suggestion,
+        filePath = file.path.takeUnless { it.isBlank() || it == "." },
+    )
+
+private fun HubResult.toHubClass(roles: Map<String, ComponentRole>): HubClass {
+    val name = component.source.simpleName
+    val role = roles[name]
+    return HubClass(
+        name = name,
+        dependentCount = count,
+        role = if (role != null && role != ComponentRole.OTHER) role.name.lowercase() else "",
+        filePath = component.source.relativePath,
+        line = component.source.declarationLine,
+        dependents = dependents.map { HubDependentRef(it.name, it.filePath, it.line) },
+        isTest = component.source.isTestSource(),
+    )
+}
+
+private fun ProjectAnalysis.toArchitectureSummary(): ArchitectureSummary =
+    ArchitectureSummary(
+        components = components.map { it.toArchitectureComponent() },
+        dependencies =
+            dependencies
+                .filter { it.from.source.qualifiedName != it.to.source.qualifiedName }
+                .map { ArchitectureDependency(it.from.source.qualifiedName, it.to.source.qualifiedName) },
+        entryPoints =
+            classifyEntryPoints(components, dependencies)
+                .filter { it.kind == EntryPointKind.APP }
+                .map(ClassifiedEntryPoint::toArchitectureEntryPoint),
+    )
+
+private fun ClassifiedEntryPoint.toArchitectureEntryPoint(): ArchitectureEntryPoint =
+    ArchitectureEntryPoint(
+        componentId = component.source.qualifiedName,
+        reason = reason,
+        kind =
+            if (reason == "Dependency graph root") {
+                ArchitectureEntryPointKind.GRAPH_ROOT
+            } else {
+                ArchitectureEntryPointKind.EXPLICIT
+            },
+    )
+
+private fun ClassifiedComponent.toArchitectureComponent(): ArchitectureComponent {
+    val isTest = source.isTestSource()
+    return ArchitectureComponent(
+        id = source.qualifiedName,
+        name = source.simpleName,
+        packageName = source.packageName,
+        packageGroup = packageGroup,
+        role = role.label,
+        layer = ArchitectureLayer.valueOf(detectLayer(source.packageName, isTest).name),
+        filePath = source.relativePath,
+        line = source.declarationLine,
+        isTest = isTest,
+    )
+}
+
+private fun SourceFileMetadata.isTestSource(): Boolean {
+    val normalizedPath = file.invariantSeparatorsPath
+    val sourceSet = normalizedPath.substringAfter("/src/", "").substringBefore('/')
+    return sourceSet.contains("test", ignoreCase = true) ||
+        simpleName.endsWith("Test") ||
+        simpleName.endsWith("Spec")
 }
 
 /**
@@ -82,5 +139,5 @@ fun analyzeProject(
     val roles = components.associate { it.source.simpleName to it.role }
     val cycles = findCycles(edges)
 
-    return ProjectAnalysis(antiPatterns, hubs, roles, cycles)
+    return ProjectAnalysis(antiPatterns, hubs, roles, cycles, components, edges)
 }

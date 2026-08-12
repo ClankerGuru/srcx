@@ -17,11 +17,13 @@ enum class FindingSeverity(
  * @property severity how serious the finding is
  * @property message human-readable description
  * @property suggestion actionable advice
+ * @property filePath project-relative source file path, or null for project-scoped findings
  */
 data class Finding(
     val severity: FindingSeverity,
     val message: String,
     val suggestion: String,
+    val filePath: String? = null,
 )
 
 /**
@@ -63,9 +65,11 @@ data class HubClass(
  * @property findings anti-patterns, warnings, and informational notes
  * @property hubs most depended-on classes
  * @property cycles circular dependency chains
+ * @property architecture source components and their directional dependencies
  */
 data class AnalysisSummary(
     val findings: List<Finding>,
     val hubs: List<HubClass>,
     val cycles: List<List<String>>,
+    val architecture: ArchitectureSummary = ArchitectureSummary(),
 )

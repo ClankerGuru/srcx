@@ -49,6 +49,32 @@ class ProjectAnalysisTest :
             )
         }
 
+        fun component(
+            name: String,
+            packageName: String,
+            packageGroup: String,
+            methods: List<String> = emptyList(),
+        ): ClassifiedComponent {
+            val source =
+                SourceFileMetadata(
+                    file = File("/project/src/main/kotlin/${packageName.replace('.', '/')}/$name.kt"),
+                    packageName = packageName,
+                    qualifiedName = "$packageName.$name",
+                    simpleName = name,
+                    imports = emptyList(),
+                    annotations = emptyList(),
+                    supertypes = emptyList(),
+                    isInterface = false,
+                    isAbstract = false,
+                    isObject = false,
+                    isDataClass = false,
+                    language = SourceFileMetadata.Language.KOTLIN,
+                    lineCount = 20,
+                    methods = methods,
+                )
+            return ClassifiedComponent(source, ComponentRole.OTHER, packageGroup)
+        }
+
         given("analyzeProject") {
 
             `when`("analyzing a project with classes") {
@@ -143,6 +169,9 @@ class ProjectAnalysisTest :
         given("ProjectAnalysis.toSummary") {
 
             `when`("converting with data") {
+                val app = component("App", "com.example.app", "app", methods = listOf("main"))
+                val service = component("UserService", "com.example.service", "service")
+                val duplicateApp = component("App", "com.example.app", "app")
                 val analysis =
                     ProjectAnalysis(
                         antiPatterns =
@@ -150,13 +179,13 @@ class ProjectAnalysisTest :
                                 AntiPattern(
                                     AntiPattern.Severity.WARNING,
                                     "`FooHelper` is a helper class",
-                                    File("Foo.kt"),
+                                    File("src/main/kotlin/Foo.kt"),
                                     "Move methods closer to usage",
                                 ),
                                 AntiPattern(
                                     AntiPattern.Severity.INFO,
                                     "`Bar` has no test",
-                                    File("Bar.kt"),
+                                    File("."),
                                     "Add BarTest",
                                 ),
                             ),
@@ -172,6 +201,8 @@ class ProjectAnalysisTest :
                                 "Other" to ComponentRole.OTHER,
                             ),
                         cycles = listOf(listOf("A", "B", "A")),
+                        components = listOf(service, app),
+                        dependencies = listOf(ClassDependency(app, service), ClassDependency(app, duplicateApp)),
                     )
 
                 val summary = analysis.toSummary()
@@ -180,7 +211,9 @@ class ProjectAnalysisTest :
                     summary.findings.size shouldBe 2
                     summary.findings[0].severity shouldBe FindingSeverity.WARNING
                     summary.findings[0].message shouldContain "FooHelper"
+                    summary.findings[0].filePath shouldBe "src/main/kotlin/Foo.kt"
                     summary.findings[1].severity shouldBe FindingSeverity.INFO
+                    summary.findings[1].filePath shouldBe null
                 }
 
                 then("hubs are converted with roles and dependents") {
@@ -197,6 +230,25 @@ class ProjectAnalysisTest :
                 then("cycles are preserved") {
                     summary.cycles.size shouldBe 1
                     summary.cycles[0] shouldBe listOf("A", "B", "A")
+                }
+
+                then("source architecture retains components, dependency direction, and real entry evidence") {
+                    summary.architecture.components.map { it.name } shouldBe listOf("UserService", "App")
+                    summary.architecture.dependencies
+                        .single()
+                        .from shouldBe "com.example.app.App"
+                    summary.architecture.dependencies
+                        .single()
+                        .to shouldBe "com.example.service.UserService"
+                    summary.architecture.entryPoints
+                        .single()
+                        .componentId shouldBe "com.example.app.App"
+                    summary.architecture.entryPoints
+                        .single()
+                        .reason shouldBe "Declares main()"
+                    summary.architecture.entryPoints
+                        .single()
+                        .kind shouldBe zone.clanker.gradle.srcx.model.ArchitectureEntryPointKind.EXPLICIT
                 }
             }
 

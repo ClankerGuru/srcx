@@ -66,6 +66,7 @@ enum class EntryPointKind {
 data class ClassifiedEntryPoint(
     val component: ClassifiedComponent,
     val kind: EntryPointKind,
+    val reason: String,
 )
 
 /**
@@ -79,12 +80,17 @@ fun classifyEntryPoints(
     components: List<ClassifiedComponent>,
     edges: List<ClassDependency> = emptyList(),
 ): List<ClassifiedEntryPoint> {
-    val result = components.mapNotNull { classifySingleEntryPoint(it) }
-    if (result.isNotEmpty()) return result.distinctBy { it.component.source.qualifiedName }
+    val classified = components.mapNotNull { classifySingleEntryPoint(it) }
+    if (classified.any { it.kind == EntryPointKind.APP }) {
+        return classified.distinctBy { it.component.source.qualifiedName }
+    }
 
-    // Fall back to graph roots
-    val roots = findGraphRoots(components, edges)
-    return roots.map { ClassifiedEntryPoint(it, EntryPointKind.APP) }
+    val classifiedIds = classified.mapTo(mutableSetOf()) { it.component.source.qualifiedName }
+    val roots =
+        findGraphRoots(components, edges)
+            .filterNot { it.source.qualifiedName in classifiedIds }
+            .map { ClassifiedEntryPoint(it, EntryPointKind.APP, "Dependency graph root") }
+    return (classified + roots).distinctBy { it.component.source.qualifiedName }
 }
 
 private fun classifySingleEntryPoint(component: ClassifiedComponent): ClassifiedEntryPoint? {
@@ -94,19 +100,21 @@ private fun classifySingleEntryPoint(component: ClassifiedComponent): Classified
         filePath.contains("/test/") || name.endsWith("Test") || name.endsWith("Spec")
     val isMockClass =
         name.contains("Mock") || name.contains("Fake") || name.contains("Stub")
-    val isPlugin =
-        "apply" in component.source.methods &&
-            component.source.supertypes.any { it.contains("Plugin") }
 
     return when {
-        isTestClass -> ClassifiedEntryPoint(component, EntryPointKind.TEST)
-        isMockClass -> ClassifiedEntryPoint(component, EntryPointKind.MOCK)
-        "main" in component.source.methods -> ClassifiedEntryPoint(component, EntryPointKind.APP)
-        component.role == ComponentRole.CONTROLLER -> ClassifiedEntryPoint(component, EntryPointKind.APP)
-        isPlugin -> ClassifiedEntryPoint(component, EntryPointKind.APP)
+        isTestClass -> ClassifiedEntryPoint(component, EntryPointKind.TEST, "Test class")
+        isMockClass -> ClassifiedEntryPoint(component, EntryPointKind.MOCK, "Test double")
+        "main" in component.source.methods -> ClassifiedEntryPoint(component, EntryPointKind.APP, "Declares main()")
+        component.role == ComponentRole.CONTROLLER ->
+            ClassifiedEntryPoint(component, EntryPointKind.APP, "Controller boundary")
+        component.isGradlePlugin() ->
+            ClassifiedEntryPoint(component, EntryPointKind.APP, "Implements Gradle Plugin.apply()")
         else -> null
     }
 }
+
+private fun ClassifiedComponent.isGradlePlugin(): Boolean =
+    "apply" in source.methods && source.supertypes.any { it.contains("Plugin") }
 
 private fun findGraphRoots(
     components: List<ClassifiedComponent>,
@@ -209,6 +217,7 @@ fun findEntryPoints(
 
     result.addAll(components.filter { "main" in it.source.methods })
     result.addAll(components.filter { it.role == ComponentRole.CONTROLLER })
+    result.addAll(components.filter { it.isGradlePlugin() })
 
     if (result.isNotEmpty()) return result.distinctBy { it.source.qualifiedName }
 
