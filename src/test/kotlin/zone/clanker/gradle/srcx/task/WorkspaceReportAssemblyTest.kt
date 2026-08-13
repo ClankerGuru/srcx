@@ -6,6 +6,8 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import zone.clanker.gradle.srcx.model.AnalysisSummary
 import zone.clanker.gradle.srcx.model.ArchitectureComponent
+import zone.clanker.gradle.srcx.model.ArchitectureComponentCycle
+import zone.clanker.gradle.srcx.model.ArchitectureDependency
 import zone.clanker.gradle.srcx.model.ArchitectureEntryPoint
 import zone.clanker.gradle.srcx.model.ArchitectureEntryPointKind
 import zone.clanker.gradle.srcx.model.ArchitectureLayer
@@ -17,12 +19,14 @@ import zone.clanker.gradle.srcx.model.ProjectPath
 import zone.clanker.gradle.srcx.model.ProjectSummary
 import zone.clanker.gradle.srcx.model.ReferenceEvidence
 import zone.clanker.gradle.srcx.model.ReferenceKind
+import zone.clanker.gradle.srcx.model.SourceSetName
 import zone.clanker.gradle.srcx.model.SymbolDetailKind
 import zone.clanker.gradle.srcx.model.WorkspaceIndex
 import zone.clanker.gradle.srcx.model.WorkspaceReference
 import zone.clanker.gradle.srcx.model.WorkspaceRelationship
 import zone.clanker.gradle.srcx.model.WorkspaceRelationshipKind
 import zone.clanker.gradle.srcx.model.WorkspaceSymbol
+import zone.clanker.gradle.srcx.scan.ProjectFileScan
 import zone.clanker.gradle.srcx.scan.ProjectScan
 
 class WorkspaceReportAssemblyTest :
@@ -51,6 +55,94 @@ class WorkspaceReportAssemblyTest :
             }
         }
 
+        given("root and included scans with exact same-path source files") {
+            val relativePath = "src/main/kotlin/sample/Shared.kt"
+            val root =
+                projectScan(
+                    build = "workspace",
+                    project = ":app",
+                    files =
+                        listOf(
+                            projectFileScan(
+                                sourceSet = "test",
+                                relativePath = relativePath,
+                                sourceText = "// root test",
+                            ),
+                            projectFileScan(
+                                sourceSet = "main",
+                                relativePath = relativePath,
+                                sourceText = "// root café 雪 🚀",
+                            ),
+                        ),
+                )
+            val library =
+                projectScan(
+                    build = "library",
+                    project = ":app",
+                    files =
+                        listOf(
+                            projectFileScan(
+                                sourceSet = "main",
+                                relativePath = relativePath,
+                                sourceText = "// included library",
+                            ),
+                        ),
+                )
+            val tools =
+                projectScan(
+                    build = "tools",
+                    project = ":tooling",
+                    files =
+                        listOf(
+                            projectFileScan(
+                                sourceSet = "main",
+                                relativePath = "src/main/kotlin/tools/Tool.kt",
+                                sourceText = "// included tools",
+                            ),
+                        ),
+                )
+            val scans =
+                WorkspaceScans(
+                    rootBuild = "workspace",
+                    rootProjectScans = listOf(root),
+                    includedProjectScans = linkedMapOf("tools" to listOf(tools), "library" to listOf(library)),
+                )
+
+            `when`("source files are assembled into report data") {
+                val sourceFiles = buildWorkspaceSourceFiles(scans)
+
+                then("root and every included build retain complete exact source text") {
+                    sourceFiles.map { it.content } shouldContainExactly
+                        listOf(
+                            "// included library",
+                            "// included tools",
+                            "// root café 雪 🚀",
+                            "// root test",
+                        )
+                }
+
+                then("same paths remain distinct by build and source-set scope") {
+                    sourceFiles.map { it.identity.value } shouldContainExactly
+                        listOf(
+                            "library:::app::main::$relativePath",
+                            "tools:::tooling::main::src/main/kotlin/tools/Tool.kt",
+                            "workspace:::app::main::$relativePath",
+                            "workspace:::app::test::$relativePath",
+                        )
+                }
+
+                then("ordering is deterministic across input map and file order") {
+                    val reordered =
+                        WorkspaceScans(
+                            rootBuild = "workspace",
+                            rootProjectScans = listOf(root.copy(files = root.files.reversed())),
+                            includedProjectScans = linkedMapOf("library" to listOf(library), "tools" to listOf(tools)),
+                        )
+                    buildWorkspaceSourceFiles(reordered) shouldContainExactly sourceFiles
+                }
+            }
+        }
+
         given("architecture and cycle signals in duplicate workspace scopes") {
             val app = workspaceSymbol("workspace", ":app", "sample.App")
             val appInIncludedBuild = workspaceSymbol("included", ":app", "sample.App")
@@ -74,6 +166,13 @@ class WorkspaceReportAssemblyTest :
                             component("sample.App"),
                             component("sample.GraphRoot"),
                             component("sample.AmbiguousEntry"),
+                            component("sample.UniqueCycle"),
+                            component("alpha.DuplicateCycle"),
+                        ),
+                    dependencies =
+                        listOf(
+                            ArchitectureDependency("sample.UniqueCycle", "alpha.DuplicateCycle"),
+                            ArchitectureDependency("alpha.DuplicateCycle", "sample.UniqueCycle"),
                         ),
                     entryPoints =
                         listOf(
@@ -93,6 +192,16 @@ class WorkspaceReportAssemblyTest :
                                 ArchitectureEntryPointKind.EXPLICIT,
                             ),
                         ),
+                    cycles =
+                        listOf(
+                            ArchitectureComponentCycle(
+                                listOf(
+                                    "sample.UniqueCycle",
+                                    "alpha.DuplicateCycle",
+                                    "sample.UniqueCycle",
+                                ),
+                            ),
+                        ),
                 )
             val analysis =
                 AnalysisSummary(
@@ -102,6 +211,20 @@ class WorkspaceReportAssemblyTest :
                                 FindingSeverity.WARNING,
                                 "sample.App appears in an anti-pattern finding",
                                 "Review it",
+                            ),
+                            Finding(
+                                FindingSeverity.WARNING,
+                                "UniqueCycle has exact analyzer evidence",
+                                "Review it",
+                                componentIds = listOf("sample.UniqueCycle"),
+                            ),
+                            Finding(
+                                FindingSeverity.WARNING,
+                                "AmbiguousEntry has exact file evidence",
+                                "Review it",
+                                filePath = firstAmbiguousEntry.projectRelativeFile,
+                                line = firstAmbiguousEntry.declarationLine,
+                                componentIds = listOf(firstAmbiguousEntry.qualifiedName),
                             ),
                         ),
                     hubs = emptyList(),
@@ -128,16 +251,18 @@ class WorkspaceReportAssemblyTest :
             `when`("important-symbol signals are assembled") {
                 val signals = buildImportantSymbolSignals(listOf(rootScan, includedScan), index)
 
-                then("only a unique build-project-FQN explicit entry point is selected") {
-                    signals.entryPoints shouldContainExactly setOf(app.identity)
+                then("component source evidence disambiguates explicit entry points") {
+                    signals.entryPoints shouldContainExactly setOf(app.identity, firstAmbiguousEntry.identity)
                 }
 
-                then("cycle names are selected only when unique in their build and project") {
-                    signals.cycleParticipants shouldContainExactly setOf(uniqueCycle.identity)
+                then("typed cycle IDs select exact participants without simple-name ambiguity") {
+                    signals.cycleParticipants shouldContainExactly
+                        setOf(uniqueCycle.identity, firstDuplicateCycle.identity)
                 }
 
-                then("finding prose does not infer anti-pattern symbol identities") {
-                    signals.antiPatternSymbols.shouldBeEmpty()
+                then("only typed finding components produce anti-pattern signals") {
+                    signals.antiPatternSymbols shouldContainExactly
+                        setOf(uniqueCycle.identity, firstAmbiguousEntry.identity)
                 }
             }
         }
@@ -180,12 +305,52 @@ class WorkspaceReportAssemblyTest :
                 }
             }
         }
+
+        given("an exact workspace interface") {
+            val repository =
+                workspaceSymbol(
+                    build = "contracts",
+                    project = ":api",
+                    qualifiedName = "api.Repository",
+                ).copy(kind = SymbolDetailKind.INTERFACE)
+            val implementation = workspaceSymbol("runtime", ":data", "data.SqlRepository")
+            val index =
+                WorkspaceIndex(
+                    symbols = listOf(implementation, repository),
+                    relationships =
+                        listOf(
+                            relationship(
+                                implementation,
+                                repository,
+                                WorkspaceRelationshipKind.IMPLEMENTS,
+                            ),
+                        ),
+                )
+
+            `when`("interface renderer facts are assembled into the workspace model") {
+                val interfaces = buildInterfaceSummaries(emptyList(), index)
+
+                then("scope, qualified name, identity, and exact implementation count survive conversion") {
+                    interfaces.single().apply {
+                        name shouldBe "Repository"
+                        packageName shouldBe null
+                        implementationCount shouldBe 1
+                        build shouldBe "contracts"
+                        project shouldBe ":api"
+                        sourceSet shouldBe "main"
+                        qualifiedName shouldBe "api.Repository"
+                        identity shouldBe repository.identity
+                    }
+                }
+            }
+        }
     })
 
 private fun projectScan(
     build: String,
     project: String,
     analysis: AnalysisSummary? = null,
+    files: List<ProjectFileScan> = emptyList(),
 ): ProjectScan {
     val path = ProjectPath(project)
     val summary =
@@ -198,8 +363,26 @@ private fun projectScan(
             subprojects = emptyList(),
             analysis = analysis,
         )
-    return ProjectScan(build, path, emptyList(), summary)
+    return ProjectScan(
+        build = build,
+        projectPath = path,
+        files = files,
+        summary = summary,
+    )
 }
+
+private fun projectFileScan(
+    sourceSet: String,
+    relativePath: String,
+    sourceText: String,
+): ProjectFileScan =
+    ProjectFileScan(
+        sourceSet = SourceSetName(sourceSet),
+        projectRelativeFile = relativePath,
+        declarations = emptyList(),
+        references = emptyList(),
+        sourceText = sourceText,
+    )
 
 private fun workspaceSymbol(
     build: String,

@@ -4,14 +4,14 @@
     <section class="srcx-dashboard__hero" id="top">
         <div class="srcx-dashboard__hero-copy">
             <div>
-                <p class="srcx-dashboard__overline">SRCX / Workspace source documentation</p>
-                <h1>Source <strong>model.</strong></h1>
+                <p class="srcx-dashboard__overline">SRCX / Multi-build architecture report</p>
+                <h1>Workspace <strong>atlas.</strong></h1>
             </div>
             <div class="srcx-dashboard__hero-summary">
                 <div class="srcx-dashboard__hero-tags">{{heroTagsHtml}}</div>
                 <p class="srcx-dashboard__dek">
-                    Structure, analysis, and architecture rendered directly from the typed WorkspaceReport,
-                    with every record attached to its modeled build and project scope.
+                    This report maps which build owns each file, which files reference one another,
+                    and where each finding came from.
                 </p>
             </div>
         </div>
@@ -23,8 +23,7 @@
         <a href="#architecture"><span>01</span>Architecture</a>
         <a href="#builds"><span>02</span>Builds</a>
         <a href="#health"><span>03</span>Health</a>
-        <a href="#model"><span>04</span>Model</a>
-        <a href="#findings"><span>05</span>Findings</a>
+        <a href="#findings"><span>04</span>Findings</a>
     </nav>
 
     <section class="srcx-dashboard__section" id="architecture">
@@ -36,13 +35,7 @@
 
     <section class="srcx-dashboard__section" id="builds">
         {{buildsHeadingHtml}}
-        <div class="srcx-dashboard__build-comparison">
-            {{buildTableHtml}}
-            <div class="srcx-dashboard__build-edges">
-                <strong>Build edges</strong>
-                <div>{{buildEdgesHtml}}</div>
-            </div>
-        </div>
+        {{buildsHtml}}
     </section>
 
     <section class="srcx-dashboard__section" id="health">
@@ -66,27 +59,10 @@
             </details>
 
             <article class="srcx-dashboard__chart srcx-dashboard__chart--coverage">
-                <header><span>Source coverage</span><strong>Typed records</strong></header>
+                <header><span>Source coverage</span><strong>Scan records</strong></header>
                 {{coverageHtml}}
             </article>
         </div>
-    </section>
-
-    <section class="srcx-dashboard__section srcx-dashboard__section--model" id="model">
-        {{modelHeadingHtml}}
-        <details class="srcx-disclosure srcx-dashboard__model-disclosure">
-            <summary><span>WorkspaceReport fields and rendering provenance</span><strong>Expand</strong></summary>
-            <div class="srcx-disclosure__body srcx-dashboard__model-grid">
-                <article>
-                    <p class="srcx-dashboard__catalog-label">Typed model coverage</p>
-                    {{modelCoverageHtml}}
-                </article>
-                <article>
-                    <p class="srcx-dashboard__catalog-label">Rendering provenance</p>
-                    {{provenanceHtml}}
-                </article>
-            </div>
-        </details>
     </section>
 
     <section class="srcx-dashboard__section srcx-dashboard__section--finding" id="findings">
@@ -97,7 +73,7 @@
     <footer class="srcx-dashboard__footer">
         {{sourceNoteHtml}}
         <div class="srcx-dashboard__footer-line">
-            <span>Generated directly from the SRCX WorkspaceReport</span>
+            <span>Built from the workspace scan and resolved source evidence</span>
             <a href="#top">Back to top</a>
         </div>
     </footer>

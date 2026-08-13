@@ -3,6 +3,7 @@ package zone.clanker.gradle.srcx.parse
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import zone.clanker.gradle.srcx.model.DeclarationSemantic
 import zone.clanker.gradle.srcx.model.ReferenceEvidence
 import zone.clanker.gradle.srcx.model.ReferenceKind
 import zone.clanker.gradle.srcx.model.SymbolDetailKind
@@ -82,6 +83,38 @@ class PsiParserTest :
                 then("it detects interface kind") {
                     symbols.first { it.name == "Repository" }.kind shouldBe SymbolDetailKind.INTERFACE
                 }
+
+                then("it retains the explicit interface declaration form") {
+                    symbols.first { it.name == "Repository" }.declarationSemantic shouldBe
+                        DeclarationSemantic.INTERFACE
+                }
+            }
+
+            `when`("parsing abstract, sealed, and concrete classes") {
+                val file =
+                    tempFile(
+                        "ClassForms.kt",
+                        """
+                        package com.example
+
+                        abstract class AbstractWorker
+                        sealed class SealedResult
+                        class ConcreteWorker
+                        """.trimIndent(),
+                    )
+                val symbols = parser.extractDeclarations(file).associateBy { it.name }
+
+                then("it retains abstract and sealed class semantics") {
+                    symbols.getValue("AbstractWorker").declarationSemantic shouldBe
+                        DeclarationSemantic.ABSTRACT_CLASS
+                    symbols.getValue("SealedResult").declarationSemantic shouldBe
+                        DeclarationSemantic.ABSTRACT_CLASS
+                }
+
+                then("it distinguishes an ordinary concrete class") {
+                    symbols.getValue("ConcreteWorker").declarationSemantic shouldBe
+                        DeclarationSemantic.CONCRETE_CLASS
+                }
             }
 
             `when`("parsing an enum") {
@@ -115,6 +148,11 @@ class PsiParserTest :
 
                 then("it detects object kind") {
                     symbols.first { it.name == "Config" }.kind shouldBe SymbolDetailKind.OBJECT
+                }
+
+                then("it identifies the language-managed singleton form") {
+                    symbols.first { it.name == "Config" }.declarationSemantic shouldBe
+                        DeclarationSemantic.SINGLETON_OBJECT
                 }
             }
 
@@ -322,6 +360,35 @@ class PsiParserTest :
 
                 then("it detects interface kind") {
                     symbols.first { it.name == "Repo" }.kind shouldBe SymbolDetailKind.INTERFACE
+                }
+
+                then("it retains the explicit interface declaration form") {
+                    symbols.first { it.name == "Repo" }.declarationSemantic shouldBe
+                        DeclarationSemantic.INTERFACE
+                }
+            }
+
+            `when`("parsing abstract and concrete Java classes") {
+                val file =
+                    tempFile(
+                        "ClassForms.java",
+                        """
+                        package com.example;
+
+                        abstract class AbstractWorker {}
+                        class ConcreteWorker {}
+                        """.trimIndent(),
+                    )
+                val symbols = parser.extractDeclarations(file).associateBy { it.name }
+
+                then("it retains the Java abstract modifier") {
+                    symbols.getValue("AbstractWorker").declarationSemantic shouldBe
+                        DeclarationSemantic.ABSTRACT_CLASS
+                }
+
+                then("it distinguishes an ordinary Java class") {
+                    symbols.getValue("ConcreteWorker").declarationSemantic shouldBe
+                        DeclarationSemantic.CONCRETE_CLASS
                 }
             }
 

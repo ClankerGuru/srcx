@@ -104,7 +104,56 @@ data class Symbol(
     val file: File,
     val line: Int,
     val packageName: String,
+    val declarationSemantic: DeclarationSemantic = DeclarationSemantic.from(kind),
 )
+
+/** Parsed declaration shape used by human-facing architecture views. */
+enum class DeclarationSemantic(
+    val label: String,
+    val detail: String,
+) {
+    INTERFACE(
+        "Interface",
+        "Interface declaration. It defines a contract shape; SRCX does not infer why the contract exists.",
+    ),
+    ABSTRACT_CLASS(
+        "Abstract or sealed class",
+        "Abstract or sealed class declaration. It cannot be treated as an ordinary concrete construction target.",
+    ),
+    CONCRETE_CLASS(
+        "Concrete class",
+        "Concrete class declaration. This describes its language form, not its quality or architectural role.",
+    ),
+    SINGLETON_OBJECT(
+        "Kotlin object",
+        "Kotlin object declaration with one language-managed instance. " +
+            "SRCX does not infer why singleton form was chosen.",
+    ),
+    ENUM(
+        "Enum",
+        "Enum declaration representing a closed set of named values.",
+    ),
+    OTHER(
+        "Other declaration",
+        "Function, property, or another declaration that is not a class-like type.",
+    ),
+    ;
+
+    companion object {
+        fun from(kind: SymbolDetailKind): DeclarationSemantic =
+            when (kind) {
+                SymbolDetailKind.INTERFACE -> INTERFACE
+                SymbolDetailKind.ENUM -> ENUM
+                SymbolDetailKind.CLASS,
+                SymbolDetailKind.DATA_CLASS,
+                -> CONCRETE_CLASS
+                SymbolDetailKind.OBJECT -> SINGLETON_OBJECT
+                SymbolDetailKind.FUNCTION,
+                SymbolDetailKind.PROPERTY,
+                -> OTHER
+            }
+    }
+}
 
 /**
  * Fine-grained kind of a source symbol, distinguishing data classes,

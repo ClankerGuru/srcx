@@ -46,13 +46,13 @@ The default `.srcx/` directory contains:
 | `context.md` | Workspace dashboard, counts, warnings, and links |
 | `hub-classes.md` | Highly referenced classes and dependency trees |
 | `entry-points.md` | Naming-based class classification; ordinary classes are categorized as application entries |
-| `anti-patterns.md` | Structural smells, cycles, forbidden names, and DI findings |
-| `interfaces.md` | Naming-based interface, implementation, and test-double candidates |
-| `cross-build.md` | Heuristic artifact-name edges plus concatenated per-project hubs and cycles; these are not semantic cross-build reference analysis |
-| `relationships/index.md` | Ranked important symbols with local/workspace/cross-build usage counts |
-| `relationships/<symbol>-<scope-hash>.md` | Cumulative consumers, dependencies, cross-build edges, and source evidence |
+| `anti-patterns.md` | Structural review prompts for oversized classes, inheritance, cycles, forbidden names, and missing tests |
+| `interfaces.md` | Exact interface implementation coverage when resolved evidence exists, with a legacy naming fallback |
+| `cross-build.md` | Resolved cross-build edges plus aggregate hubs and project-scoped analyzer-cycle summaries |
+| `relationships/index.md` | Ranked important symbols with local/workspace/cross-build inbound record counts |
+| `relationships/<symbol>-<scope-hash>.md` | Inbound/outbound relationship records, cross-build edges, and source evidence |
 | `site/index.html` | Self-contained static dashboard rendered directly from the typed workspace report |
-| `site/report.html` | Scoped static fragment for notebook embedding |
+| `site/report.html` | Scoped static fragment for embedding in an existing page |
 | `root/context.md` | Detailed root-project context |
 | `<project>/context.md` | Detailed subproject context |
 
@@ -62,14 +62,36 @@ Each included build also receives its own configured output directory with a das
 
 - Start with `context.md`, then open focused reports linked from the dashboard.
 - Start relationship exploration at `relationships/index.md`, then open only relevant symbol pages and cited source.
-- Read local, workspace, and cross-build inbound separately. Local zero with workspace inbound is still workspace-used.
+- Read local, workspace, and cross-build inbound separately. Local zero with workspace inbound is still workspace-referenced.
 - Treat zero resolved workspace inbound as absence of observed evidence, not proof that a symbol is unused.
-- The D3 atlas opens with scoped files. `A -> B` means source in A contains a resolved relationship to B. Switch to
-  Symbols for declarations, Problems for exact file findings, or Cycles for resolved file SCCs. Select a node or edge
-  for declarations, relationship kinds, evidence locations, and inbound/outbound flow; dashed edges are heuristic.
-- Do not treat `entry-points.md`, `interfaces.md`, or `cross-build.md` as authoritative semantic analysis; each uses
-  naming or dependency-coordinate heuristics and can contain omissions or false positives.
+- The Atlas narrows Build → Project → Source set. Files opens with one globally bounded overview of at most 42 files.
+  Selecting a scope refills from the complete typed file catalog and deterministically pages at most 42 files plus
+  incident cross-scope endpoints; it does not merely filter the global overview.
+- Symbols likewise refills from the typed declaration and exact non-import relationship catalogs. Each page has at most
+  42 unique declaration/endpoint nodes. Hubs or cross-scope endpoints may repeat to keep both endpoints together, while
+  every exact relationship edge appears on exactly one page. Indexed, available, displayed, and not-on-page counts stay
+  distinct.
+- In the Atlas, `A -> B` means source in A has a resolved relationship record to a declaration in B. Arrows route around
+  labels and rings; each badge counts displayed non-import records in that direction, and kind controls filter the
+  categories present in the projection. “Call / construct records” are captured call or construction occurrences, not
+  distinct callers or runtime executions; one line may contribute multiple records. Files aggregates records assigned
+  to the current page. Symbols shows only exact edges assigned to the current page and can show
+  fewer arrows even when hubs repeat across pages. A heavier arrow represents more displayed records, not greater
+  certainty. Imports are excluded.
+- Selecting a file opens its complete embedded source in a horizontally resizable pane capped at 50% of the Atlas.
+  Only the active symbol, relationship occurrence, or finding evidence is emphasized. Hover may preview one relationship
+  occurrence, and Previous/Next pages repeated records; unrelated evidence remains unhighlighted.
+- Cycles exposes two distinct models. Observed file cycles are resolved strongly connected components in the complete
+  available file-relationship catalog. Analyzer-inferred component cycles are closed, directed routes through qualified
+  analysis components and may contain participants without matched typed source or outside the current page. Their
+  explanatory route arrows are not resolved relationship records and do not contribute to relationship-count badges.
+- A finding deep-links to the Problems map or source only when it carries typed file, component, or component-cycle
+  evidence. A project-scoped review prompt without that evidence remains visible without inventing a graph target.
+- Treat legacy naming or artifact-coordinate fallbacks in `entry-points.md`, `interfaces.md`, and `cross-build.md` as
+  candidates rather than semantic proof. Exact scoped workspace relationships are identified separately.
 - Treat anti-pattern findings as review prompts. Inspect the cited source before changing architecture.
+- Concrete dependencies and one-implementation interfaces are neutral by default. Require actual boundary or
+  substitutability evidence before adding or removing an abstraction.
 - A missing WRKX repository is expected when it is disabled and therefore absent from the Gradle composite.
 
 ## Relationship evidence and limits
@@ -77,12 +99,23 @@ Each included build also receives its own configured output directory with a das
 - `DIRECT` means the source extractor observed the syntax directly.
 - `DERIVED` means SRCX deterministically composed direct facts, such as resolving one explicit import.
 - `HEURISTIC` means syntax is approximate and the relationship needs review.
-- Import-only facts do not count as usage.
+- These labels describe static source evidence; none means compiler-semantic or runtime certainty.
+- Import-only facts may assist deterministic resolution but are currently excluded from relationship counts.
 - Duplicate or ambiguous declarations stay unresolved; SRCX does not choose an arbitrary target.
+- A relationship record is keyed by source declaration (or import-owner scope), target declaration, and source line.
+  Duplicate keys collapse to one record, retaining the most-specific relationship kind and then strongest evidence.
+- The unified Build comparison counts one source-set record per analyzed Gradle project/source-set summary; its column
+  maxima are exact values, while bar lengths are independently scaled visual comparisons.
+- Atlas node radius uses attached totals, not only currently drawn edges: file nodes use their payload's total workspace
+  inbound, outbound, and internal records; symbol nodes use records reconstructed across the available symbol pages.
+- Embedded Atlas source is the full typed source-file set supplied by the immutable workspace report; the HTML renderer
+  never performs arbitrary filesystem reads. Declaration lines keep subtle location marks; only the active declaration,
+  relationship occurrence, or finding receives a strong highlight.
 - PSI parsing is static and does not model reflection, generated code, runtime DI graphs, Android lifecycle, or dynamic
   dispatch. Java/Kotlin support is limited to relationship kinds the current extractors can identify reliably.
-- Relationship pages are capped at 100 important symbols. Each interactive file/symbol projection is capped at 42
-  nodes and favors important, connected source evidence.
+- Relationship pages are capped at 100 important symbols. The All-build Files overview is capped at 42 nodes; selected
+  scopes refill into deterministic pages of at most 42. Symbols pages also contain at most 42 unique nodes; hubs may
+  repeat, but every exact edge belongs to one page.
 
 ## Automatic generation
 

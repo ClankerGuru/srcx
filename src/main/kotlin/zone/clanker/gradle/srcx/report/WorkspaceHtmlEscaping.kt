@@ -17,3 +17,13 @@ internal fun String.escapeWorkspaceHtml(): String =
             )
         }
     }
+
+internal fun workspaceProjectDisplayName(
+    buildName: String,
+    projectPath: String,
+): String =
+    if (projectPath == ":") {
+        "${buildName.uppercase()} · : (root project)"
+    } else {
+        projectPath
+    }

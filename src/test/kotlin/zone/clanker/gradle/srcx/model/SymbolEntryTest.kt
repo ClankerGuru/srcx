@@ -201,6 +201,7 @@ class SymbolEntryTest :
                     sym.name shouldBe "MyService"
                     sym.qualifiedName shouldBe "com.example.MyService"
                     sym.kind shouldBe SymbolDetailKind.CLASS
+                    sym.declarationSemantic shouldBe DeclarationSemantic.CONCRETE_CLASS
                     sym.line shouldBe 5
                     sym.packageName shouldBe "com.example"
                 }
@@ -223,6 +224,27 @@ class SymbolEntryTest :
                     SymbolDetailKind.OBJECT.label shouldBe "object"
                     SymbolDetailKind.FUNCTION.label shouldBe "fun"
                     SymbolDetailKind.PROPERTY.label shouldBe "val/var"
+                }
+            }
+        }
+
+        given("DeclarationSemantic enum") {
+            `when`("deriving a default from a symbol kind") {
+                then("class-like forms remain factual and functions remain other") {
+                    DeclarationSemantic.from(SymbolDetailKind.INTERFACE) shouldBe DeclarationSemantic.INTERFACE
+                    DeclarationSemantic.from(SymbolDetailKind.CLASS) shouldBe DeclarationSemantic.CONCRETE_CLASS
+                    DeclarationSemantic.from(SymbolDetailKind.DATA_CLASS) shouldBe DeclarationSemantic.CONCRETE_CLASS
+                    DeclarationSemantic.from(SymbolDetailKind.OBJECT) shouldBe DeclarationSemantic.SINGLETON_OBJECT
+                    DeclarationSemantic.from(SymbolDetailKind.ENUM) shouldBe DeclarationSemantic.ENUM
+                    DeclarationSemantic.from(SymbolDetailKind.FUNCTION) shouldBe DeclarationSemantic.OTHER
+                }
+            }
+
+            `when`("reading human-facing descriptions") {
+                then("they describe syntax without inventing architectural intent") {
+                    DeclarationSemantic.INTERFACE.detail shouldContain "does not infer why"
+                    DeclarationSemantic.SINGLETON_OBJECT.detail shouldContain "one language-managed instance"
+                    DeclarationSemantic.CONCRETE_CLASS.detail shouldContain "not its quality"
                 }
             }
         }

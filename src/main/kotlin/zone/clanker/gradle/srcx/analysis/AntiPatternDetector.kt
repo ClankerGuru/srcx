@@ -2,6 +2,7 @@
 
 package zone.clanker.gradle.srcx.analysis
 
+import zone.clanker.gradle.srcx.model.ArchitectureComponentCycle
 import java.io.File
 
 private const val MAX_IMPORTS = 30
@@ -19,12 +20,18 @@ private const val UNTESTED_PREVIEW_COUNT = 5
  * @property message human-readable description of the anti-pattern
  * @property file the file where the anti-pattern was found (relative)
  * @property suggestion actionable advice for fixing the anti-pattern
+ * @property line exact one-based declaration line when available
+ * @property componentIds exact qualified analyzer component IDs implicated by the finding
+ * @property componentCycle closed directed component route for a circular-dependency finding
  */
 data class AntiPattern(
     val severity: Severity,
     val message: String,
     val file: File,
     val suggestion: String,
+    val line: Int? = null,
+    val componentIds: List<String> = emptyList(),
+    val componentCycle: ArchitectureComponentCycle? = null,
 ) {
     /** Severity level of an anti-pattern finding. */
     enum class Severity(
@@ -50,14 +57,18 @@ fun detectAntiPatterns(
     patterns.addAll(detectSmellClasses(components, rootDir, forbiddenPackages))
     patterns.addAll(detectForbiddenNames(components, rootDir, forbiddenPackages))
     patterns.addAll(detectForbiddenClassNames(components, rootDir, forbiddenClassPatterns))
-    patterns.addAll(detectSingleImplInterfaces(components, resolver, rootDir))
     patterns.addAll(detectGodClasses(components, rootDir))
     patterns.addAll(detectDeepInheritance(components, resolver, rootDir))
     patterns.addAll(detectCircularDeps(edges))
-    patterns.addAll(detectDependencyInversionViolations(components, resolver, rootDir))
     patterns.addAll(detectMissingTests(components, rootDir))
 
-    return patterns.sortedWith(compareBy({ it.severity }, { it.file.path }))
+    return patterns.sortedWith(
+        compareBy<AntiPattern> { it.severity }
+            .thenBy { it.file.invariantSeparatorsPath }
+            .thenBy { it.line ?: 0 }
+            .thenBy { it.message }
+            .thenBy { it.suggestion },
+    )
 }
 
 private class SupertypeResolver(
@@ -75,11 +86,6 @@ private class SupertypeResolver(
                 ?.let { byQualifiedName[it] }
                 ?: byQualifiedName["${owner.source.packageName}.$supertype"]
                 ?: bySimpleName[supertype]?.singleOrNull()
-        }
-
-    fun findImplementors(iface: ClassifiedComponent): List<ClassifiedComponent> =
-        bySimpleName.values.flatten().filter { c ->
-            c.source.supertypes.any { supertype -> resolve(c, supertype) === iface }
         }
 }
 
@@ -106,6 +112,8 @@ private fun detectSmellClasses(
                 message = "`${c.source.simpleName}` is a $roleLabel class",
                 file = c.source.file.relativeTo(rootDir),
                 suggestion = suggestion,
+                line = c.source.declarationLine,
+                componentIds = listOf(c.source.qualifiedName),
             )
         }
 
@@ -159,101 +167,10 @@ private fun detectForbiddenClassNames(
                 message = "`${c.source.simpleName}` contains forbidden pattern `$matched`",
                 file = c.source.file.relativeTo(rootDir),
                 suggestion = "Rename to describe what the class does instead of using a generic name.",
+                line = c.source.declarationLine,
+                componentIds = listOf(c.source.qualifiedName),
             )
         }
-
-private fun detectDependencyInversionViolations(
-    components: List<ClassifiedComponent>,
-    resolver: SupertypeResolver,
-    rootDir: File,
-): List<AntiPattern> {
-    val nonTestComponents =
-        components.filter { c ->
-            !c.source.file.path
-                .contains("/test/") &&
-                !c.source.file.path
-                    .contains("\\test\\") &&
-                !c.source.isInterface
-        }
-
-    val patterns = mutableListOf<AntiPattern>()
-
-    nonTestComponents.forEach { c ->
-        patterns.addAll(checkImportsForDiViolations(c, resolver, rootDir))
-    }
-
-    return patterns.distinctBy { it.message }
-}
-
-private fun checkImportsForDiViolations(
-    c: ClassifiedComponent,
-    resolver: SupertypeResolver,
-    rootDir: File,
-): List<AntiPattern> =
-    c.source.imports.mapNotNull { importedFqn ->
-        val importedSimpleName = importedFqn.substringAfterLast(".")
-        val resolved = resolver.resolve(c, importedSimpleName) ?: return@mapNotNull null
-        val isAbstraction = resolved.source.isInterface || resolved.source.isAbstract || resolved.source.isDataClass
-        if (isAbstraction) return@mapNotNull null
-        buildDiViolationPattern(c, resolved, resolver, rootDir)
-    }
-
-private fun buildDiViolationPattern(
-    c: ClassifiedComponent,
-    resolved: ClassifiedComponent,
-    resolver: SupertypeResolver,
-    rootDir: File,
-): AntiPattern {
-    val implementedInterfaces =
-        resolved.source.supertypes
-            .mapNotNull { supertype ->
-                resolver.resolve(resolved, supertype)
-            }.filter { it.source.isInterface }
-
-    return if (implementedInterfaces.isNotEmpty()) {
-        val ifaceName = implementedInterfaces.first().source.simpleName
-        val concreteName = resolved.source.simpleName
-        val msg =
-            "Dependency on concrete `$concreteName` instead of interface `$ifaceName`"
-        AntiPattern(
-            severity = AntiPattern.Severity.WARNING,
-            message = msg,
-            file = c.source.file.relativeTo(rootDir),
-            suggestion = "Depend on `$ifaceName` instead of the concrete class.",
-        )
-    } else {
-        AntiPattern(
-            severity = AntiPattern.Severity.INFO,
-            message = "Dependency on concrete class `${resolved.source.simpleName}` in `${c.source.simpleName}`",
-            file = c.source.file.relativeTo(rootDir),
-            suggestion = "Consider extracting an interface for `${resolved.source.simpleName}`.",
-        )
-    }
-}
-
-private fun detectSingleImplInterfaces(
-    components: List<ClassifiedComponent>,
-    resolver: SupertypeResolver,
-    rootDir: File,
-): List<AntiPattern> =
-    components.filter { it.source.isInterface }.mapNotNull { iface ->
-        val impls = resolver.findImplementors(iface)
-        if (impls.size == 1) {
-            val impl = impls[0]
-            val ifaceName = iface.source.simpleName
-            val implName = impl.source.simpleName
-            val msg =
-                "Interface `$ifaceName` has only one implementation: `$implName`"
-            AntiPattern(
-                severity = AntiPattern.Severity.INFO,
-                message = msg,
-                file = iface.source.file.relativeTo(rootDir),
-                suggestion = "Consider using `$implName` directly unless needed for testing.",
-            )
-        } else {
-            null
-        }
-    }
 
 private fun detectGodClasses(
     components: List<ClassifiedComponent>,
@@ -274,6 +191,8 @@ private fun detectGodClasses(
                 message = "`${c.source.simpleName}` may be doing too much (${reasons.joinToString(", ")})",
                 file = c.source.file.relativeTo(rootDir),
                 suggestion = suggestion,
+                line = c.source.declarationLine,
+                componentIds = listOf(c.source.qualifiedName),
             )
         }
 
@@ -301,6 +220,8 @@ private fun detectDeepInheritance(
                     message = "`${c.source.simpleName}` has inheritance depth $d: $chain",
                     file = c.source.file.relativeTo(rootDir),
                     suggestion = "Deep inheritance makes code rigid. Prefer composition.",
+                    line = c.source.declarationLine,
+                    componentIds = listOf(c.source.qualifiedName),
                 )
             } else {
                 null
@@ -337,13 +258,18 @@ private fun buildChain(c: ClassifiedComponent, resolver: SupertypeResolver): Lis
 }
 
 private fun detectCircularDeps(edges: List<ClassDependency>): List<AntiPattern> {
-    val cycles = findCycles(edges)
+    val cycles = findQualifiedCycles(edges)
     return cycles.take(MAX_CYCLE_REPORT).map { cycle ->
+        val typedCycle = ArchitectureComponentCycle(cycle)
         AntiPattern(
             severity = AntiPattern.Severity.WARNING,
-            message = "Circular dependency: ${cycle.joinToString(" -> ")}",
+            message = "Analyzer-inferred component cycle: ${cycle.joinToString(" -> ") { it.substringAfterLast('.') }}",
             file = File("."),
-            suggestion = "Break the cycle by extracting a shared interface or moving shared logic to a separate class.",
+            suggestion =
+                "Reverse an edge or move shared policy/data to an acyclic owner. " +
+                    "Introduce a boundary abstraction only when independently justified.",
+            componentIds = cycle.dropLast(1).distinct().sorted(),
+            componentCycle = typedCycle,
         )
     }
 }
@@ -396,6 +322,8 @@ private fun detectMissingTests(
                 message = "`${c.source.simpleName}` has no test",
                 file = c.source.file.relativeTo(rootDir),
                 suggestion = "Consider adding `${c.source.simpleName}Test`.",
+                line = c.source.declarationLine,
+                componentIds = listOf(c.source.qualifiedName),
             )
         }
     }

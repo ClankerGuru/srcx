@@ -93,7 +93,8 @@ class ProjectReportAnalysisTest :
                 }
 
                 then("it contains cycles section") {
-                    output shouldContain "## Circular Dependencies"
+                    output shouldContain "## Analyzer-Inferred Component Cycles"
+                    output shouldContain "analyzer evidence, not resolved Atlas relationship records"
                     output shouldContain "A -> B -> A"
                 }
             }
@@ -152,7 +153,7 @@ class ProjectReportAnalysisTest :
                 then("it does not contain analysis sections") {
                     output shouldNotContain "Hub Classes"
                     output shouldNotContain "Warnings"
-                    output shouldNotContain "Circular Dependencies"
+                    output shouldNotContain "Analyzer-Inferred Component Cycles"
                 }
             }
 
@@ -173,7 +174,7 @@ class ProjectReportAnalysisTest :
                 then("it does not show empty sections") {
                     output shouldNotContain "Hub Classes"
                     output shouldNotContain "Warnings"
-                    output shouldNotContain "Circular Dependencies"
+                    output shouldNotContain "Analyzer-Inferred Component Cycles"
                 }
             }
         }

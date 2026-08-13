@@ -6,6 +6,14 @@ import io.kotest.matchers.file.shouldNotExist
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.gradle.testkit.runner.GradleRunner
 import org.gradle.testkit.runner.TaskOutcome
 import java.io.File
@@ -24,7 +32,16 @@ class WorkspaceCumulativeCompositeBuildTest :
                 val firstPageBytes = relationshipPage.readBytes()
                 val contextMarkdown = rootOutput.resolve("context.md").readText()
                 val relationshipMarkdown = relationshipPage.readText()
-                val graphData = rootOutput.resolve("site/index.html").readText().architectureGraphData()
+                val siteHtml = rootOutput.resolve("site/index.html").readText()
+                val firstSiteBytes = siteHtml.toByteArray()
+                val graphData = siteHtml.architectureGraphData()
+                val sourceFiles =
+                    Json
+                        .parseToJsonElement(graphData)
+                        .jsonObject
+                        .getValue("sourceFiles")
+                        .jsonArray
+                val expectedSourceFiles = expectedEmbeddedSources()
 
                 workspace.gradle(Srcx.TASK_CONTEXT).build()
                 val secondRelationshipPage = rootOutput.relationshipPages().single()
@@ -37,13 +54,13 @@ class WorkspaceCumulativeCompositeBuildTest :
                     relationshipIndex.readText() shouldContain "| 1000 | 0 | 2 | 2 | observed |"
                 }
 
-                then("the cumulative page distinguishes local, workspace, and cross-build inbound usage") {
+                then("the cumulative page distinguishes local, workspace, and cross-build inbound relationships") {
                     relationshipMarkdown shouldContain "# fixture.contract.WorkspaceContract"
                     relationshipMarkdown shouldContain "| Local inbound | 0 |"
                     relationshipMarkdown shouldContain "| Workspace inbound | 2 |"
                     relationshipMarkdown shouldContain "| Cross-build inbound | 2 |"
                     relationshipMarkdown shouldContain
-                        "| Workspace-used status | yes - resolved workspace usage observed |"
+                        "| Workspace-referenced status | yes - resolved workspace inbound records observed |"
                     relationshipMarkdown.lowercase() shouldNotContain "globally unused"
                 }
 
@@ -53,14 +70,14 @@ class WorkspaceCumulativeCompositeBuildTest :
                         "(<code>consumer-build</code> / <code>:</code> / <code>main</code>) | implements | " +
                         "yes (<code>consumer-build</code> to <code>contract-build</code>) | DERIVED | " +
                         "<code>consumer-build</code> | <code>:</code> | " +
-                        "<code>src/main/kotlin/fixture/consumer/ContractImplementation.kt</code> | 5 | " +
+                        "<code>$SHARED_SOURCE_PATH</code> | 5 | " +
                         "WorkspaceContract |"
                     relationshipMarkdown shouldContain
                         "| fixture.root.RootConsumer " +
                         "(<code>workspace-root</code> / <code>:</code> / <code>main</code>) | parameter type | " +
                         "yes (<code>workspace-root</code> to <code>contract-build</code>) | DERIVED | " +
                         "<code>workspace-root</code> | <code>:</code> | " +
-                        "<code>src/main/kotlin/fixture/root/RootConsumer.kt</code> | 5 | WorkspaceContract |"
+                        "<code>$SHARED_SOURCE_PATH</code> | 5 | WorkspaceContract |"
                 }
 
                 then("the root context links both relationship entry points") {
@@ -81,6 +98,44 @@ class WorkspaceCumulativeCompositeBuildTest :
                     graphData shouldContain "\"kind\":\"PARAMETER_TYPE\""
                 }
 
+                then("the sourceFiles payload embeds every exact root and included-build source") {
+                    val expectedPayload =
+                        buildJsonArray {
+                            expectedSourceFiles.forEach { sourceFile -> add(sourceFile.toJsonObject()) }
+                        }
+                    sourceFiles shouldBe expectedPayload
+                }
+
+                then("identical project-relative paths retain distinct workspace scopes") {
+                    val sourceIds =
+                        sourceFiles.map { sourceFile ->
+                            sourceFile.jsonObject
+                                .getValue("id")
+                                .jsonPrimitive
+                                .content
+                        }
+
+                    sourceIds shouldBe expectedSourceFiles.map(EmbeddedSourceExpectation::id)
+                    sourceIds.distinct().size shouldBe 3
+                    sourceFiles.count { sourceFile ->
+                        sourceFile.jsonObject
+                            .getValue("path")
+                            .jsonPrimitive
+                            .content == SHARED_SOURCE_PATH
+                    } shouldBe 3
+                }
+
+                then("the generated site safely transports source and remains self-contained") {
+                    siteHtml shouldContain "<script data-srcx-vendor=\"d3-7.9.0\">"
+                    siteHtml shouldContain "<script data-srcx-owned=\"architecture-graph\">"
+                    siteHtml shouldNotContain "<script src="
+                    siteHtml shouldNotContain "<link "
+                    graphData shouldNotContain "</script"
+                    graphData shouldNotContain "{{root-source}}"
+                    graphData shouldContain "\\u003c/script\\u003e"
+                    graphData shouldContain "\\u007b\\u007broot-source\\u007d\\u007d"
+                }
+
                 then("included build output stays a local summary rather than the relationship-document root") {
                     workspace.resolve("contract-build/.srcx/context.md").shouldExist()
                     workspace.resolve("consumer-build/.srcx/context.md").shouldExist()
@@ -92,6 +147,10 @@ class WorkspaceCumulativeCompositeBuildTest :
                     secondRelationshipPage.name shouldBe relationshipPage.name
                     relationshipIndex.readBytes().contentEquals(firstIndexBytes) shouldBe true
                     secondRelationshipPage.readBytes().contentEquals(firstPageBytes) shouldBe true
+                    rootOutput
+                        .resolve("site/index.html")
+                        .readBytes()
+                        .contentEquals(firstSiteBytes) shouldBe true
                 }
             }
         }
@@ -137,40 +196,73 @@ private fun cumulativeCompositeWorkspace(): File =
         )
         writeFixture("build.gradle.kts", "plugins { base }")
         writeFixture(
-            "src/main/kotlin/fixture/root/RootConsumer.kt",
-            """
-            package fixture.root
-
-            import fixture.contract.WorkspaceContract
-
-            class RootConsumer(private val contract: WorkspaceContract)
-            """,
+            SHARED_SOURCE_PATH,
+            ROOT_SOURCE_FIXTURE,
         )
 
         writeFixture("contract-build/settings.gradle.kts", "rootProject.name = \"contract-build\"")
         writeFixture("contract-build/build.gradle.kts", "plugins { base }")
         writeFixture(
-            "contract-build/src/main/kotlin/fixture/contract/WorkspaceContract.kt",
-            """
-            package fixture.contract
-
-            interface WorkspaceContract
-            """,
+            "contract-build/$SHARED_SOURCE_PATH",
+            CONTRACT_SOURCE_FIXTURE,
         )
 
         writeFixture("consumer-build/settings.gradle.kts", "rootProject.name = \"consumer-build\"")
         writeFixture("consumer-build/build.gradle.kts", "plugins { base }")
         writeFixture(
-            "consumer-build/src/main/kotlin/fixture/consumer/ContractImplementation.kt",
-            """
-            package fixture.consumer
-
-            import fixture.contract.WorkspaceContract
-
-            class ContractImplementation : WorkspaceContract
-            """,
+            "consumer-build/$SHARED_SOURCE_PATH",
+            CONSUMER_SOURCE_FIXTURE,
         )
     }
+
+private data class EmbeddedSourceExpectation(
+    val build: String,
+    val content: String,
+    val declarationLines: List<Int>,
+    val relationshipLines: List<Int>,
+) {
+    val id: String = "file::$build:::::main::$SHARED_SOURCE_PATH"
+
+    fun toJsonObject() =
+        buildJsonObject {
+            put("id", id)
+            put("build", build)
+            put("project", ":")
+            put("sourceSet", "main")
+            put("path", SHARED_SOURCE_PATH)
+            put("content", content)
+            put(
+                "declarationLines",
+                buildJsonArray { declarationLines.forEach { line -> add(JsonPrimitive(line)) } },
+            )
+            put(
+                "relationshipLines",
+                buildJsonArray { relationshipLines.forEach { line -> add(JsonPrimitive(line)) } },
+            )
+        }
+}
+
+private fun expectedEmbeddedSources(): List<EmbeddedSourceExpectation> =
+    listOf(
+        EmbeddedSourceExpectation(
+            build = "contract-build",
+            content = fixtureText(CONTRACT_SOURCE_FIXTURE),
+            declarationLines = listOf(3),
+            relationshipLines = emptyList(),
+        ),
+        EmbeddedSourceExpectation(
+            build = "consumer-build",
+            content = fixtureText(CONSUMER_SOURCE_FIXTURE),
+            declarationLines = listOf(5),
+            relationshipLines = listOf(5),
+        ),
+        EmbeddedSourceExpectation(
+            build = "workspace-root",
+            content = fixtureText(ROOT_SOURCE_FIXTURE),
+            declarationLines = listOf(5),
+            relationshipLines = listOf(5),
+        ),
+    ).sortedBy(EmbeddedSourceExpectation::id)
 
 private fun File.writeFixture(
     relativePath: String,
@@ -178,5 +270,40 @@ private fun File.writeFixture(
 ) {
     val target = resolve(relativePath)
     target.parentFile.mkdirs()
-    target.writeText(content.trimIndent() + "\n")
+    target.writeText(fixtureText(content))
 }
+
+private fun fixtureText(content: String): String = content.trimIndent() + "\n"
+
+private const val SHARED_SOURCE_PATH = "src/main/kotlin/fixture/shared/ScopedSource.kt"
+
+private const val ROOT_SOURCE_FIXTURE =
+    """
+    package fixture.root
+
+    import fixture.contract.WorkspaceContract
+
+    class RootConsumer(private val contract: WorkspaceContract)
+
+    // Root source transport sentinel: </script><script src="root.invalid/atlas.js"></script> & {{root-source}} 雪
+    """
+
+private const val CONTRACT_SOURCE_FIXTURE =
+    """
+    package fixture.contract
+
+    interface WorkspaceContract
+
+    // Included contract source: exact scoped payload.
+    """
+
+private const val CONSUMER_SOURCE_FIXTURE =
+    """
+    package fixture.consumer
+
+    import fixture.contract.WorkspaceContract
+
+    class ContractImplementation : WorkspaceContract
+
+    // Included consumer source: exact scoped payload.
+    """

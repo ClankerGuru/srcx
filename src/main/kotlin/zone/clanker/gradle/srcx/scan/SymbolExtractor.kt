@@ -187,7 +187,12 @@ object SymbolExtractor {
         val sourceSets = ProjectScanner.discoverSourceSets(projectDir)
         val files = scanProjectFiles(projectDir, sourceSets)
         val summary = buildProjectSummary(projectDir, projectPath, subprojectPaths, dependencies, sourceSets, files)
-        return ProjectScan(build, ProjectPath(projectPath), files, summary)
+        return ProjectScan(
+            build = build,
+            projectPath = ProjectPath(projectPath),
+            files = files,
+            summary = summary,
+        )
     }
 
     private fun scanProjectFiles(
@@ -200,23 +205,67 @@ object SymbolExtractor {
             }
         if (sourceFiles.isEmpty()) return emptyList()
 
-        val env = PsiEnvironment.shared() ?: return emptyList()
-        return synchronized(env) {
-            val parser = PsiParser(env)
-            sourceFiles
-                .map { (sourceSet, file) ->
-                    val facts = extractFacts(parser, file)
-                    ProjectFileScan(
+        val env = PsiEnvironment.shared()
+        val scans =
+            if (env == null) {
+                sourceFiles.map { (sourceSet, file) ->
+                    scanSourceFile(
+                        projectDir = projectDir,
                         sourceSet = sourceSet,
-                        projectRelativeFile = file.relativeTo(projectDir).path.replace(File.separatorChar, '/'),
-                        declarations = facts.declarations.sortedWith(declarationFactComparator),
-                        references = facts.references.sortedWith(referenceFactComparator),
+                        file = file,
+                        parser = null,
                     )
-                }.sortedWith(
-                    compareBy<ProjectFileScan> { sourceSets.indexOf(it.sourceSet) }
-                        .thenBy { it.projectRelativeFile },
+                }
+            } else {
+                synchronized(env) {
+                    val parser = PsiParser(env)
+                    sourceFiles.map { (sourceSet, file) ->
+                        scanSourceFile(
+                            projectDir = projectDir,
+                            sourceSet = sourceSet,
+                            file = file,
+                            parser = parser,
+                        )
+                    }
+                }
+            }
+        return scans.sortedWith(
+            compareBy<ProjectFileScan> { sourceSets.indexOf(it.sourceSet) }
+                .thenBy { it.projectRelativeFile },
+        )
+    }
+
+    private fun scanSourceFile(
+        projectDir: File,
+        sourceSet: SourceSetName,
+        file: File,
+        parser: PsiParser?,
+    ): ProjectFileScan {
+        val sourceText = file.readText(charset = Charsets.UTF_8)
+        val facts =
+            parser?.let { activeParser ->
+                extractFacts(
+                    parser = activeParser,
+                    file = file,
                 )
-        }
+            } ?: FileFacts(
+                declarations = emptyList(),
+                references = emptyList(),
+            )
+        return ProjectFileScan(
+            sourceSet = sourceSet,
+            projectRelativeFile =
+                file
+                    .relativeTo(base = projectDir)
+                    .path
+                    .replace(
+                        oldChar = File.separatorChar,
+                        newChar = '/',
+                    ),
+            declarations = facts.declarations.sortedWith(declarationFactComparator),
+            references = facts.references.sortedWith(referenceFactComparator),
+            sourceText = sourceText,
+        )
     }
 
     private val declarationFactComparator =

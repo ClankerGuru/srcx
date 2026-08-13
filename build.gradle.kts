@@ -7,6 +7,7 @@ dependencies {
     implementation("org.webjars.npm:d3:7.9.0") {
         isTransitive = false
     }
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
 }
 
 gradlePlugin {

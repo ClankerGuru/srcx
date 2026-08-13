@@ -1,6 +1,7 @@
 package zone.clanker.gradle.srcx.parse
 
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtClassOrObject
@@ -16,6 +17,7 @@ import org.jetbrains.kotlin.psi.KtSuperTypeListEntry
 import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.psi.KtUserType
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import zone.clanker.gradle.srcx.model.DeclarationSemantic
 import zone.clanker.gradle.srcx.model.Reference
 import zone.clanker.gradle.srcx.model.ReferenceEvidence
 import zone.clanker.gradle.srcx.model.ReferenceKind
@@ -72,7 +74,17 @@ internal class KotlinPsiExtractor {
             val name = cls.name ?: continue
             val fqName = cls.fqName?.asString() ?: qualified(pkg, name)
             val line = lineOf(ktFile.text, cls.textOffset)
-            results.add(Symbol(name, fqName, classKind(cls), file, line, pkg))
+            results.add(
+                Symbol(
+                    name,
+                    fqName,
+                    classKind(cls),
+                    file,
+                    line,
+                    pkg,
+                    classDeclarationSemantic(cls),
+                ),
+            )
             extractMembers(cls, name, fqName, pkg, file, ktFile.text, results)
         }
     }
@@ -115,7 +127,17 @@ internal class KotlinPsiExtractor {
             val name = obj.name ?: continue
             val fqName = obj.fqName?.asString() ?: qualified(pkg, name)
             val line = lineOf(ktFile.text, obj.textOffset)
-            results.add(Symbol(name, fqName, SymbolDetailKind.OBJECT, file, line, pkg))
+            results.add(
+                Symbol(
+                    name,
+                    fqName,
+                    SymbolDetailKind.OBJECT,
+                    file,
+                    line,
+                    pkg,
+                    DeclarationSemantic.SINGLETON_OBJECT,
+                ),
+            )
         }
     }
 
@@ -291,6 +313,15 @@ internal class KotlinPsiExtractor {
             cls.isEnum() -> SymbolDetailKind.ENUM
             cls.isData() -> SymbolDetailKind.DATA_CLASS
             else -> SymbolDetailKind.CLASS
+        }
+
+    private fun classDeclarationSemantic(cls: KtClass): DeclarationSemantic =
+        when {
+            cls.isInterface() -> DeclarationSemantic.INTERFACE
+            cls.isEnum() -> DeclarationSemantic.ENUM
+            cls.hasModifier(KtTokens.ABSTRACT_KEYWORD) || cls.hasModifier(KtTokens.SEALED_KEYWORD) ->
+                DeclarationSemantic.ABSTRACT_CLASS
+            else -> DeclarationSemantic.CONCRETE_CLASS
         }
 
     private fun supertypeName(entry: KtSuperTypeListEntry): String? =

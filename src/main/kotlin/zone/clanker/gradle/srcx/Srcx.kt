@@ -52,7 +52,7 @@ data object Srcx {
     /** Standalone static documentation entry point. */
     const val HTML_INDEX_FILE = "index.html"
 
-    /** Notebook-safe static documentation fragment. */
+    /** Scoped static documentation fragment for embedding in an existing page. */
     const val HTML_FRAGMENT_FILE = "report.html"
 
     /** Dependency scopes excluded from scanning by default. */

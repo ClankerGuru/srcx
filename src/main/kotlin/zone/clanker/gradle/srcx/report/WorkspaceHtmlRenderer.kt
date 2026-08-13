@@ -2,7 +2,7 @@ package zone.clanker.gradle.srcx.report
 
 import zone.clanker.gradle.srcx.model.WorkspaceReport
 
-/** Renders a typed [WorkspaceReport] as notebook and standalone HTML without source or Gradle access. */
+/** Renders a typed [WorkspaceReport] as embedded and standalone HTML without source or Gradle access. */
 class WorkspaceHtmlRenderer internal constructor(
     private val resources: WorkspaceHtmlResourceRenderer,
 ) {
@@ -14,11 +14,13 @@ class WorkspaceHtmlRenderer internal constructor(
     private val architectureRenderer = WorkspaceArchitectureHtmlRenderer(resources)
 
     fun render(report: WorkspaceReport): RenderedWorkspaceHtml {
+        val architectureGraph = buildWorkspaceArchitectureGraph(report)
+        val findingEvidence = workspaceArchitectureFindingEvidence(report, architectureGraph)
         val slots =
             frameRenderer.render(report) +
-                structureRenderer.render(report) +
-                analysisRenderer.render(report) +
-                architectureRenderer.render(report) +
+                structureRenderer.render(report, findingEvidence) +
+                analysisRenderer.render(report, findingEvidence) +
+                architectureRenderer.render(architectureGraph) +
                 mapOf("scriptsHtml" to resources.scripts())
         val article = resources.dashboard(slots).trim()
         val fragment =

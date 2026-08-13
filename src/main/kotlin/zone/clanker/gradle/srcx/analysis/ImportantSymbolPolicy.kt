@@ -19,14 +19,14 @@ object ImportantSymbolPolicy {
     const val UNUSUAL_CONNECTIVITY_THRESHOLD = 8
 
     // This exceeds every non-cross-build score combined, preserving cross-build APIs under the default ranking.
-    const val CROSS_BUILD_INBOUND_SCORE = 1_000
-    const val HIGH_WORKSPACE_INBOUND_SCORE = 180
-    const val MULTIPLE_IMPLEMENTATIONS_SCORE = 160
-    const val ENTRY_POINT_SCORE = 140
-    const val DEPENDENCY_CYCLE_SCORE = 120
-    const val HIGH_WORKSPACE_OUTBOUND_SCORE = 100
-    const val UNUSUAL_CONNECTIVITY_SCORE = 80
-    const val ANTI_PATTERN_INVOLVEMENT_SCORE = 60
+    val CROSS_BUILD_INBOUND_SCORE = ImportantSymbolReason.CROSS_BUILD_INBOUND.score
+    val HIGH_WORKSPACE_INBOUND_SCORE = ImportantSymbolReason.HIGH_WORKSPACE_INBOUND.score
+    val MULTIPLE_IMPLEMENTATIONS_SCORE = ImportantSymbolReason.MULTIPLE_IMPLEMENTATIONS.score
+    val ENTRY_POINT_SCORE = ImportantSymbolReason.ENTRY_POINT.score
+    val DEPENDENCY_CYCLE_SCORE = ImportantSymbolReason.DEPENDENCY_CYCLE.score
+    val HIGH_WORKSPACE_OUTBOUND_SCORE = ImportantSymbolReason.HIGH_WORKSPACE_OUTBOUND.score
+    val UNUSUAL_CONNECTIVITY_SCORE = ImportantSymbolReason.UNUSUAL_CONNECTIVITY.score
+    val ANTI_PATTERN_INVOLVEMENT_SCORE = ImportantSymbolReason.ANTI_PATTERN_INVOLVEMENT.score
 
     /**
      * Select important symbols in score-descending, scoped-identity order.
@@ -95,17 +95,7 @@ object ImportantSymbolPolicy {
         )
     }
 
-    private fun scoreFor(reason: ImportantSymbolReason): Int =
-        when (reason) {
-            ImportantSymbolReason.CROSS_BUILD_INBOUND -> CROSS_BUILD_INBOUND_SCORE
-            ImportantSymbolReason.HIGH_WORKSPACE_INBOUND -> HIGH_WORKSPACE_INBOUND_SCORE
-            ImportantSymbolReason.MULTIPLE_IMPLEMENTATIONS -> MULTIPLE_IMPLEMENTATIONS_SCORE
-            ImportantSymbolReason.ENTRY_POINT -> ENTRY_POINT_SCORE
-            ImportantSymbolReason.DEPENDENCY_CYCLE -> DEPENDENCY_CYCLE_SCORE
-            ImportantSymbolReason.HIGH_WORKSPACE_OUTBOUND -> HIGH_WORKSPACE_OUTBOUND_SCORE
-            ImportantSymbolReason.UNUSUAL_CONNECTIVITY -> UNUSUAL_CONNECTIVITY_SCORE
-            ImportantSymbolReason.ANTI_PATTERN_INVOLVEMENT -> ANTI_PATTERN_INVOLVEMENT_SCORE
-        }
+    private fun scoreFor(reason: ImportantSymbolReason): Int = reason.score
 
     private fun WorkspaceSymbolUsage.withoutImports(): WorkspaceSymbolUsage =
         copy(

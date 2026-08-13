@@ -51,6 +51,7 @@ object WorkspaceIndexBuilder {
                                             kind = declaration.kind,
                                             projectRelativeFile = file.projectRelativeFile,
                                             declarationLine = declaration.line,
+                                            declarationSemantic = declaration.declarationSemantic,
                                         ),
                                     packageName = declaration.packageName,
                                 )

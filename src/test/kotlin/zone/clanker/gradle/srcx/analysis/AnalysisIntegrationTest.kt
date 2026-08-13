@@ -112,9 +112,8 @@ class AnalysisIntegrationTest :
                         components, edges, dir,
                     )
 
-                then("it returns findings") {
-                    // At minimum, single-impl interface or missing tests
-                    patterns.isNotEmpty() shouldBe true
+                then("it reports the missing tests without relying on abstraction findings") {
+                    patterns.any { it.message.contains("no test") } shouldBe true
                 }
             }
 

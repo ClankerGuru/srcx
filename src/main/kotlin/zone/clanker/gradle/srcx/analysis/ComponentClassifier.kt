@@ -20,7 +20,7 @@ enum class ArchitecturalLayer {
 fun detectLayer(packageName: String, isTest: Boolean): ArchitecturalLayer {
     if (isTest) return ArchitecturalLayer.TEST
 
-    val lastSegment = packageName.split(".").lastOrNull()?.lowercase() ?: return ArchitecturalLayer.OTHER
+    val lastSegment = packageName.substringAfterLast('.').lowercase()
 
     return when (lastSegment) {
         "task", "ui", "screen", "view", "route", "controller", "activity", "fragment" ->

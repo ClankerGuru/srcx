@@ -1,7 +1,9 @@
 package zone.clanker.gradle.srcx.model
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 
 class WorkspaceIndexTest :
     BehaviorSpec({
@@ -71,6 +73,35 @@ class WorkspaceIndexTest :
                     usage.workspaceInbound shouldBe 2
                     usage.crossBuildInbound shouldBe 1
                     usage.isWorkspaceUsed shouldBe true
+                }
+            }
+
+            `when`("resolved relationship evidence names a different source file") {
+                val reference =
+                    WorkspaceReference(
+                        build = symbol.build,
+                        project = symbol.project,
+                        sourceSet = symbol.sourceSet,
+                        sourceSymbol = symbol,
+                        targetName = symbol.name,
+                        targetQualifiedName = symbol.qualifiedName,
+                        kind = ReferenceKind.CALL,
+                        projectRelativeFile = "src/main/kotlin/sample/Other.kt",
+                        line = 9,
+                        context = symbol.name,
+                        evidence = ReferenceEvidence.DIRECT,
+                    )
+
+                then("the typed relationship rejects misleading file provenance") {
+                    shouldThrow<IllegalArgumentException> {
+                        WorkspaceRelationship(
+                            source = symbol,
+                            target = symbol,
+                            kind = WorkspaceRelationshipKind.CALL,
+                            sourceEvidence = reference,
+                            evidence = ReferenceEvidence.DIRECT,
+                        )
+                    }.message shouldContain "source and evidence must share"
                 }
             }
         }

@@ -3,6 +3,8 @@
 package zone.clanker.gradle.srcx.report
 
 import zone.clanker.gradle.srcx.model.ImportantSymbol
+import zone.clanker.gradle.srcx.model.ImportantSymbolReason
+import zone.clanker.gradle.srcx.model.SymbolDetailKind
 import zone.clanker.gradle.srcx.model.WorkspaceRelationship
 import zone.clanker.gradle.srcx.model.WorkspaceRelationshipKind
 import zone.clanker.gradle.srcx.model.WorkspaceReport
@@ -71,12 +73,15 @@ internal class WorkspaceRelationshipsRenderer {
                     "Rows are ordered by descending importance score, then stable workspace identity.",
             )
             appendLine()
+            appendLine("[How to read the columns, symbol kinds, and score](#how-to-read-this-table).")
+            appendLine()
             if (pages.isEmpty()) {
                 appendLine("No important symbols were selected for this workspace.")
                 appendLine()
             } else {
                 appendLine(
-                    "| Symbol | Kind | Scope | Score | Local in | Workspace in | Cross-build in | Workspace-used |",
+                    "| Symbol | Kind | Scope | Score | Local in | Workspace in | Cross-build in | " +
+                        "Workspace-referenced |",
                 )
                 appendLine(
                     "|--------|------|-------|------:|---------:|-------------:|---------------:|----------------|",
@@ -94,32 +99,36 @@ internal class WorkspaceRelationshipsRenderer {
                 }
                 appendLine()
             }
-            appendLine("## Evidence model and limits")
-            appendLine()
-            appendLine("- **DIRECT**: the extractor supplied direct source evidence for the resolved target.")
-            appendLine(
-                "- **DERIVED**: the target was resolved from deterministic source facts, " +
-                    "such as an unambiguous import.",
-            )
-            appendLine(
-                "- **HEURISTIC**: the relationship relies on approximate name or syntax evidence " +
-                    "and should be reviewed.",
-            )
-            appendLine(
-                "- Import facts do not count as usage and are excluded from inbound, outbound, " +
-                    "and workspace-used results.",
-            )
-            appendLine(
-                "- Counts cover resolved, observed workspace relationships only. " +
-                    "No resolved workspace usage is not proof " +
-                    "of semantic unusedness.",
-            )
-            appendLine(
-                "- Local inbound means the same build and project. Workspace inbound includes all projects " +
-                    "and builds; " +
-                    "cross-build inbound has a consumer in another build.",
-            )
+            appendRelationshipGlossary()
+            appendEvidenceModel()
         }
+
+    private fun StringBuilder.appendEvidenceModel() {
+        appendLine("## Evidence model and limits")
+        appendLine()
+        appendLine("- **DIRECT**: the extractor supplied direct source evidence for the resolved target.")
+        appendLine(
+            "- **DERIVED**: the target was resolved from deterministic source facts, " +
+                "such as an unambiguous import.",
+        )
+        appendLine(
+            "- **HEURISTIC**: the relationship relies on approximate name or syntax evidence " +
+                "and should be reviewed.",
+        )
+        appendLine(
+            "- Import facts are excluded from inbound and outbound relationship counts and " +
+                "workspace-referenced status.",
+        )
+        appendLine(
+            "- Counts cover resolved, observed workspace relationship records only. " +
+                "Absence of resolved workspace inbound records is not proof of semantic unusedness.",
+        )
+        appendLine(
+            "- Local inbound means the same build and project. Workspace inbound includes all projects " +
+                "and builds; " +
+                "cross-build inbound has a source declaration in another build.",
+        )
+    }
 
     private fun renderPage(
         page: RelationshipPage,
@@ -132,9 +141,21 @@ internal class WorkspaceRelationshipsRenderer {
             appendLine()
             appendIdentity(symbol)
             appendImportance(importantSymbol)
-            appendUsage(page.usage)
-            appendRelationships("Who uses it", "Consumer", page.usage.incoming, fileNames, inbound = true)
-            appendRelationships("What it uses", "Dependency", page.usage.outgoing, fileNames, inbound = false)
+            appendRelationshipCounts(page.usage)
+            appendRelationships(
+                title = "Inbound relationships",
+                endpointLabel = "Source declaration",
+                relationships = page.usage.incoming,
+                fileNames = fileNames,
+                inbound = true,
+            )
+            appendRelationships(
+                title = "Outbound relationships",
+                endpointLabel = "Target declaration",
+                relationships = page.usage.outgoing,
+                fileNames = fileNames,
+                inbound = false,
+            )
             appendCrossBuildEdges(page.usage, fileNames)
         }
 
@@ -154,46 +175,95 @@ internal class WorkspaceRelationshipsRenderer {
     }
 
     private fun StringBuilder.appendImportance(importantSymbol: ImportantSymbol) {
-        val reasons =
-            importantSymbol.reasons
-                .sortedBy { it.ordinal }
-                .joinToString("; ") { it.label.markdownText() }
         appendLine("## Importance")
         appendLine()
-        appendLine("| Score | Reasons |")
-        appendLine("|------:|---------|")
-        appendLine("| ${importantSymbol.score} | $reasons |")
+        appendLine(
+            "The score is an additive ranking value, not a percentage, confidence, or quality grade. " +
+                "[See every score rule](index.md#how-to-read-this-table).",
+        )
+        appendLine()
+        appendLine("| Reason | Points | Applied when |")
+        appendLine("|--------|-------:|--------------|")
+        importantSymbol.reasons.sortedBy { it.ordinal }.forEach { reason ->
+            appendLine(
+                "| ${reason.label.markdownText()} | ${reason.score} | ${reason.description.markdownText()} |",
+            )
+        }
+        appendLine("| **Total ranking score** | **${importantSymbol.score}** | Sum of the applicable reason points. |")
+        appendLine()
+        val terms = importantSymbol.reasons.sortedBy { it.ordinal }.joinToString(" + ") { it.score.toString() }
+        appendLine("Calculation: **$terms = ${importantSymbol.score}**.")
         appendLine()
     }
 
-    private fun StringBuilder.appendUsage(usage: WorkspaceSymbolUsage) {
+    private fun StringBuilder.appendRelationshipGlossary() {
+        appendLine("## How to read this table")
+        appendLine()
+        appendLine("<details>")
+        appendLine("<summary><strong>Expand column definitions, symbol kinds, and score rules</strong></summary>")
+        appendLine()
+        appendLine("### Columns")
+        appendLine()
+        COLUMN_DESCRIPTIONS.forEach { (column, description) ->
+            appendLine("- **$column**: $description")
+        }
+        appendLine()
+        appendLine("### Symbol kinds")
+        appendLine()
+        SymbolDetailKind.entries.forEach { kind ->
+            appendLine("- **${kind.label}**: ${kindDescription(kind)}")
+        }
+        appendLine()
+        appendLine("### Score rules")
+        appendLine()
+        appendLine(
+            "Scores rank symbols for bounded reports. Applicable reason points are added once; " +
+                "a larger score means more selection signals matched, not that the code is better or worse.",
+        )
+        appendLine()
+        appendLine("| Reason | Points | Applied when |")
+        appendLine("|--------|-------:|--------------|")
+        ImportantSymbolReason.entries.forEach { reason ->
+            appendLine("| ${reason.label} | ${reason.score} | ${reason.description} |")
+        }
+        appendLine()
+        appendLine(
+            "Relationship thresholds count resolved non-import records, not unique callers. " +
+                "The 1,000-point cross-build signal intentionally outranks every combination of local-only signals.",
+        )
+        appendLine()
+        appendLine("</details>")
+        appendLine()
+    }
+
+    private fun StringBuilder.appendRelationshipCounts(usage: WorkspaceSymbolUsage) {
         val status =
             if (usage.isWorkspaceUsed) {
-                "yes - resolved workspace usage observed"
+                "yes - resolved workspace inbound records observed"
             } else {
-                "no resolved workspace usage observed; not proof of semantic unusedness"
+                "no resolved workspace inbound records observed; not proof of semantic unusedness"
             }
-        appendLine("## Usage")
+        appendLine("## Relationship counts")
         appendLine()
         appendLine("| Metric | Value |")
         appendLine("|--------|------:|")
         appendLine("| Local inbound | ${usage.localInbound} |")
         appendLine("| Workspace inbound | ${usage.workspaceInbound} |")
         appendLine("| Cross-build inbound | ${usage.crossBuildInbound} |")
-        appendLine("| Workspace-used status | ${status.markdownText()} |")
+        appendLine("| Workspace-referenced status | ${status.markdownText()} |")
         appendLine()
         when {
             !usage.isWorkspaceUsed ->
                 appendLine(
-                    "No resolved workspace usage was observed. This is not proof that the declaration is " +
-                        "semantically unused.",
+                    "No resolved workspace inbound relationship records were observed. " +
+                        "This is not proof that the declaration is semantically unused.",
                 )
             usage.localInbound == 0 ->
                 appendLine(
-                    "No local inbound relationship was resolved, but consumers were observed " +
-                        "elsewhere in the workspace.",
+                    "No local inbound relationship record was resolved, but inbound records were observed elsewhere " +
+                        "in the workspace.",
                 )
-            else -> appendLine("Resolved non-import workspace usage was observed.")
+            else -> appendLine("Resolved non-import workspace inbound relationship records were observed.")
         }
         appendLine()
     }
@@ -209,7 +279,11 @@ internal class WorkspaceRelationshipsRenderer {
         appendLine()
         if (relationships.isEmpty()) {
             appendLine(
-                if (inbound) "No resolved consumers were observed." else "No resolved dependencies were observed.",
+                if (inbound) {
+                    "No resolved inbound relationship records were observed."
+                } else {
+                    "No resolved outbound relationship records were observed."
+                },
             )
             appendLine()
             return
@@ -359,8 +433,31 @@ internal class WorkspaceRelationshipsRenderer {
         private val DIRECTED_RELATIONSHIP_COMPARATOR =
             compareBy<DirectedRelationship> { it.direction }
                 .thenBy(RELATIONSHIP_COMPARATOR) { it.relationship }
+        private val COLUMN_DESCRIPTIONS =
+            listOf(
+                "Symbol" to "the fully-qualified declaration name; the link opens its evidence page.",
+                "Kind" to "the declaration form extracted from source.",
+                "Scope" to "the owning build, Gradle project path, and source set, in that order.",
+                "Score" to "the sum of all applicable importance-reason points; it is only a ranking value.",
+                "Local in" to "resolved non-import incoming records from the same build and project.",
+                "Workspace in" to "all resolved non-import incoming records from every project and build.",
+                "Cross-build in" to "workspace-in records whose source declaration belongs to another build.",
+                "Workspace-referenced" to
+                    "observed when workspace in is greater than zero; otherwise not observed.",
+            )
     }
 }
+
+private fun kindDescription(kind: SymbolDetailKind): String =
+    when (kind) {
+        SymbolDetailKind.CLASS -> "a regular class declaration."
+        SymbolDetailKind.INTERFACE -> "an interface or contract declaration."
+        SymbolDetailKind.ENUM -> "an enum declaration."
+        SymbolDetailKind.DATA_CLASS -> "a Kotlin data class declaration."
+        SymbolDetailKind.OBJECT -> "a Kotlin singleton object declaration."
+        SymbolDetailKind.FUNCTION -> "a named function or method declaration."
+        SymbolDetailKind.PROPERTY -> "a property declared with val or var."
+    }
 
 private fun scope(symbol: WorkspaceSymbol): String =
     listOf(symbol.build, symbol.project, symbol.sourceSet).joinToString(" / ") { it.markdownCode() }

@@ -34,6 +34,8 @@ import zone.clanker.gradle.srcx.model.WorkspaceIndex
 import zone.clanker.gradle.srcx.model.WorkspaceRelationship
 import zone.clanker.gradle.srcx.model.WorkspaceRelationshipKind
 import zone.clanker.gradle.srcx.model.WorkspaceReport
+import zone.clanker.gradle.srcx.model.WorkspaceSourceFile
+import zone.clanker.gradle.srcx.model.WorkspaceSymbol
 import zone.clanker.gradle.srcx.model.WorkspaceSymbolIdentity
 import zone.clanker.gradle.srcx.parse.PsiEnvironment
 import zone.clanker.gradle.srcx.report.AntiPatternsRenderer
@@ -227,9 +229,10 @@ abstract class ContextTask : DefaultTask() {
             buildEdges = buildEdges,
             aggregateAnalysis = aggregateAnalysis,
             entryPoints = buildEntryPoints(allSummaries),
-            interfaces = buildInterfaces(allSummaries),
+            interfaces = buildInterfaceSummaries(allSummaries, workspaceIndex),
             workspaceIndex = workspaceIndex,
             importantSymbols = importantSymbols,
+            sourceFiles = buildWorkspaceSourceFiles(scans),
         )
     }
 
@@ -297,8 +300,8 @@ abstract class ContextTask : DefaultTask() {
 
     private fun buildEntryPoints(summaries: List<ProjectSummary>): List<EntryPointSummary> =
         summaries
-            .flatMap { summary ->
-                val architecture = summary.analysis?.architecture ?: return@flatMap emptyList()
+            .mapNotNull { summary -> summary.analysis?.architecture }
+            .flatMap { architecture ->
                 val components = architecture.components.associateBy { it.id }
                 architecture.entryPoints
                     .filter { it.kind == ArchitectureEntryPointKind.EXPLICIT }
@@ -313,17 +316,6 @@ abstract class ContextTask : DefaultTask() {
                     }
             }.distinctBy { "${it.packageName}.${it.name}" }
 
-    private fun buildInterfaces(summaries: List<ProjectSummary>): List<InterfaceSummary> =
-        InterfacesRenderer.fromSummaries(summaries).map { info ->
-            InterfaceSummary(
-                name = info.name,
-                packageName = info.packageName,
-                implementationCount = info.implementationCount,
-                hasMock = info.hasMock,
-                sourceSet = info.sourceSet,
-            )
-        }
-
     private fun EntryPointSummary.toMarkdownEntry(): EntryPointsRenderer.ClassifiedEntry =
         EntryPointsRenderer.ClassifiedEntry(
             className = name,
@@ -332,7 +324,17 @@ abstract class ContextTask : DefaultTask() {
         )
 
     private fun InterfaceSummary.toMarkdownInterface(): InterfacesRenderer.InterfaceInfo =
-        InterfacesRenderer.InterfaceInfo(name, packageName, implementationCount, hasMock, sourceSet)
+        InterfacesRenderer.InterfaceInfo(
+            name = name,
+            packageName = packageName,
+            implementationCount = implementationCount,
+            hasMock = hasMock,
+            sourceSet = sourceSet,
+            build = build,
+            project = project,
+            qualifiedName = qualifiedName,
+            identity = identity,
+        )
 
     private fun collectIncludedBuildScans(
         builds: List<IncludedBuildInfo>,
@@ -391,6 +393,45 @@ internal data class WorkspaceScans(
         get() = includedProjectScans.mapValues { (_, scans) -> scans.map { it.summary } }
 }
 
+/** Preserve exact interface identity while adapting renderer facts into the workspace report model. */
+internal fun buildInterfaceSummaries(
+    summaries: List<ProjectSummary>,
+    workspaceIndex: WorkspaceIndex,
+): List<InterfaceSummary> =
+    InterfacesRenderer.fromSummaries(summaries, workspaceIndex).map { info ->
+        InterfaceSummary(
+            name = info.name,
+            packageName = info.packageName,
+            implementationCount = info.implementationCount,
+            hasMock = info.hasMock,
+            sourceSet = info.sourceSet,
+            build = info.build,
+            project = info.project,
+            qualifiedName = info.qualifiedName,
+            identity = info.identity,
+        )
+    }
+
+/** Assemble exact source text from every owned scan into deterministic workspace scope order. */
+internal fun buildWorkspaceSourceFiles(scans: WorkspaceScans): List<WorkspaceSourceFile> =
+    scans.allScans
+        .flatMap { scan ->
+            scan.files.map { file ->
+                WorkspaceSourceFile(
+                    build = scan.build,
+                    project = scan.projectPath.value,
+                    sourceSet = file.sourceSet.value,
+                    projectRelativeFile = file.projectRelativeFile,
+                    content = file.sourceText,
+                )
+            }
+        }.sortedWith(
+            compareBy<WorkspaceSourceFile> { it.build }
+                .thenBy { it.project }
+                .thenBy { it.sourceSet }
+                .thenBy { it.projectRelativeFile },
+        )
+
 /** Build exact analysis signals without deriving symbol identities from prose findings. */
 internal fun buildImportantSymbolSignals(
     scans: List<ProjectScan>,
@@ -402,33 +443,78 @@ internal fun buildImportantSymbolSignals(
             .groupBy { it.build to it.project }
     val entryPoints = mutableSetOf<WorkspaceSymbolIdentity>()
     val cycleParticipants = mutableSetOf<WorkspaceSymbolIdentity>()
+    val antiPatternSymbols = mutableSetOf<WorkspaceSymbolIdentity>()
 
     scans.forEach { scan ->
         val scopedSymbols = symbolsByScope[scan.build to scan.projectPath.value].orEmpty()
         val analysis = scan.summary.analysis ?: return@forEach
+        val componentsById = analysis.architecture.components.groupBy { component -> component.id }
+
+        fun resolveComponent(
+            componentId: String,
+            exactFilePath: String? = null,
+        ): WorkspaceSymbol? {
+            val candidates = scopedSymbols.filter { symbol -> symbol.qualifiedName == componentId }
+            val component = componentsById[componentId].orEmpty().singleOrNull()
+            val findingCandidates =
+                exactFilePath
+                    ?.replace('\\', '/')
+                    ?.let { path ->
+                        candidates.filter { symbol -> symbol.projectRelativeFile.replace('\\', '/') == path }
+                    }.orEmpty()
+            val exactCandidates =
+                component
+                    ?.let { architectureComponent ->
+                        candidates.filter { symbol ->
+                            symbol.projectRelativeFile.endsWith(architectureComponent.filePath) &&
+                                isTestSourceSet(symbol.sourceSet) == architectureComponent.isTest
+                        }
+                    }.orEmpty()
+            return findingCandidates.singleOrNull() ?: exactCandidates.singleOrNull() ?: candidates.singleOrNull()
+        }
         analysis.architecture.entryPoints
             .filter { it.kind == ArchitectureEntryPointKind.EXPLICIT }
             .forEach { entryPoint ->
-                scopedSymbols
-                    .filter { it.qualifiedName == entryPoint.componentId }
-                    .singleOrNull()
+                resolveComponent(entryPoint.componentId)
                     ?.identity
                     ?.let(entryPoints::add)
             }
-        analysis.cycles.flatten().distinct().forEach { cycleName ->
-            scopedSymbols
-                .filter { it.qualifiedName == cycleName || it.name == cycleName }
-                .singleOrNull()
+        val exactCycleIds =
+            analysis.architecture.cycles
+                .flatMap { cycle -> cycle.componentIds.dropLast(1) }
+                .distinct()
+        exactCycleIds.forEach { componentId ->
+            resolveComponent(componentId)
                 ?.identity
                 ?.let(cycleParticipants::add)
         }
+        if (exactCycleIds.isEmpty()) {
+            analysis.cycles.flatten().distinct().forEach { cycleName ->
+                scopedSymbols
+                    .filter { symbol -> symbol.qualifiedName == cycleName || symbol.name == cycleName }
+                    .singleOrNull()
+                    ?.identity
+                    ?.let(cycleParticipants::add)
+            }
+        }
+        analysis.findings
+            .flatMap { finding ->
+                finding.componentIds.mapNotNull { componentId ->
+                    resolveComponent(componentId, finding.filePath)
+                }
+            }.distinctBy { symbol -> symbol.identity }
+            .mapTo(antiPatternSymbols) { symbol -> symbol.identity }
     }
 
     return ImportantSymbolSignals(
         entryPoints = entryPoints,
         cycleParticipants = cycleParticipants,
+        antiPatternSymbols = antiPatternSymbols,
     )
 }
+
+private fun isTestSourceSet(sourceSet: String): Boolean =
+    sourceSet == "test" || sourceSet.startsWith("test") || sourceSet.endsWith("Test")
 
 /** Merge resolved source dependencies with deterministic artifact fallbacks. */
 internal fun buildWorkspaceBuildEdges(

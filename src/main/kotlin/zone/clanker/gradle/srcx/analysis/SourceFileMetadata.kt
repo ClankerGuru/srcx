@@ -297,7 +297,8 @@ fun scanSources(srcDirs: List<File>): List<SourceFileMetadata> {
                     .walkTopDown()
                     .filter { it.isFile && (it.extension == "kt" || it.extension == "java") }
                     .toList()
-            }
+            }.distinctBy { file -> file.absoluteFile.invariantSeparatorsPath }
+            .sortedBy { file -> file.absoluteFile.invariantSeparatorsPath }
     if (files.isEmpty()) return emptyList()
 
     val env = PsiEnvironment.shared() ?: return emptyList()

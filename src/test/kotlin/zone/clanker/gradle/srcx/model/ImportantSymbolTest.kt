@@ -25,7 +25,7 @@ class ImportantSymbolTest :
                     ImportantSymbol(
                         symbol = symbol,
                         reasons = listOf(ImportantSymbolReason.ENTRY_POINT),
-                        score = 1,
+                        score = ImportantSymbolReason.ENTRY_POINT.score,
                         usage = usage,
                     )
 
@@ -33,7 +33,7 @@ class ImportantSymbolTest :
                     result.symbol.identity shouldBe symbol.identity
                     result.reasons shouldBe listOf(ImportantSymbolReason.ENTRY_POINT)
                     result.reasons.single().label shouldBe "Entry point"
-                    result.score shouldBe 1
+                    result.score shouldBe 140
                     result.usage shouldBe usage
                 }
             }
@@ -61,7 +61,7 @@ class ImportantSymbolTest :
                         ImportantSymbol(
                             symbol,
                             listOf(ImportantSymbolReason.ENTRY_POINT, ImportantSymbolReason.ENTRY_POINT),
-                            1,
+                            ImportantSymbolReason.ENTRY_POINT.score * 2,
                             usage,
                         )
                     }
@@ -69,7 +69,7 @@ class ImportantSymbolTest :
                         ImportantSymbol(
                             symbol,
                             listOf(ImportantSymbolReason.ENTRY_POINT),
-                            1,
+                            ImportantSymbolReason.ENTRY_POINT.score,
                             usage.copy(symbol = other),
                         )
                     }

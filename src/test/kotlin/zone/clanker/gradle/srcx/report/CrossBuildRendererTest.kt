@@ -56,7 +56,7 @@ class CrossBuildRendererTest :
                 }
             }
 
-            `when`("rendering with cross-build cycles") {
+            `when`("rendering with aggregate analyzer cycles") {
                 val analysis =
                     AnalysisSummary(
                         findings = emptyList(),
@@ -67,7 +67,8 @@ class CrossBuildRendererTest :
                 val output = renderer.render()
 
                 then("it shows cycles") {
-                    output shouldContain "## Cross-Build Cycles"
+                    output shouldContain "## Analyzer-Inferred Component Cycles (Workspace Aggregate)"
+                    output shouldContain "They do not establish cycle hops between builds."
                     output shouldContain "- A -> B -> A"
                 }
             }

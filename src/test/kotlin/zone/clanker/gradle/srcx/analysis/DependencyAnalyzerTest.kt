@@ -2,6 +2,7 @@ package zone.clanker.gradle.srcx.analysis
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import java.io.File
@@ -80,6 +81,19 @@ class DependencyAnalyzerTest :
                     edges.shouldBeEmpty()
                 }
             }
+
+            `when`("a qualified component identity is duplicated across source inputs") {
+                val first = component("Shared")
+                val second = component("Shared")
+                val consumer = component("Consumer", imports = listOf("com.example.Shared"))
+
+                val edges = buildDependencyGraph(listOf(first, second, consumer))
+
+                then("it omits the ambiguous endpoint instead of choosing one by input order") {
+                    edges.shouldBeEmpty()
+                    buildDependencyGraph(listOf(second, consumer, first)).shouldBeEmpty()
+                }
+            }
         }
 
         given("findHubClasses") {
@@ -95,10 +109,10 @@ class DependencyAnalyzerTest :
 
                 then("it identifies the hub") {
                     hubs shouldHaveSize 1
-                    val hub = hubs.first()
-                    hub.component.source.simpleName shouldBe "Hub"
-                    hub.count shouldBe 3
-                    hub.dependents.map { it.name } shouldBe listOf("A", "B", "C")
+                    val detectedHub = hubs.first()
+                    detectedHub.component.source.simpleName shouldBe "Hub"
+                    detectedHub.count shouldBe 3
+                    detectedHub.dependents.map { it.name } shouldBe listOf("A", "B", "C")
                 }
             }
         }
@@ -127,6 +141,41 @@ class DependencyAnalyzerTest :
 
                 then("it returns empty list") {
                     cycles.shouldBeEmpty()
+                }
+            }
+
+            `when`("three components close one directed route") {
+                val a = component("A", imports = listOf("com.example.B"))
+                val b = component("B", imports = listOf("com.example.C"))
+                val c = component("C", imports = listOf("com.example.A"))
+
+                val cycles = findQualifiedCycles(buildDependencyGraph(listOf(c, a, b)))
+
+                then("it retains every qualified participant in direction order") {
+                    cycles.single() shouldContainExactly
+                        listOf("com.example.A", "com.example.B", "com.example.C", "com.example.A")
+                }
+            }
+
+            `when`("a strongly connected component contains two related routes") {
+                val a = component("A", imports = listOf("com.example.B", "com.example.C"))
+                val b = component("B", imports = listOf("com.example.A", "com.example.C"))
+                val c = component("C", imports = listOf("com.example.A"))
+
+                val cycles = findQualifiedCycles(buildDependencyGraph(listOf(a, b, c)))
+
+                then("deterministic routes cover every internal directed edge") {
+                    val routeEdges =
+                        cycles.flatMap { cycle -> cycle.zipWithNext() }.toSet()
+                    routeEdges shouldBe
+                        setOf(
+                            "com.example.A" to "com.example.B",
+                            "com.example.A" to "com.example.C",
+                            "com.example.B" to "com.example.A",
+                            "com.example.B" to "com.example.C",
+                            "com.example.C" to "com.example.A",
+                        )
+                    findQualifiedCycles(buildDependencyGraph(listOf(c, b, a))) shouldContainExactly cycles
                 }
             }
         }

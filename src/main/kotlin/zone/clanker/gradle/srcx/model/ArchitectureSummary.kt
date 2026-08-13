@@ -1,11 +1,34 @@
 package zone.clanker.gradle.srcx.model
 
+private const val MINIMUM_CLOSED_COMPONENT_CYCLE_SIZE = 3
+
 /** Structural source evidence for one Gradle project. */
 data class ArchitectureSummary(
     val components: List<ArchitectureComponent> = emptyList(),
     val dependencies: List<ArchitectureDependency> = emptyList(),
     val entryPoints: List<ArchitectureEntryPoint> = emptyList(),
+    val cycles: List<ArchitectureComponentCycle> = emptyList(),
 ) {
+    init {
+        require(components.distinctBy { it.id }.size == components.size) {
+            "architecture component IDs must be unique within a project"
+        }
+        val componentIds = components.mapTo(mutableSetOf()) { it.id }
+        require(dependencies.all { dependency -> dependency.from in componentIds && dependency.to in componentIds }) {
+            "architecture dependency endpoints must identify project components"
+        }
+        require(entryPoints.all { entryPoint -> entryPoint.componentId in componentIds }) {
+            "architecture entry points must identify project components"
+        }
+        require(cycles.all { cycle -> cycle.componentIds.dropLast(1).all { it in componentIds } }) {
+            "architecture cycle members must identify project components"
+        }
+        val dependencyPairs = dependencies.mapTo(mutableSetOf()) { it.from to it.to }
+        require(cycles.all { cycle -> cycle.componentIds.zipWithNext().all { it in dependencyPairs } }) {
+            "architecture cycle steps must identify directed project dependencies"
+        }
+    }
+
     val runtimeComponents: List<ArchitectureComponent>
         get() = components.filterNot { it.isTest }
 
@@ -14,6 +37,22 @@ data class ArchitectureSummary(
             val runtimeIds = runtimeComponents.mapTo(mutableSetOf()) { it.id }
             return dependencies.filter { it.from in runtimeIds && it.to in runtimeIds }
         }
+}
+
+/** A closed, directed analyzer-inferred route through source components. */
+data class ArchitectureComponentCycle(
+    val componentIds: List<String>,
+) {
+    init {
+        require(componentIds.size >= MINIMUM_CLOSED_COMPONENT_CYCLE_SIZE) {
+            "a component cycle must contain at least two members and a repeated start"
+        }
+        require(componentIds.first() == componentIds.last()) { "a component cycle must start and end at the same ID" }
+        require(componentIds.dropLast(1).all { it.isNotBlank() }) { "component cycle IDs must not be blank" }
+        require(componentIds.dropLast(1).distinct().size == componentIds.size - 1) {
+            "a component cycle route must not repeat a member before closing"
+        }
+    }
 }
 
 /** A source component that participates in the internal dependency graph. */

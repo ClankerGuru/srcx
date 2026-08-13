@@ -26,7 +26,7 @@ internal class CrossBuildRenderer(
             }
             appendBuildEdges()
             appendCrossBuildHubs()
-            appendCrossBuildCycles()
+            appendAggregateAnalyzerCycles()
             appendNoAnalysisData()
         }
 
@@ -73,10 +73,15 @@ internal class CrossBuildRenderer(
         }
     }
 
-    private fun StringBuilder.appendCrossBuildCycles() {
+    private fun StringBuilder.appendAggregateAnalyzerCycles() {
         val cycles = crossBuildAnalysis?.cycles ?: return
         if (cycles.isEmpty()) return
-        appendLine("## Cross-Build Cycles")
+        appendLine("## Analyzer-Inferred Component Cycles (Workspace Aggregate)")
+        appendLine()
+        appendLine(
+            "These routes are collected from project-scoped analyzer results. " +
+                "They do not establish cycle hops between builds.",
+        )
         appendLine()
         for (cycle in cycles) {
             appendLine("- ${cycle.joinToString(" -> ")}")

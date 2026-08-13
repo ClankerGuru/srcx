@@ -20,13 +20,17 @@ class SymbolExtractorTest :
                 val projectDir = tempProject()
                 val main = projectDir.resolve("src/main/kotlin/sample").apply { mkdirs() }
                 main.resolve("Zulu.kt").writeText("package sample\nclass Zulu")
-                main.resolve("Alpha.kt").writeText(
+                val alphaSource =
                     """
                     package sample
+                    // Exact UTF-8 source evidence: café, 雪, 🚀, and </script>.
                     class Alpha {
                         fun use(): Zulu = Zulu()
                     }
-                    """.trimIndent(),
+                    """.trimIndent() + "\n"
+                main.resolve("Alpha.kt").writeText(
+                    text = alphaSource,
+                    charset = Charsets.UTF_8,
                 )
                 val test = projectDir.resolve("src/test/java/sample").apply { mkdirs() }
                 test.resolve("AlphaTest.java").writeText("package sample; class AlphaTest {}")
@@ -56,6 +60,10 @@ class SymbolExtractorTest :
                     alpha.declarations.map { it.qualifiedName } shouldContainExactly
                         listOf("sample.Alpha", "sample.Alpha.use")
                     alpha.references.any { it.sourceQualifiedName == "sample.Alpha.use" } shouldBe true
+                }
+
+                then("each file retains its complete exact Unicode source text") {
+                    scan.files.first().sourceText shouldBe alphaSource
                 }
 
                 then("repeated scans retain deterministic file and fact ordering") {

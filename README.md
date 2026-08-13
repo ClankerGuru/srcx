@@ -42,16 +42,16 @@ srcx {
 | `context.md` | Dashboard: symbol counts, warnings, links to included builds |
 | `hub-classes.md` | Most-depended-on classes with dependency trees across all builds |
 | `entry-points.md` | App, test, and mock entry points classified by kind |
-| `anti-patterns.md` | Code smells: god classes, circular deps, forbidden names, DI violations |
-| `interfaces.md` | Interface coverage: implementations, missing mocks |
+| `anti-patterns.md` | Structural review prompts: oversized classes, deep inheritance, cycles, forbidden names, and missing tests |
+| `interfaces.md` | Interface coverage with exact implementation relationships when workspace evidence is available |
 | `cross-build.md` | Resolved source relationships and build edges across active builds |
 | `relationships/index.md` | Important symbols ranked by cumulative workspace relationships |
 | `relationships/<symbol>-<scope-hash>.md` | Evidence-backed incoming and outgoing relationships for one important symbol |
 | `site/index.html` | Self-contained static workspace dashboard with an interactive D3 relationship graph |
-| `site/report.html` | Scoped HTML fragment for Kotlin notebooks or an existing page |
+| `site/report.html` | Scoped HTML fragment for embedding in an existing page |
 
 Project scans remain independent and bounded, but the root task resolves their raw declarations and references together.
-The root report is therefore authoritative for cumulative usage across the active workspace.
+The root report is therefore authoritative for cumulative relationship records across the active workspace.
 Open `.srcx/site/index.html` directly or serve the `.srcx/site/` directory from an authenticated static host.
 
 ## Workspace-cumulative relationships
@@ -68,22 +68,80 @@ ambiguous targets remain unresolved rather than being assigned arbitrarily.
 
 Relationship pages distinguish:
 
-- **Local inbound**: resolved consumers in the declaration's own build and Gradle project.
-- **Workspace inbound**: resolved consumers across every active root and included-build project.
-- **Cross-build inbound**: resolved consumers owned by another Gradle build.
+- **Local inbound**: resolved relationship records whose source is in the declaration's build and Gradle project.
+- **Workspace inbound**: resolved relationship records from every active root and included-build project.
+- **Cross-build inbound**: resolved relationship records whose source declaration belongs to another Gradle build.
 
-A declaration with zero local inbound and non-zero workspace inbound is workspace-used. Conversely, zero resolved
+A declaration with zero local inbound and non-zero workspace inbound is workspace-referenced. Conversely, zero resolved
 workspace inbound is not proof of semantic unusedness: generated code, reflection, dependency injection, and runtime
 lookup may be invisible to static PSI analysis.
 
-SRCX selects a bounded set of important symbols with one documented policy. Cross-build inbound is the strongest
-signal, followed by high connectivity, multiple interface implementations, exact entry-point/cycle evidence, and
-other cumulative graph signals. The default limit is 100 relationship pages. The HTML atlas shows at most 42 files
-and 42 symbols. It opens in the file lens and provides symbol, exact-problem, and resolved-cycle lenses; selecting a
-node or edge reveals declarations, findings, source evidence, and an inbound/outbound flow without shrinking the map.
+SRCX selects a bounded set of important symbols with one documented policy. Applicable reason weights are additive and
+rank the bounded output; they are not percentages, quality grades, confidence, severity, or risk. Cross-build inbound
+intentionally outweighs every combination of local-only signals. Relationship thresholds count resolved non-import
+records, not unique source symbols or files. The default limit is 100 relationship pages.
 
-Evidence labels are explicit: `DIRECT` for source facts, `DERIVED` for deterministic resolution composed from direct
-facts, and `HEURISTIC` where syntax alone is approximate. Import facts are retained but do not count as usage.
+The unified Build comparison matrix counts one **source-set record** for each analyzed Gradle project/source-set
+summary, such as `:app / main`; it is not a file, dependency, or relationship record. Bars scale independently by
+metric, and the Column maximums cards print the exact largest value used by each metric column.
+
+### Reading the Workspace Atlas
+
+The HTML Atlas opens with Files, one globally bounded overview of at most 42 relationship-connected files or files with
+exact findings. Its navigator narrows Build → Project → Source set. Selecting a scope refills Files from the complete
+typed source catalog instead of filtering the global overview, then creates deterministic pages of at most 42 files and
+incident cross-scope endpoints. Dense scopes report exact indexed, available, displayed, and not-on-this-page counts.
+Exact file findings are prioritized so Problems does not silently drop them behind relationship-heavy files.
+
+Symbols refills from the typed declaration and exact non-import relationship catalogs for the selected scope, then
+paginates at no more than 42 unique declaration/endpoint nodes per page. A cross-scope endpoint or hub may repeat so an
+edge always keeps both endpoints, while every exact relationship edge is assigned to exactly one page. Declarations
+without a relationship remain reachable on later pages. Indexed, available, displayed, and not-on-this-page counts stay
+separate; none is presented as a runtime call count.
+
+An arrow points from source to dependency. Routes bend around node rings and labels, and the badge on an arrow is the
+number of displayed, non-import relationship records in that direction; a heavier arrow means more such records. Kind
+filters separate the relationship categories present in the projection. One relationship record is an addressed static
+fact: source declaration—or the owning build/project/source-set/file for an import—to target declaration at one source
+line. Facts with that same address collapse to one record, retaining the most-specific relationship kind and then the
+strongest evidence. “Call / construct records” are captured source occurrences resolved as a call or construction
+relationship; the number is not a count of distinct callers or runtime executions, and one source line can contribute
+more than one distinct record. Files aggregates records between files assigned to the current page. Symbols shows the
+exact edges assigned to its current page, so it can show fewer arrows even when a repeated hub connects several pages.
+`DIRECT` means SRCX observed the source syntax, `DERIVED` means it resolved a target by
+deterministically composing source facts, and `HEURISTIC` means approximate syntax evidence needs review. None of these
+labels claims compiler-semantic or runtime certainty. Import facts may help resolution, but they are currently excluded
+from relationship counts and arrows.
+
+Node radius uses attached totals rather than only the edges currently drawn. File nodes use their payload's total
+workspace inbound, outbound, and internal records; symbol nodes use inbound and outbound records reconstructed across
+the available symbol pages. Radius is not a measure of importance, severity, quality, traffic, or runtime frequency.
+
+Selecting a file opens its complete embedded source in a horizontally resizable pane capped at half of the Atlas width.
+The source payload is the full, typed set of exact source files supplied by the immutable workspace report. The HTML
+renderer does not perform arbitrary filesystem reads. Declaration lines retain subtle location marks; selecting a
+relationship lightly marks all its occurrence lines in the open file, while only the active declaration, relationship
+occurrence, or finding receives a strong highlight. Hovering a relationship may preview that evidence. Wider source
+remains horizontally scrollable, and repeated records can be paged without leaving the report.
+
+The cycle views deliberately keep two evidence models separate. An **observed file cycle** is a strongly connected
+component of the complete available file-relationship catalog. An **analyzer-inferred component cycle** is a closed,
+directed route of qualified analysis components and may include participants without matched typed source or outside
+the current page. Analyzer route arrows are explanatory overlays, not resolved relationship records, so they do not
+increase the arrow badges. The Atlas lists the complete typed route even when it cannot draw every participant.
+
+Findings deep-link into the Problems map or source pane only when the report carries typed evidence such as an exact file
+location, qualified component identity, or typed component-cycle route. Project-scoped review prompts without that
+evidence remain readable findings but do not pretend that the Atlas can identify a source location.
+
+## Findings policy
+
+Concrete dependencies are normal by default, and one local interface with one implementation is neutral. SRCX does not
+recommend extracting an interface merely because a concrete class is referenced, nor removing an interface merely
+because it has one implementation. An interface becomes architecturally notable when source evidence shows an actual
+boundary, multiple implementations, or explicit substitutability. Composition roots may construct concrete
+implementations. Cycle guidance recommends reversing an edge or moving shared policy/data; it does not prescribe an
+interface without independent evidence.
 
 ## wrkx worktree integration
 
@@ -125,7 +183,7 @@ srcx {
 
 ### `model/`
 
-Data types include scoped workspace symbols/references, resolved relationships, cumulative usage, important-symbol
+Data types include scoped workspace symbols/references, cumulative relationship records, important-symbol
 reasons, project summaries, and analysis summaries.
 
 ### `parse/`
@@ -143,7 +201,7 @@ Architecture analysis on parsed source metadata.
 
 - **ComponentClassifier** — classifies source files by role (Controller, Service, Repository, Entity) using annotations and naming conventions.
 - **DependencyAnalyzer** — builds dependency graphs, finds hub classes, detects circular dependencies.
-- **AntiPatternDetector** — detects god classes, forbidden names, DI violations, missing tests, circular deps.
+- **AntiPatternDetector** — detects oversized classes, deep inheritance, forbidden names, missing tests, and cycles.
 - **DiagramGenerator** — generates Mermaid diagrams from the dependency graph.
 - **SourceFileMetadata** — lightweight structural metadata extraction.
 
@@ -155,9 +213,9 @@ Markdown report generators.
 - **HotClassesRenderer** — hub classes ranked by dependent count with dependency trees.
 - **EntryPointsRenderer** — app/test/mock entry point classification.
 - **AntiPatternsRenderer** — per-build anti-pattern findings grouped by severity.
-- **CrossBuildRenderer** — shared hub classes and cycles across build boundaries.
+- **CrossBuildRenderer** — resolved build edges plus workspace-level hub and project-scoped analyzer-cycle summaries.
 - **WorkspaceRelationshipsRenderer** — root relationship index and collision-safe important-symbol pages.
-- **WorkspaceArchitectureGraphRenderer** — bounded D3 graph data from the cumulative relationship index.
+- **WorkspaceArchitectureGraphRenderer** — bounded D3 graph and scoped source-viewer data from cumulative evidence.
 - **InterfacesRenderer** — interface coverage with implementation counts (excludes mocks).
 - **ProjectReportRenderer** — per-project symbol and dependency tables.
 - **IncludedBuildRenderer** — per-build context for included builds.
@@ -167,7 +225,7 @@ Markdown report generators.
 Gradle model integration.
 
 - **ProjectScanner** — discovers source sets and projects using the Gradle API.
-- **SymbolExtractor** — extracts deterministic per-project summaries plus raw, owned PSI facts.
+- **SymbolExtractor** — extracts deterministic per-project summaries, exact scoped source text, and owned PSI facts.
 - **WorkspaceIndexBuilder** — resolves all active project facts into one cumulative workspace index.
 
 ### `task/`
@@ -180,8 +238,8 @@ Gradle model integration.
 1. Plugin reads DSL configuration at settings evaluation time
 2. `ContextTask` extracts declarations, references, and compatible project summaries per project
 3. The root task resolves all active project facts in one ownership-aware workspace index
-4. Cumulative usage, build edges, hubs, and important symbols derive from resolved workspace relationships
-5. Relationship Markdown and the D3 graph render from that same typed evidence
+4. Cumulative relationship records, build edges, hubs, and important symbols derive from the resolved workspace index
+5. Relationship Markdown, bounded source files, and the D3 graph render from that same typed evidence
 6. Existing project/build reports and the root HTML/Markdown dashboard are written
 7. The shared PSI environment is closed after generation
 

@@ -7,11 +7,13 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiJavaCodeReferenceElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiJavaFile
 import org.jetbrains.kotlin.com.intellij.psi.PsiMethod
 import org.jetbrains.kotlin.com.intellij.psi.PsiMethodCallExpression
+import org.jetbrains.kotlin.com.intellij.psi.PsiModifier
 import org.jetbrains.kotlin.com.intellij.psi.PsiNewExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiParameter
 import org.jetbrains.kotlin.com.intellij.psi.PsiReferenceExpression
 import org.jetbrains.kotlin.com.intellij.psi.PsiTypeElement
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
+import zone.clanker.gradle.srcx.model.DeclarationSemantic
 import zone.clanker.gradle.srcx.model.Reference
 import zone.clanker.gradle.srcx.model.ReferenceEvidence
 import zone.clanker.gradle.srcx.model.ReferenceKind
@@ -60,7 +62,14 @@ internal class JavaPsiExtractor {
                 cls.isEnum -> SymbolDetailKind.ENUM
                 else -> SymbolDetailKind.CLASS
             }
-        results.add(Symbol(name, fqName, kind, file, lineOf(cls), pkg))
+        val declarationSemantic =
+            when {
+                cls.isInterface -> DeclarationSemantic.INTERFACE
+                cls.isEnum -> DeclarationSemantic.ENUM
+                cls.hasModifierProperty(PsiModifier.ABSTRACT) -> DeclarationSemantic.ABSTRACT_CLASS
+                else -> DeclarationSemantic.CONCRETE_CLASS
+            }
+        results.add(Symbol(name, fqName, kind, file, lineOf(cls), pkg, declarationSemantic))
 
         for (method in cls.methods) {
             results.add(

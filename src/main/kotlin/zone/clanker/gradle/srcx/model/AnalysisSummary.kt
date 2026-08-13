@@ -18,13 +18,29 @@ enum class FindingSeverity(
  * @property message human-readable description
  * @property suggestion actionable advice
  * @property filePath project-relative source file path, or null for project-scoped findings
+ * @property line exact one-based source line when the analyzer can locate the finding
+ * @property componentIds exact qualified analyzer component IDs implicated by the finding
+ * @property componentCycle closed directed component route when the finding describes a cycle
  */
 data class Finding(
     val severity: FindingSeverity,
     val message: String,
     val suggestion: String,
     val filePath: String? = null,
-)
+    val line: Int? = null,
+    val componentIds: List<String> = emptyList(),
+    val componentCycle: ArchitectureComponentCycle? = null,
+) {
+    init {
+        require(line == null || line > 0) { "line must be null or > 0" }
+        require(filePath != null || line == null) { "a finding line requires a file path" }
+        require(componentIds.all { it.isNotBlank() }) { "componentIds must not contain blanks" }
+        require(componentIds.distinct().size == componentIds.size) { "componentIds must not contain duplicates" }
+        require(
+            componentCycle == null || componentCycle.componentIds.dropLast(1).all { it in componentIds },
+        ) { "componentIds must contain every component-cycle member" }
+    }
+}
 
 /**
  * A class that depends on a hub class.

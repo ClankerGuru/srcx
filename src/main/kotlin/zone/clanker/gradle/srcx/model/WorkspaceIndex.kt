@@ -33,6 +33,7 @@ data class WorkspaceSymbol(
     val kind: SymbolDetailKind,
     val projectRelativeFile: String,
     val declarationLine: Int,
+    val declarationSemantic: DeclarationSemantic = DeclarationSemantic.from(kind),
 ) {
     val identity: WorkspaceSymbolIdentity
         get() =
@@ -70,8 +71,8 @@ enum class WorkspaceRelationshipKind(
     val label: String,
 ) {
     IMPORT("imports"),
-    CALL("calls"),
-    CONSTRUCTOR("constructs"),
+    CALL("call record"),
+    CONSTRUCTOR("construction record"),
     NAME_REFERENCE("references"),
     TYPE_REFERENCE("uses type"),
     PROPERTY_TYPE("property type"),
@@ -89,6 +90,20 @@ data class WorkspaceRelationship(
     val sourceEvidence: WorkspaceReference,
     val evidence: ReferenceEvidence,
 ) {
+    init {
+        require(
+            source == null ||
+                (
+                    source.build == sourceEvidence.build &&
+                        source.project == sourceEvidence.project &&
+                        source.sourceSet == sourceEvidence.sourceSet &&
+                        source.projectRelativeFile == sourceEvidence.projectRelativeFile
+                ),
+        ) {
+            "resolved relationship source and evidence must share a build/project/source-set/file scope"
+        }
+    }
+
     val sourceIdentity: WorkspaceSymbolIdentity?
         get() = source?.identity
 
@@ -96,7 +111,7 @@ data class WorkspaceRelationship(
         get() = target.identity
 }
 
-/** Cumulative usage of one symbol across local projects and included builds. */
+/** Cumulative relationship evidence for one symbol across local projects and included builds. */
 data class WorkspaceSymbolUsage(
     val symbol: WorkspaceSymbol,
     val incoming: List<WorkspaceRelationship>,

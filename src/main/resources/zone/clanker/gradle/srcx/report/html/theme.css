@@ -1,12 +1,12 @@
-/* SRCX Notebook Theme
- * A static HTML/CSS translation of Gort's neo-brutalist design grammar.
- * Scope every notebook surface with .srcx-theme to avoid leaking into the IDE.
+/* SRCX Embedded Report Theme
+ * A warm paper-and-ink report palette with restrained printed-label accents.
+ * Scope every embedded report surface with .srcx-theme to avoid leaking into its host.
  */
 
 .srcx-theme {
     /* Color */
-    --srcx-paper: #f5f0e8;
-    --srcx-surface: #ffffff;
+    --srcx-paper: #f3efe4;
+    --srcx-surface: #fbf7ec;
     --srcx-ink: #1a1a1a;
     --srcx-muted-ink: #68645e;
     --srcx-border: #1a1a1a;
@@ -19,13 +19,24 @@
     --srcx-secondary-container: #d0f5e5;
     --srcx-tertiary: #ffbe0b;
     --srcx-on-tertiary: #1a1a1a;
-    --srcx-tertiary-container: #fff3cc;
+    --srcx-tertiary-container: #f6edcf;
     --srcx-accent: #4cc9f0;
     --srcx-on-accent: #1a1a1a;
     --srcx-accent-container: #d8f5fd;
     --srcx-error: #ff3333;
     --srcx-on-error: #ffffff;
     --srcx-error-container: #ffd6d6;
+    --srcx-code-bg: #faf3df;
+    --srcx-code-ink: #3b3a32;
+    --srcx-code-gutter: #ece1c2;
+    --srcx-code-muted: #786f5d;
+    --srcx-code-keyword: #7b3fb2;
+    --srcx-code-string: #0b6f52;
+    --srcx-code-number: #a24900;
+    --srcx-code-comment: #68727f;
+    --srcx-code-property: #155ca2;
+    --srcx-code-punctuation: #6b4f2a;
+    --srcx-code-emphasis: #9d2f64;
 
     /* Geometry */
     --srcx-border-thin: 1px;
@@ -62,24 +73,11 @@
     --srcx-tone-on-solid: var(--srcx-on-primary);
     background: var(--srcx-paper);
     color: var(--srcx-ink);
+    color-scheme: light;
     container-type: inline-size;
     font-family: var(--srcx-font-body);
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1.5;
-}
-
-.srcx-theme--dark {
-    --srcx-paper: #1a1a1a;
-    --srcx-surface: #2a2a2a;
-    --srcx-ink: #f5f5f5;
-    --srcx-muted-ink: #b8b6b2;
-    --srcx-border: #f5f5f5;
-    --srcx-shadow: #000000;
-    --srcx-primary-container: #5c1a24;
-    --srcx-secondary-container: #1a4d36;
-    --srcx-tertiary-container: #4d3800;
-    --srcx-accent-container: #164454;
-    --srcx-error-container: #5c1a1a;
 }
 
 .srcx-theme,
@@ -1617,6 +1615,9 @@
 .srcx-disclosure {
     background: var(--srcx-surface);
     border: var(--srcx-border-default) solid var(--srcx-border);
+    display: grid;
+    grid-template-rows: auto 0fr;
+    transition: grid-template-rows 180ms ease;
 }
 
 .srcx-disclosure summary {
@@ -1634,7 +1635,26 @@
 }
 
 .srcx-disclosure__body {
-    padding: var(--srcx-space-4);
+    display: block;
+    min-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    padding: 0 var(--srcx-space-4);
+    pointer-events: none;
+    transition: opacity 150ms ease, padding-block 180ms ease, visibility 0s linear 180ms;
+    visibility: hidden;
+}
+
+.srcx-disclosure[open] {
+    grid-template-rows: auto 1fr;
+}
+
+.srcx-disclosure[open] .srcx-disclosure__body {
+    opacity: 1;
+    padding-block: var(--srcx-space-4);
+    pointer-events: auto;
+    transition: opacity 150ms ease, padding-block 180ms ease, visibility 0s linear 0s;
+    visibility: visible;
 }
 
 /* Small composition utilities */
@@ -1804,5 +1824,28 @@
 
     .srcx-disclosure:not([open]) .srcx-disclosure__body {
         display: block;
+        opacity: 1;
+        overflow: visible;
+        padding-block: var(--srcx-space-4);
+        pointer-events: auto;
+        visibility: visible;
+    }
+
+    .srcx-disclosure {
+        display: block;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .srcx-theme,
+    .srcx-theme *,
+    .srcx-theme *::before,
+    .srcx-theme *::after {
+        animation-delay: 0ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-delay: 0ms !important;
+        transition-duration: 0.01ms !important;
     }
 }

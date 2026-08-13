@@ -2,6 +2,7 @@ package zone.clanker.gradle.srcx.analysis
 
 import zone.clanker.gradle.srcx.model.AnalysisSummary
 import zone.clanker.gradle.srcx.model.ArchitectureComponent
+import zone.clanker.gradle.srcx.model.ArchitectureComponentCycle
 import zone.clanker.gradle.srcx.model.ArchitectureDependency
 import zone.clanker.gradle.srcx.model.ArchitectureEntryPoint
 import zone.clanker.gradle.srcx.model.ArchitectureEntryPointKind
@@ -52,6 +53,9 @@ private fun AntiPattern.toFinding(): Finding =
         message = message,
         suggestion = suggestion,
         filePath = file.path.takeUnless { it.isBlank() || it == "." },
+        line = line,
+        componentIds = componentIds,
+        componentCycle = componentCycle,
     )
 
 private fun HubResult.toHubClass(roles: Map<String, ComponentRole>): HubClass {
@@ -69,17 +73,37 @@ private fun HubResult.toHubClass(roles: Map<String, ComponentRole>): HubClass {
 }
 
 private fun ProjectAnalysis.toArchitectureSummary(): ArchitectureSummary =
-    ArchitectureSummary(
-        components = components.map { it.toArchitectureComponent() },
-        dependencies =
-            dependencies
-                .filter { it.from.source.qualifiedName != it.to.source.qualifiedName }
-                .map { ArchitectureDependency(it.from.source.qualifiedName, it.to.source.qualifiedName) },
-        entryPoints =
-            classifyEntryPoints(components, dependencies)
-                .filter { it.kind == EntryPointKind.APP }
-                .map(ClassifiedEntryPoint::toArchitectureEntryPoint),
-    )
+    components
+        .groupBy { component -> component.source.qualifiedName }
+        .filterValues { candidates -> candidates.size == 1 }
+        .values
+        .map { candidates -> candidates.single() }
+        .sortedWith(
+            compareBy<ClassifiedComponent> { component -> component.source.qualifiedName }
+                .thenBy { component -> component.source.file.invariantSeparatorsPath },
+        ).let { unambiguousComponents ->
+            val componentIds = unambiguousComponents.mapTo(mutableSetOf()) { it.source.qualifiedName }
+            val unambiguousDependencies =
+                dependencies.filter { edge ->
+                    edge.from.source.qualifiedName in componentIds && edge.to.source.qualifiedName in componentIds
+                }
+            ArchitectureSummary(
+                components = unambiguousComponents.map { it.toArchitectureComponent() },
+                dependencies =
+                    unambiguousDependencies
+                        .filter { it.from.source.qualifiedName != it.to.source.qualifiedName }
+                        .map { ArchitectureDependency(it.from.source.qualifiedName, it.to.source.qualifiedName) }
+                        .distinct()
+                        .sortedWith(compareBy({ it.from }, { it.to })),
+                entryPoints =
+                    classifyEntryPoints(unambiguousComponents, unambiguousDependencies)
+                        .filter { it.kind == EntryPointKind.APP }
+                        .map(ClassifiedEntryPoint::toArchitectureEntryPoint)
+                        .distinct()
+                        .sortedWith(compareBy({ it.componentId }, { it.kind }, { it.reason })),
+                cycles = findQualifiedCycles(unambiguousDependencies).map(::ArchitectureComponentCycle),
+            )
+        }
 
 private fun ClassifiedEntryPoint.toArchitectureEntryPoint(): ArchitectureEntryPoint =
     ArchitectureEntryPoint(

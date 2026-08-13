@@ -233,7 +233,7 @@ class ProjectAnalysisTest :
                 }
 
                 then("source architecture retains components, dependency direction, and real entry evidence") {
-                    summary.architecture.components.map { it.name } shouldBe listOf("UserService", "App")
+                    summary.architecture.components.map { it.name } shouldBe listOf("App", "UserService")
                     summary.architecture.dependencies
                         .single()
                         .from shouldBe "com.example.app.App"
@@ -265,6 +265,29 @@ class ProjectAnalysisTest :
 
                 then("OTHER role maps to empty string") {
                     summary.hubs[0].role shouldBe ""
+                }
+            }
+
+            `when`("two source inputs declare the same qualified component name") {
+                val main = component("Shared", "com.example", "example")
+                val test = component("Shared", "com.example", "example")
+                val consumer = component("Consumer", "com.example", "example")
+                val analysis =
+                    ProjectAnalysis(
+                        antiPatterns = emptyList(),
+                        hubs = emptyList(),
+                        roles = emptyMap(),
+                        cycles = emptyList(),
+                        components = listOf(main, test, consumer),
+                        dependencies = listOf(ClassDependency(consumer, main)),
+                    )
+
+                val architecture = analysis.toSummary().architecture
+
+                then("the ambiguous component and every edge to it stay out of typed architecture evidence") {
+                    architecture.components.map { it.id } shouldBe listOf("com.example.Consumer")
+                    architecture.dependencies.shouldBeEmpty()
+                    architecture.cycles.shouldBeEmpty()
                 }
             }
         }

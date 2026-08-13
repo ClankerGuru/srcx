@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import zone.clanker.gradle.srcx.model.DeclarationSemantic
 import zone.clanker.gradle.srcx.model.ProjectPath
 import zone.clanker.gradle.srcx.model.ProjectSummary
 import zone.clanker.gradle.srcx.model.Reference
@@ -162,6 +163,13 @@ class WorkspaceIndexBuilderTest :
                 then("the resolved target kind distinguishes implementation") {
                     index.relationships.count { it.kind == WorkspaceRelationshipKind.IMPLEMENTS } shouldBe 1
                     index.relationships.none { it.kind == WorkspaceRelationshipKind.TYPE_REFERENCE } shouldBe true
+                }
+
+                then("the parsed declaration form survives workspace indexing") {
+                    contractUsage.symbol.declarationSemantic shouldBe DeclarationSemantic.INTERFACE
+                    index.symbols
+                        .first { it.qualifiedName == "impl.ContractImpl" }
+                        .declarationSemantic shouldBe DeclarationSemantic.CONCRETE_CLASS
                 }
 
                 then("the import remains available without counting as usage") {

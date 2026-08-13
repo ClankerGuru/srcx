@@ -2,7 +2,7 @@ package zone.clanker.gradle.srcx.report
 
 import zone.clanker.gradle.srcx.model.WorkspaceReport
 
-/** Renders the dashboard frame, metrics, headings, and provenance footer. */
+/** Renders the dashboard frame, metrics, headings, and evidence footer. */
 internal class WorkspaceFrameHtmlRenderer(
     private val resources: WorkspaceHtmlResourceRenderer,
 ) {
@@ -18,8 +18,7 @@ internal class WorkspaceFrameHtmlRenderer(
             )
             put("buildsHeadingHtml", renderHeading("02", "Workspace", "Builds", BUILD_SUMMARY, "primary"))
             put("healthHeadingHtml", renderHeading("03", "Analysis", "Health", HEALTH_SUMMARY, "secondary"))
-            put("modelHeadingHtml", renderHeading("04", "Direct input", "Model provenance", MODEL_SUMMARY, "accent"))
-            put("findingsHeadingHtml", renderHeading("05", "Project scopes", "Findings", FINDINGS_SUMMARY, "error"))
+            put("findingsHeadingHtml", renderHeading("04", "Project scopes", "Findings", FINDINGS_SUMMARY, "error"))
             put("sourceNoteHtml", renderSourceNote())
         }
 
@@ -29,9 +28,9 @@ internal class WorkspaceFrameHtmlRenderer(
             mapOf(
                 "brand" to "SRCX",
                 "bureau" to report.name.escapeWorkspaceHtml(),
-                "folio" to "WorkspaceReport / typed HTML",
+                "folio" to "Workspace architecture / source evidence",
                 "tone" to "success",
-                "state" to "Direct model",
+                "state" to "Scan complete",
                 "classes" to "",
             ),
         )
@@ -44,7 +43,7 @@ internal class WorkspaceFrameHtmlRenderer(
             append("<span class=\"srcx-tag srcx-tone--secondary\">")
             append(report.includedBuilds.size + 1)
             append(" builds</span>")
-            append("<span class=\"srcx-tag srcx-tone--accent\">direct typed model</span>")
+            append("<span class=\"srcx-tag srcx-tone--accent\">source relationships</span>")
         }
 
     private fun renderMetricStrip(report: WorkspaceReport): String {
@@ -59,8 +58,8 @@ internal class WorkspaceFrameHtmlRenderer(
         return resources.component(
             "metric-strip",
             mapOf(
-                "source" to "Workspace snapshot",
-                "snapshot" to "Project-scoped source data",
+                "source" to "Workspace scan",
+                "snapshot" to "Root + included builds",
                 "metricCount" to metrics.size.toString(),
                 "itemsHtml" to metrics.joinToString("\n"),
                 "classes" to "",
@@ -106,20 +105,20 @@ internal class WorkspaceFrameHtmlRenderer(
         resources.component(
             "source-note",
             mapOf(
-                "label" to "Typed source",
-                "path" to "SRCX WorkspaceReport",
-                "meta" to "Direct render",
+                "label" to "Evidence",
+                "path" to "Resolved source relationships",
+                "meta" to "Build + project scoped",
                 "tone" to "secondary",
                 "classes" to "",
             ),
         )
 
     private companion object {
-        const val BUILD_SUMMARY = "One comparison of root and included builds, with observed build edges."
-        const val HEALTH_SUMMARY = "Ownership, project-scoped severity, production hubs, and source coverage."
-        const val FINDINGS_SUMMARY = "Findings remain grouped under the project analysis that produced them."
+        const val BUILD_SUMMARY =
+            "See workspace membership, compare build sizes, and inspect observed cross-build dependencies."
+        const val HEALTH_SUMMARY = "Review symbol ownership, finding severity, production hubs, and scan coverage."
+        const val FINDINGS_SUMMARY = "Each finding stays with the build and project where the scan found it."
         const val ARCHITECTURE_SUMMARY =
-            "Important symbols and their resolved cumulative workspace relationships, clustered by build and project."
-        const val MODEL_SUMMARY = "Collapsed field coverage and provenance for the typed workspace report."
+            "See which build owns each indexed file and how resolved source references connect files across projects."
     }
 }

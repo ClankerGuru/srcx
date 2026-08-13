@@ -88,7 +88,7 @@ class AntiPatternDetectorTest :
                 }
             }
 
-            `when`("interface has only one implementation") {
+            `when`("a local interface has one implementation") {
                 val iface =
                     component(
                         ComponentConfig("Repository", isInterface = true),
@@ -101,8 +101,8 @@ class AntiPatternDetectorTest :
                 val edges = buildDependencyGraph(components)
                 val patterns = detectAntiPatterns(components, edges, rootDir)
 
-                then("it detects the single-impl interface") {
-                    patterns.any { it.message.contains("only one implementation") } shouldBe true
+                then("it makes no abstraction recommendation") {
+                    patterns.shouldBeEmpty()
                 }
             }
 
@@ -153,7 +153,7 @@ class AntiPatternDetectorTest :
                 }
             }
 
-            `when`("dependency inversion is violated") {
+            `when`("an interface has one implementation and a consumer uses the implementation") {
                 val iface =
                     component(
                         ComponentConfig("Dispatcher", isInterface = true),
@@ -176,15 +176,8 @@ class AntiPatternDetectorTest :
                 val edges = buildDependencyGraph(components)
                 val patterns = detectAntiPatterns(components, edges, rootDir)
 
-                then("it detects the dependency inversion violation") {
-                    val dipViolation =
-                        patterns.filter {
-                            it.message.contains("Dependency on concrete")
-                        }
-                    dipViolation shouldHaveSize 1
-                    dipViolation[0].severity shouldBe AntiPattern.Severity.WARNING
-                    dipViolation[0].message shouldBe
-                        "Dependency on concrete `AgentDispatcher` instead of interface `Dispatcher`"
+                then("it recommends neither adding nor removing the interface") {
+                    patterns.shouldBeEmpty()
                 }
             }
 
@@ -197,7 +190,6 @@ class AntiPatternDetectorTest :
                     component(
                         ComponentConfig(
                             simpleName = "NotificationService",
-                            annotations = listOf("Service"),
                             imports = listOf("com.example.EmailSender"),
                         ),
                     )
@@ -205,15 +197,8 @@ class AntiPatternDetectorTest :
                 val edges = buildDependencyGraph(components)
                 val patterns = detectAntiPatterns(components, edges, rootDir)
 
-                then("it suggests extracting an interface") {
-                    val suggestions =
-                        patterns.filter {
-                            it.message.contains("Dependency on concrete class")
-                        }
-                    suggestions shouldHaveSize 1
-                    suggestions[0].severity shouldBe AntiPattern.Severity.INFO
-                    suggestions[0].suggestion shouldBe
-                        "Consider extracting an interface for `EmailSender`."
+                then("it does not recommend extracting an interface") {
+                    patterns.shouldBeEmpty()
                 }
             }
 

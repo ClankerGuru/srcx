@@ -6,12 +6,13 @@ import zone.clanker.gradle.srcx.model.Reference
 import zone.clanker.gradle.srcx.model.SourceSetName
 import zone.clanker.gradle.srcx.model.Symbol
 
-/** Raw PSI facts for one project-relative source file. */
+/** Raw PSI facts and complete source text for one project-relative source file. */
 internal data class ProjectFileScan(
     val sourceSet: SourceSetName,
     val projectRelativeFile: String,
     val declarations: List<Symbol>,
     val references: List<Reference>,
+    val sourceText: String = "",
 )
 
 /** Raw source facts and the compatible legacy summary for one owned Gradle project. */

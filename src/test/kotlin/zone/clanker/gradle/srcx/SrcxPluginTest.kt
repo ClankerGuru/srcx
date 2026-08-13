@@ -178,7 +178,7 @@ class SrcxPluginTest :
             `when`("srcx-context renders static documentation") {
                 val projectDir = tempProject().withMultiProject()
 
-                then("the standalone page and notebook fragment come from the workspace model") {
+                then("the standalone page and embedded fragment come from the workspace model") {
                     projectDir.gradle(Srcx.TASK_CONTEXT).build()
                     val standalone = projectDir.resolve(".srcx/site/index.html")
                     val fragment = projectDir.resolve(".srcx/site/report.html")

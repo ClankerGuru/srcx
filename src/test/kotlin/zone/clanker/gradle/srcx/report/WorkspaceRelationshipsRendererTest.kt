@@ -37,9 +37,20 @@ class WorkspaceRelationshipsRendererTest :
                     rendered.indexMarkdown shouldContain
                         "| [sample.Api](${page.fileName}) | interface | " +
                         "<code>workspace</code> / <code>:api</code> / <code>main</code> | 1140 | 1 | 3 | 1 | observed |"
+                    rendered.indexMarkdown shouldContain
+                        "[How to read the columns, symbol kinds, and score](#how-to-read-this-table)."
+                    rendered.indexMarkdown shouldContain "<summary><strong>Expand column definitions"
+                    rendered.indexMarkdown shouldContain "**Local in**: resolved non-import incoming records"
+                    rendered.indexMarkdown shouldContain
+                        "**Workspace-referenced**: observed when workspace in is greater than zero"
+                    ImportantSymbolReason.entries.forEach { reason ->
+                        rendered.indexMarkdown shouldContain
+                            "| ${reason.label} | ${reason.score} | ${reason.description} |"
+                    }
                     rendered.indexMarkdown shouldContain "## Evidence model and limits"
-                    rendered.indexMarkdown shouldContain "Import facts do not count as usage"
+                    rendered.indexMarkdown shouldContain "Import facts are excluded from inbound and outbound"
                     rendered.indexMarkdown shouldContain "not proof of semantic unusedness"
+                    rendered.indexMarkdown shouldNotContain "Workspace-used"
                 }
 
                 then("the page has exact identity, importance, and cumulative counts") {
@@ -61,38 +72,50 @@ class WorkspaceRelationshipsRendererTest :
 
                         ## Importance
 
-                        | Score | Reasons |
-                        |------:|---------|
-                        | 1140 | Used from another build; Entry point |
+                        The score is an additive ranking value, not a percentage, confidence, or quality grade. [See every score rule](index.md#how-to-read-this-table).
 
-                        ## Usage
+                        | Reason | Points | Applied when |
+                        |--------|-------:|--------------|
+                        | Used from another build | 1000 | Preserves a build-boundary contract: at least one resolved, non-import incoming relationship originates in a different build. |
+                        | Entry point | 140 | Keeps a useful starting point for reading the system: exact project analysis identifies the declaration as an explicit entry point. |
+                        | **Total ranking score** | **1140** | Sum of the applicable reason points. |
+
+                        Calculation: **1000 + 140 = 1140**.
+
+                        ## Relationship counts
 
                         | Metric | Value |
                         |--------|------:|
                         | Local inbound | 1 |
                         | Workspace inbound | 3 |
                         | Cross-build inbound | 1 |
-                        | Workspace-used status | yes - resolved workspace usage observed |
+                        | Workspace-referenced status | yes - resolved workspace inbound records observed |
                         """.trimIndent()
                 }
 
-                then("external consumers, dependencies, kinds, and source evidence remain explicit") {
-                    page.markdown shouldContain "## Who uses it"
+                then("inbound and outbound declarations, kinds, and source evidence remain explicit") {
+                    page.markdown shouldContain "## Inbound relationships"
+                    page.markdown shouldContain "| Source declaration | Relationship kind |"
                     page.markdown shouldContain "sample.ExternalConsumer"
                     page.markdown shouldContain "implements"
                     page.markdown shouldContain "yes (<code>included</code> to <code>workspace</code>)"
                     page.markdown shouldContain "<code>included</code> | <code>:client</code>"
                     page.markdown shouldContain "<code>src/main/kotlin/sample/ExternalConsumer.kt</code> | 40"
                     page.markdown shouldContain "class ExternalConsumer : Api"
-                    page.markdown shouldContain "## What it uses"
+                    page.markdown shouldContain "## Outbound relationships"
+                    page.markdown shouldContain "| Target declaration | Relationship kind |"
                     page.markdown shouldContain "sample.Repository"
-                    page.markdown shouldContain "constructs"
+                    page.markdown shouldContain "construction record"
                     page.markdown shouldContain "## Cross-build edges"
                     page.markdown shouldContain "| inbound |"
                     page.markdown shouldContain "| outbound |"
+                    page.markdown shouldNotContain "## Usage"
+                    page.markdown shouldNotContain "## Who uses it"
+                    page.markdown shouldNotContain "## What it uses"
+                    page.markdown shouldNotContain "workspace usage"
                 }
 
-                then("all evidence strengths are labeled and imports do not inflate or appear as usage") {
+                then("all evidence strengths are labeled and imports do not inflate or appear as relationships") {
                     page.markdown shouldContain "| DIRECT |"
                     page.markdown shouldContain "| DERIVED |"
                     page.markdown shouldContain "| HEURISTIC |"
@@ -104,7 +127,7 @@ class WorkspaceRelationshipsRendererTest :
         given("the same fully-qualified symbol name in different workspace scopes") {
             val first = workspaceSymbol("first-build", ":one", "sample.Service")
             val second = workspaceSymbol("second-build", ":two", "sample.Service")
-            val report = reportFor(listOf(important(first, 20), important(second, 10)))
+            val report = reportFor(listOf(rankedImportant(first, 1), rankedImportant(second, 0)))
 
             `when`("page filenames are assigned") {
                 val pages = WorkspaceRelationshipsRenderer().render(report).pages
@@ -146,7 +169,7 @@ class WorkspaceRelationshipsRendererTest :
             val symbols =
                 (0..WorkspaceRelationshipsRenderer.CONTEXT_LINK_LIMIT + 2).map { index ->
                     val symbol = workspaceSymbol("workspace", ":app", "sample.Symbol$index", line = index + 1)
-                    important(symbol, score = index + 1)
+                    rankedImportant(symbol, rank = index)
                 }
 
             `when`("the compact scout section is rendered") {
@@ -189,7 +212,7 @@ class WorkspaceRelationshipsRendererTest :
             val outputDirectory = temporaryDirectory()
             val renderer = WorkspaceRelationshipsRenderer()
             val oldSymbol = workspaceSymbol("workspace", ":app", "sample.Old")
-            val initial = renderer.render(reportFor(listOf(important(oldSymbol, 1))))
+            val initial = renderer.render(reportFor(listOf(important(oldSymbol))))
             ReportWriter.writeWorkspaceRelationshipReports(outputDirectory, initial)
             val oldPage = File(outputDirectory, "relationships/${initial.pages.single().fileName}")
             val stalePage = File(outputDirectory, "relationships/stale-shard.md").apply { writeText("stale") }
@@ -286,7 +309,7 @@ private fun relationshipReport(): WorkspaceReport {
 private fun relationshipReportWithTwoImportantSymbols(): WorkspaceReport {
     val report = relationshipReport()
     val repository = report.workspaceIndex.symbols.single { it.qualifiedName == "sample.Repository" }
-    return report.copy(importantSymbols = report.importantSymbols + important(repository, 10))
+    return report.copy(importantSymbols = report.importantSymbols + important(repository))
 }
 
 private fun reportFor(importantSymbols: List<ImportantSymbol>): WorkspaceReport =
@@ -348,14 +371,26 @@ private fun workspaceSymbol(
 
 private fun important(
     symbol: WorkspaceSymbol,
-    score: Int,
 ): ImportantSymbol =
     ImportantSymbol(
         symbol = symbol,
         reasons = listOf(ImportantSymbolReason.ENTRY_POINT),
-        score = score,
+        score = ImportantSymbolReason.ENTRY_POINT.score,
         usage = WorkspaceSymbolUsage(symbol, emptyList(), emptyList()),
     )
+
+private fun rankedImportant(
+    symbol: WorkspaceSymbol,
+    rank: Int,
+): ImportantSymbol {
+    val reasons = RANKING_REASON_SETS.getOrElse(rank) { error("unsupported fixture rank: $rank") }
+    return ImportantSymbol(
+        symbol = symbol,
+        reasons = reasons,
+        score = reasons.sumOf { it.score },
+        usage = WorkspaceSymbolUsage(symbol, emptyList(), emptyList()),
+    )
+}
 
 private fun relationship(
     source: WorkspaceSymbol?,
@@ -399,25 +434,79 @@ private fun referenceKind(kind: WorkspaceRelationshipKind): ReferenceKind =
     }
 
 private fun emptyIndexMarkdown(): String =
-    listOf(
-        "# Important workspace relationships",
-        "",
-        "Important symbols selected for empty-workspace. " +
-            "Rows are ordered by descending importance score, then stable workspace identity.",
-        "",
-        "No important symbols were selected for this workspace.",
-        "",
-        "## Evidence model and limits",
-        "",
-        "- **DIRECT**: the extractor supplied direct source evidence for the resolved target.",
-        "- **DERIVED**: the target was resolved from deterministic source facts, such as an unambiguous import.",
-        "- **HEURISTIC**: the relationship relies on approximate name or syntax evidence and should be reviewed.",
-        "- Import facts do not count as usage and are excluded from inbound, outbound, and workspace-used results.",
-        "- Counts cover resolved, observed workspace relationships only. " +
-            "No resolved workspace usage is not proof of semantic unusedness.",
-        "- Local inbound means the same build and project. Workspace inbound includes all projects and builds; " +
-            "cross-build inbound has a consumer in another build.",
-    ).joinToString("\n", postfix = "\n")
+    buildString {
+        appendLine("# Important workspace relationships")
+        appendLine()
+        appendLine(
+            "Important symbols selected for empty-workspace. " +
+                "Rows are ordered by descending importance score, then stable workspace identity.",
+        )
+        appendLine()
+        appendLine("[How to read the columns, symbol kinds, and score](#how-to-read-this-table).")
+        appendLine()
+        appendLine("No important symbols were selected for this workspace.")
+        appendLine()
+        appendLine("## How to read this table")
+        appendLine()
+        appendLine("<details>")
+        appendLine("<summary><strong>Expand column definitions, symbol kinds, and score rules</strong></summary>")
+        appendLine()
+        appendLine("### Columns")
+        appendLine()
+        EXPECTED_COLUMN_DESCRIPTIONS.forEach { (column, description) ->
+            appendLine("- **$column**: $description")
+        }
+        appendLine()
+        appendLine("### Symbol kinds")
+        appendLine()
+        EXPECTED_KIND_DESCRIPTIONS.forEach { (kind, description) ->
+            appendLine("- **${kind.label}**: $description")
+        }
+        appendLine()
+        appendLine("### Score rules")
+        appendLine()
+        appendLine(
+            "Scores rank symbols for bounded reports. Applicable reason points are added once; " +
+                "a larger score means more selection signals matched, not that the code is better or worse.",
+        )
+        appendLine()
+        appendLine("| Reason | Points | Applied when |")
+        appendLine("|--------|-------:|--------------|")
+        ImportantSymbolReason.entries.forEach { reason ->
+            appendLine("| ${reason.label} | ${reason.score} | ${reason.description} |")
+        }
+        appendLine()
+        appendLine(
+            "Relationship thresholds count resolved non-import records, not unique callers. " +
+                "The 1,000-point cross-build signal intentionally outranks every combination of local-only signals.",
+        )
+        appendLine()
+        appendLine("</details>")
+        appendLine()
+        appendLine("## Evidence model and limits")
+        appendLine()
+        appendLine("- **DIRECT**: the extractor supplied direct source evidence for the resolved target.")
+        appendLine(
+            "- **DERIVED**: the target was resolved from deterministic source facts, " +
+                "such as an unambiguous import.",
+        )
+        appendLine(
+            "- **HEURISTIC**: the relationship relies on approximate name or syntax evidence " +
+                "and should be reviewed.",
+        )
+        appendLine(
+            "- Import facts are excluded from inbound and outbound relationship counts and " +
+                "workspace-referenced status.",
+        )
+        appendLine(
+            "- Counts cover resolved, observed workspace relationship records only. " +
+                "Absence of resolved workspace inbound records is not proof of semantic unusedness.",
+        )
+        appendLine(
+            "- Local inbound means the same build and project. Workspace inbound includes all projects " +
+                "and builds; cross-build inbound has a source declaration in another build.",
+        )
+    }
 
 private fun temporaryDirectory(): File =
     File.createTempFile("srcx-relationships", "").apply {
@@ -425,3 +514,41 @@ private fun temporaryDirectory(): File =
         check(mkdirs())
         deleteOnExit()
     }
+
+private val RANKING_REASON_SETS =
+    listOf(
+        listOf(ImportantSymbolReason.ANTI_PATTERN_INVOLVEMENT),
+        listOf(ImportantSymbolReason.UNUSUAL_CONNECTIVITY),
+        listOf(ImportantSymbolReason.HIGH_WORKSPACE_OUTBOUND),
+        listOf(ImportantSymbolReason.DEPENDENCY_CYCLE),
+        listOf(ImportantSymbolReason.ENTRY_POINT),
+        listOf(ImportantSymbolReason.MULTIPLE_IMPLEMENTATIONS),
+        listOf(ImportantSymbolReason.HIGH_WORKSPACE_INBOUND),
+        listOf(ImportantSymbolReason.ENTRY_POINT, ImportantSymbolReason.ANTI_PATTERN_INVOLVEMENT),
+        listOf(ImportantSymbolReason.MULTIPLE_IMPLEMENTATIONS, ImportantSymbolReason.ANTI_PATTERN_INVOLVEMENT),
+        listOf(ImportantSymbolReason.HIGH_WORKSPACE_INBOUND, ImportantSymbolReason.ANTI_PATTERN_INVOLVEMENT),
+        listOf(ImportantSymbolReason.HIGH_WORKSPACE_INBOUND, ImportantSymbolReason.UNUSUAL_CONNECTIVITY),
+    )
+
+private val EXPECTED_COLUMN_DESCRIPTIONS =
+    listOf(
+        "Symbol" to "the fully-qualified declaration name; the link opens its evidence page.",
+        "Kind" to "the declaration form extracted from source.",
+        "Scope" to "the owning build, Gradle project path, and source set, in that order.",
+        "Score" to "the sum of all applicable importance-reason points; it is only a ranking value.",
+        "Local in" to "resolved non-import incoming records from the same build and project.",
+        "Workspace in" to "all resolved non-import incoming records from every project and build.",
+        "Cross-build in" to "workspace-in records whose source declaration belongs to another build.",
+        "Workspace-referenced" to "observed when workspace in is greater than zero; otherwise not observed.",
+    )
+
+private val EXPECTED_KIND_DESCRIPTIONS =
+    listOf(
+        SymbolDetailKind.CLASS to "a regular class declaration.",
+        SymbolDetailKind.INTERFACE to "an interface or contract declaration.",
+        SymbolDetailKind.ENUM to "an enum declaration.",
+        SymbolDetailKind.DATA_CLASS to "a Kotlin data class declaration.",
+        SymbolDetailKind.OBJECT to "a Kotlin singleton object declaration.",
+        SymbolDetailKind.FUNCTION to "a named function or method declaration.",
+        SymbolDetailKind.PROPERTY to "a property declared with val or var.",
+    )
