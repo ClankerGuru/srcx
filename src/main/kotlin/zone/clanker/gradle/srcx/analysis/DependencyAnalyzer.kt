@@ -19,14 +19,21 @@ data class ClassDependency(
  */
 fun buildDependencyGraph(components: List<ClassifiedComponent>): List<ClassDependency> {
     val bySimpleName = components.groupBy { it.source.simpleName }
-    val byQualifiedName = components.associateBy { it.source.qualifiedName }
+    val byQualifiedName =
+        components
+            .groupBy { it.source.qualifiedName }
+            .mapNotNull { (qualifiedName, candidates) ->
+                candidates.singleOrNull()?.let { component -> qualifiedName to component }
+            }.toMap()
+    val unambiguousQualifiedNames = byQualifiedName.keys
 
     val edges = mutableListOf<ClassDependency>()
 
     for (component in components) {
+        if (component.source.qualifiedName !in unambiguousQualifiedNames) continue
         addImportEdges(component, byQualifiedName, edges)
         addSupertypeEdges(component, byQualifiedName, bySimpleName, edges)
-        addSamePackageEdges(component, components, edges)
+        addSamePackageEdges(component, components, unambiguousQualifiedNames, edges)
     }
 
     return edges.distinct()
@@ -65,6 +72,7 @@ private fun addSupertypeEdges(
 private fun addSamePackageEdges(
     component: ClassifiedComponent,
     allComponents: List<ClassifiedComponent>,
+    unambiguousQualifiedNames: Set<String>,
     edges: MutableList<ClassDependency>,
 ) {
     val pkg = component.source.packageName
@@ -74,8 +82,12 @@ private fun addSamePackageEdges(
     val codeOnly = stripComments(sourceText)
 
     allComponents
-        .filter { it !== component && it.source.packageName == pkg && it.source.simpleName.length >= 2 }
-        .filter { candidate ->
+        .filter {
+            it !== component &&
+                it.source.qualifiedName in unambiguousQualifiedNames &&
+                it.source.packageName == pkg &&
+                it.source.simpleName.length >= 2
+        }.filter { candidate ->
             Regex("\\b${Regex.escape(candidate.source.simpleName)}\\b").containsMatchIn(codeOnly)
         }.forEach { edges.add(ClassDependency(component, it)) }
 }
@@ -164,50 +176,72 @@ fun findHubClasses(
  * Detect circular dependencies between components.
  * Returns lists of component names forming cycles.
  */
-fun findCycles(edges: List<ClassDependency>): List<List<String>> {
-    val adjacency = mutableMapOf<String, MutableSet<String>>()
-    for (edge in edges) {
-        if (edge.from.source.qualifiedName == edge.to.source.qualifiedName) continue
-        adjacency
-            .getOrPut(edge.from.source.qualifiedName) { mutableSetOf() }
-            .add(edge.to.source.qualifiedName)
-    }
+fun findCycles(
+    edges: List<ClassDependency>,
+): List<List<String>> = findQualifiedCycles(edges).map { cycle -> cycle.map { it.substringAfterLast('.') } }
 
-    val cycles = mutableListOf<List<String>>()
-    val visited = mutableSetOf<String>()
-    val inStack = mutableSetOf<String>()
-    val stack = mutableListOf<String>()
-
-    fun dfs(node: String) {
-        if (node in inStack) {
-            val cycleStart = stack.indexOf(node)
-            if (cycleStart >= 0) {
-                val cycle =
-                    stack
-                        .subList(cycleStart, stack.size)
-                        .map { it.substringAfterLast(".") } +
-                        node.substringAfterLast(".")
-                cycles.add(cycle)
-            }
-            return
-        }
-        if (node in visited) return
-
-        visited.add(node)
-        inStack.add(node)
-        stack.add(node)
-
-        for (neighbor in adjacency[node] ?: emptySet()) {
-            dfs(neighbor)
-        }
-
-        stack.removeAt(stack.size - 1)
-        inStack.remove(node)
-    }
-
-    for (node in adjacency.keys) {
-        dfs(node)
-    }
-
-    return cycles
+/** Detect deterministic closed routes while preserving exact qualified component IDs. */
+internal fun findQualifiedCycles(edges: List<ClassDependency>): List<List<String>> {
+    val graphEdges =
+        edges
+            .map { ComponentDependencyEdge(it.from.source.qualifiedName, it.to.source.qualifiedName) }
+            .filter { it.source != it.target }
+            .distinct()
+            .sortedWith(compareBy({ it.source }, { it.target }))
+    val adjacency = graphEdges.groupBy { it.source }.mapValues { (_, outgoing) -> outgoing.map { it.target }.sorted() }
+    return graphEdges
+        .mapNotNull { edge ->
+            shortestComponentPath(edge.target, edge.source, adjacency)
+                ?.let { returnPath -> canonicalComponentCycle(listOf(edge.source) + returnPath) }
+        }.distinct()
+        .sortedBy { it.joinToString("\u0000") }
 }
+
+private fun shortestComponentPath(
+    start: String,
+    target: String,
+    adjacency: Map<String, List<String>>,
+): List<String>? {
+    val queue = ArrayDeque<String>()
+    val visited = mutableSetOf(start)
+    val predecessor = mutableMapOf<String, String>()
+    queue.addLast(start)
+    while (queue.isNotEmpty() && target !in predecessor) {
+        val current = queue.removeFirst()
+        adjacency[current].orEmpty().forEach { next ->
+            if (visited.add(next)) {
+                predecessor[next] = current
+                queue.addLast(next)
+            }
+        }
+    }
+    return if (target in predecessor) componentPath(start, target, predecessor) else null
+}
+
+private fun componentPath(
+    start: String,
+    target: String,
+    predecessor: Map<String, String>,
+): List<String> {
+    val reversed = mutableListOf(target)
+    var current = target
+    while (current != start) {
+        current = requireNotNull(predecessor[current])
+        reversed += current
+    }
+    return reversed.asReversed()
+}
+
+private fun canonicalComponentCycle(cycle: List<String>): List<String> {
+    val members = cycle.dropLast(1)
+    return members.indices
+        .map { offset ->
+            val rotated = members.drop(offset) + members.take(offset)
+            rotated + rotated.first()
+        }.minBy { it.joinToString("\u0000") }
+}
+
+private data class ComponentDependencyEdge(
+    val source: String,
+    val target: String,
+)

@@ -86,9 +86,9 @@ class SrcxSettingsPluginTest :
                 }
             }
 
-            `when`("generateIncludedBuildReportsFromData with no builds") {
+            `when`("writeIncludedBuildReports has no builds") {
                 then("runs without error") {
-                    ReportWriter.generateIncludedBuildReportsFromData(emptyList(), Srcx.OUTPUT_DIR)
+                    ReportWriter.writeIncludedBuildReports(emptyMap(), emptyMap(), Srcx.OUTPUT_DIR)
                 }
             }
 

@@ -29,6 +29,12 @@ class SrcxContextCleanTest :
                 then("TASK_CLEAN is srcx-clean") {
                     Srcx.TASK_CLEAN shouldBe "srcx-clean"
                 }
+
+                then("HTML output names identify the static site") {
+                    Srcx.HTML_SITE_DIR shouldBe "site"
+                    Srcx.HTML_INDEX_FILE shouldBe "index.html"
+                    Srcx.HTML_FRAGMENT_FILE shouldBe "report.html"
+                }
             }
         }
 
@@ -152,13 +158,18 @@ class SrcxContextCleanTest :
 
                 then("it runs generate and dashboard as dependencies") {
                     val result = projectDir.gradle(Srcx.TASK_CONTEXT).build()
-                    result.output shouldContain "srcx: context written"
-                    result.output shouldContain "srcx: context written"
+                    result.output shouldContain "srcx: context and HTML documentation written"
 
                     val dashboardFile = projectDir.resolve(".srcx/context.md")
                     dashboardFile.shouldExist()
+                    projectDir.resolve(".srcx/relationships/index.md").shouldExist()
+                    projectDir.resolve(".srcx/site/index.html").shouldExist()
+                    projectDir.resolve(".srcx/site/report.html").shouldExist()
                     val content = dashboardFile.readText()
                     content shouldContain "# ctx-test"
+                    content shouldContain "[Workspace Relationships](relationships/index.md)"
+                    content shouldContain "## Important workspace relationships"
+                    content shouldContain "[Browse the complete relationship index](relationships/index.md)"
                 }
             }
 
@@ -171,6 +182,18 @@ class SrcxContextCleanTest :
 
                     val result = projectDir.gradle(Srcx.TASK_CLEAN).build()
                     result.output shouldContain "srcx: deleted"
+                    projectDir.resolve(".srcx").shouldNotExist()
+                }
+            }
+
+            `when`("running the standard clean lifecycle after generate") {
+                val projectDir = tempProject().withProject()
+
+                then("it delegates to srcx-clean and removes the static site") {
+                    projectDir.gradle(Srcx.TASK_CONTEXT).build()
+                    projectDir.resolve(".srcx/site/index.html").shouldExist()
+
+                    projectDir.gradle("clean").build()
                     projectDir.resolve(".srcx").shouldNotExist()
                 }
             }

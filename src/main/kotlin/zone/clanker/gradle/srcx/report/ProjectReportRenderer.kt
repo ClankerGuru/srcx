@@ -109,7 +109,9 @@ internal class ProjectReportRenderer(
         }
 
         if (analysis.cycles.isNotEmpty()) {
-            appendLine("## Circular Dependencies")
+            appendLine("## Analyzer-Inferred Component Cycles")
+            appendLine()
+            appendLine("These project-scoped routes are analyzer evidence, not resolved Atlas relationship records.")
             appendLine()
             for (cycle in analysis.cycles) {
                 appendLine("- ${cycle.joinToString(" -> ")}")

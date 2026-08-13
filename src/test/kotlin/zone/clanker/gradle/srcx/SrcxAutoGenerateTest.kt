@@ -34,7 +34,7 @@ class SrcxAutoGenerateTest :
         given("wireAutoGenerate via ProjectBuilder") {
             val plugin = Srcx.SettingsPlugin()
 
-            `when`("autoGenerate is enabled and compileKotlin task exists") {
+            `when`("autoGenerate is enabled and the base plugin is applied") {
                 val projectDir = tempDir()
                 projectDir.resolve("build.gradle.kts").writeText("")
                 val project =
@@ -42,37 +42,15 @@ class SrcxAutoGenerateTest :
                         .builder()
                         .withProjectDir(projectDir)
                         .build()
+                project.pluginManager.apply("base")
 
                 val extension = newExtension().apply { autoGenerate.set(true) }
                 plugin.registerTasks(project, extension)
 
-                project.tasks.register("compileKotlin")
-
-                then("compileKotlin is finalized by srcx-context") {
-                    val compileTask = project.tasks.getByName("compileKotlin")
-                    val finalizers = compileTask.finalizedBy.getDependencies(compileTask)
-                    finalizers.any { it.name == Srcx.TASK_CONTEXT } shouldBe true
-                }
-            }
-
-            `when`("autoGenerate is enabled and compileJava task exists") {
-                val projectDir = tempDir()
-                projectDir.resolve("build.gradle.kts").writeText("")
-                val project =
-                    ProjectBuilder
-                        .builder()
-                        .withProjectDir(projectDir)
-                        .build()
-
-                val extension = newExtension().apply { autoGenerate.set(true) }
-                plugin.registerTasks(project, extension)
-
-                project.tasks.register("compileJava")
-
-                then("compileJava is finalized by srcx-context") {
-                    val compileTask = project.tasks.getByName("compileJava")
-                    val finalizers = compileTask.finalizedBy.getDependencies(compileTask)
-                    finalizers.any { it.name == Srcx.TASK_CONTEXT } shouldBe true
+                then("assemble depends on srcx-context") {
+                    val assemble = project.tasks.getByName("assemble")
+                    val dependencies = assemble.taskDependencies.getDependencies(assemble)
+                    dependencies.any { it.name == Srcx.TASK_CONTEXT } shouldBe true
                 }
             }
 
@@ -84,16 +62,35 @@ class SrcxAutoGenerateTest :
                         .builder()
                         .withProjectDir(projectDir)
                         .build()
+                project.pluginManager.apply("base")
 
                 val extension = newExtension()
                 plugin.registerTasks(project, extension)
 
-                project.tasks.register("compileKotlin")
+                then("assemble does not depend on srcx-context") {
+                    val assemble = project.tasks.getByName("assemble")
+                    val dependencies = assemble.taskDependencies.getDependencies(assemble)
+                    dependencies.none { it.name == Srcx.TASK_CONTEXT } shouldBe true
+                }
+            }
 
-                then("compileKotlin is NOT finalized by srcx-context") {
-                    val compileTask = project.tasks.getByName("compileKotlin")
-                    val finalizers = compileTask.finalizedBy.getDependencies(compileTask)
-                    finalizers.none { it.name == Srcx.TASK_CONTEXT } shouldBe true
+            `when`("clean and assemble are requested together") {
+                val projectDir = tempDir()
+                projectDir.resolve("build.gradle.kts").writeText("")
+                val project =
+                    ProjectBuilder
+                        .builder()
+                        .withProjectDir(projectDir)
+                        .build()
+                project.pluginManager.apply("base")
+
+                val extension = newExtension().apply { autoGenerate.set(true) }
+                plugin.registerTasks(project, extension)
+
+                then("srcx-context runs after srcx-clean") {
+                    val context = project.tasks.getByName(Srcx.TASK_CONTEXT)
+                    val ordering = context.mustRunAfter.getDependencies(context)
+                    ordering.any { it.name == Srcx.TASK_CLEAN } shouldBe true
                 }
             }
         }
@@ -115,15 +112,17 @@ class SrcxAutoGenerateTest :
                 )
                 projectDir.resolve("build.gradle.kts").writeText("plugins { base }")
 
-                then("tasks still register successfully") {
+                then("assemble generates the static documentation site") {
                     val result =
                         GradleRunner
                             .create()
                             .withProjectDir(projectDir)
                             .withPluginClasspath()
-                            .withArguments("tasks", "--group=srcx", "--stacktrace")
+                            .withArguments("assemble", "--stacktrace")
                             .build()
-                    result.output shouldContain "srcx-context"
+                    result.output shouldContain ":srcx-context"
+                    projectDir.resolve(".srcx/site/index.html").isFile shouldBe true
+                    projectDir.resolve(".srcx/site/report.html").isFile shouldBe true
                 }
             }
         }

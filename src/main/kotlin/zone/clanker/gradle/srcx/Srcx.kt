@@ -8,6 +8,7 @@ import org.gradle.api.logging.Logging
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
 import org.gradle.api.tasks.Internal
+import org.gradle.language.base.plugins.LifecycleBasePlugin
 import zone.clanker.gradle.srcx.scan.ProjectScanner
 import zone.clanker.gradle.srcx.scan.SymbolExtractor
 import zone.clanker.gradle.srcx.task.CleanTask
@@ -44,6 +45,15 @@ data object Srcx {
 
     /** Task: delete the .srcx output directory. */
     const val TASK_CLEAN = "srcx-clean"
+
+    /** Static documentation directory inside [OUTPUT_DIR]. */
+    const val HTML_SITE_DIR = "site"
+
+    /** Standalone static documentation entry point. */
+    const val HTML_INDEX_FILE = "index.html"
+
+    /** Scoped static documentation fragment for embedding in an existing page. */
+    const val HTML_FRAGMENT_FILE = "report.html"
 
     /** Dependency scopes excluded from scanning by default. */
     val DEFAULT_EXCLUDED_DEP_SCOPES: Set<String> =
@@ -128,7 +138,7 @@ data object Srcx {
      * 2. Use `rootProject` callback to wire tasks after DSL runs
      * 3. Register [ContextTask] and [CleanTask]
      * 4. Wire extension properties into task `@Input` properties via conventions
-     * 5. Optionally wire compile tasks to finalize with srcx-context
+     * 5. Optionally make the standard assemble lifecycle depend on srcx-context
      */
     class SettingsPlugin : Plugin<Settings> {
         override fun apply(settings: Settings) {
@@ -201,9 +211,12 @@ data object Srcx {
                     }
                 }
             rootProject.plugins.withType(
-                org.gradle.language.base.plugins.LifecycleBasePlugin::class.java,
+                LifecycleBasePlugin::class.java,
             ) {
-                rootProject.tasks.named("clean").configure { it.dependsOn(cleanTask) }
+                rootProject.tasks.named(LifecycleBasePlugin.CLEAN_TASK_NAME).configure { clean ->
+                    clean.dependsOn(cleanTask)
+                }
+                contextTask.configure { context -> context.mustRunAfter(cleanTask) }
             }
             if (extension.autoGenerate.get()) {
                 wireAutoGenerate(rootProject, contextTask)
@@ -253,13 +266,9 @@ data object Srcx {
             rootProject: Project,
             contextTask: org.gradle.api.tasks.TaskProvider<ContextTask>,
         ) {
-            rootProject.allprojects { project ->
-                project.tasks.whenTaskAdded { task ->
-                    if (task.name.startsWith("compile") &&
-                        (task.name.endsWith("Kotlin") || task.name.endsWith("Java"))
-                    ) {
-                        task.finalizedBy(contextTask)
-                    }
+            rootProject.plugins.withType(LifecycleBasePlugin::class.java) {
+                rootProject.tasks.named(LifecycleBasePlugin.ASSEMBLE_TASK_NAME).configure { assemble ->
+                    assemble.dependsOn(contextTask)
                 }
             }
         }

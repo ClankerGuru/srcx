@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtObjectDeclaration
@@ -117,30 +118,18 @@ private data class KtTypeInfo(
 
 private fun resolveKtTypeInfo(ktFile: KtFile, fallbackName: String): KtTypeInfo {
     val text = ktFile.text
-    val firstClass = ktFile.collectDescendantsOfType<KtClass>().firstOrNull()
-    if (firstClass != null) {
+    val firstType = ktFile.declarations.filterIsInstance<KtClassOrObject>().firstOrNull()
+    if (firstType != null) {
+        val firstClass = firstType as? KtClass
         return KtTypeInfo(
-            className = firstClass.name ?: fallbackName,
-            annotations = firstClass.annotationEntries.mapNotNull { it.shortName?.asString() },
-            supertypes = firstClass.superTypeListEntries.mapNotNull { supertypeName(it) },
-            isInterface = firstClass.isInterface(),
-            isAbstract = firstClass.hasModifier(KtTokens.ABSTRACT_KEYWORD),
-            isObject = false,
-            isDataClass = firstClass.isData(),
-            declarationLine = lineOfOffset(text, firstClass.textOffset),
-        )
-    }
-    val firstObject = ktFile.collectDescendantsOfType<KtObjectDeclaration>().firstOrNull { !it.isCompanion() }
-    if (firstObject != null) {
-        return KtTypeInfo(
-            className = firstObject.name ?: fallbackName,
-            annotations = firstObject.annotationEntries.mapNotNull { it.shortName?.asString() },
-            supertypes = firstObject.superTypeListEntries.mapNotNull { supertypeName(it) },
-            isInterface = false,
-            isAbstract = false,
-            isObject = true,
-            isDataClass = false,
-            declarationLine = lineOfOffset(text, firstObject.textOffset),
+            className = firstType.name ?: fallbackName,
+            annotations = firstType.annotationEntries.mapNotNull { it.shortName?.asString() },
+            supertypes = firstType.superTypeListEntries.mapNotNull { supertypeName(it) },
+            isInterface = firstClass?.isInterface() == true,
+            isAbstract = firstClass?.hasModifier(KtTokens.ABSTRACT_KEYWORD) == true,
+            isObject = firstType is KtObjectDeclaration,
+            isDataClass = firstClass?.isData() == true,
+            declarationLine = lineOfOffset(text, firstType.textOffset),
         )
     }
     return KtTypeInfo(
@@ -308,7 +297,8 @@ fun scanSources(srcDirs: List<File>): List<SourceFileMetadata> {
                     .walkTopDown()
                     .filter { it.isFile && (it.extension == "kt" || it.extension == "java") }
                     .toList()
-            }
+            }.distinctBy { file -> file.absoluteFile.invariantSeparatorsPath }
+            .sortedBy { file -> file.absoluteFile.invariantSeparatorsPath }
     if (files.isEmpty()) return emptyList()
 
     val env = PsiEnvironment.shared() ?: return emptyList()

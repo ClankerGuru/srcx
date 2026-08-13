@@ -106,7 +106,7 @@ class SymbolIndex(
             .sortedByDescending { it.second }
 
     /** Build a method-level call graph. */
-    @Suppress("LoopWithTooManyJumpStatements")
+    @Suppress("LoopWithTooManyJumpStatements", "UnreachableCode")
     fun callGraph(): List<MethodCall> {
         val calls = mutableListOf<MethodCall>()
         val methodSymbols = symbols.filter { it.kind == SymbolDetailKind.FUNCTION }
@@ -293,8 +293,9 @@ class SymbolIndex(
                 val parser = PsiParser(env)
                 for (file in sourceFiles) {
                     runCatching {
-                        allSymbols.addAll(parser.extractDeclarations(file))
-                        allRefs.addAll(parser.extractReferences(file))
+                        val facts = parser.extractFacts(file)
+                        allSymbols.addAll(facts.declarations)
+                        allRefs.addAll(facts.references)
                     }.onFailure { e ->
                         val log = Logging.getLogger(SymbolIndex::class.java)
                         log.warn("srcx: failed to parse ${file.name}: ${e.message}")

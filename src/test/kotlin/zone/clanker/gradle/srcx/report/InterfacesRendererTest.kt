@@ -14,11 +14,19 @@ import zone.clanker.gradle.srcx.model.FindingSeverity
 import zone.clanker.gradle.srcx.model.PackageName
 import zone.clanker.gradle.srcx.model.ProjectPath
 import zone.clanker.gradle.srcx.model.ProjectSummary
+import zone.clanker.gradle.srcx.model.ReferenceEvidence
+import zone.clanker.gradle.srcx.model.ReferenceKind
 import zone.clanker.gradle.srcx.model.SourceSetName
 import zone.clanker.gradle.srcx.model.SourceSetSummary
+import zone.clanker.gradle.srcx.model.SymbolDetailKind
 import zone.clanker.gradle.srcx.model.SymbolEntry
 import zone.clanker.gradle.srcx.model.SymbolKind
 import zone.clanker.gradle.srcx.model.SymbolName
+import zone.clanker.gradle.srcx.model.WorkspaceIndex
+import zone.clanker.gradle.srcx.model.WorkspaceReference
+import zone.clanker.gradle.srcx.model.WorkspaceRelationship
+import zone.clanker.gradle.srcx.model.WorkspaceRelationshipKind
+import zone.clanker.gradle.srcx.model.WorkspaceSymbol
 
 class InterfacesRendererTest :
     BehaviorSpec({
@@ -57,9 +65,10 @@ class InterfacesRendererTest :
                 val output = renderer.render()
 
                 then("it contains the interface table") {
-                    output shouldContain "| Interface | Package | Implementations | Has Mock |"
-                    output shouldContain "| `UserRepository` | com.example.repo | 2 | yes |"
-                    output shouldContain "| `ILogger` | com.example.log | 1 | no |"
+                    output shouldContain "| Interface | Qualified name | Scope | Implementations | Has Mock |"
+                    output shouldContain
+                        "| `UserRepository` | `com.example.repo.UserRepository` | `main` | 2 | yes |"
+                    output shouldContain "| `ILogger` | `com.example.log.ILogger` | `main` | 1 | no |"
                 }
             }
         }
@@ -321,7 +330,89 @@ class InterfacesRendererTest :
                 }
             }
 
-            `when`("summaries have analysis findings referencing interfaces") {
+            `when`("a summary only mentions an interface in recommendation prose") {
+                val summaries =
+                    listOf(
+                        ProjectSummary(
+                            projectPath = ProjectPath(":app"),
+                            symbols = emptyList(),
+                            dependencies = emptyList(),
+                            buildFile = "build.gradle.kts",
+                            sourceDirs = emptyList(),
+                            subprojects = emptyList(),
+                            analysis =
+                                AnalysisSummary(
+                                    findings =
+                                        listOf(
+                                            Finding(
+                                                FindingSeverity.INFO,
+                                                "Interface `Dao` has only one implementation",
+                                                "Consider inlining it",
+                                            ),
+                                        ),
+                                    hubs = emptyList(),
+                                    cycles = emptyList(),
+                                ),
+                        ),
+                    )
+                val result = InterfacesRenderer.fromSummaries(summaries)
+
+                then("it does not infer an interface candidate from prose") {
+                    result.shouldBeEmpty()
+                }
+            }
+
+            `when`("the workspace index has an exact interface and implementation relationship") {
+                val iface =
+                    WorkspaceSymbol(
+                        build = "root",
+                        project = ":app",
+                        sourceSet = "main",
+                        name = "Dao",
+                        qualifiedName = "com.example.Dao",
+                        kind = SymbolDetailKind.INTERFACE,
+                        projectRelativeFile = "src/main/kotlin/com/example/Dao.kt",
+                        declarationLine = 1,
+                    )
+                val implementation =
+                    WorkspaceSymbol(
+                        build = "root",
+                        project = ":app",
+                        sourceSet = "main",
+                        name = "DefaultDao",
+                        qualifiedName = "com.example.DefaultDao",
+                        kind = SymbolDetailKind.CLASS,
+                        projectRelativeFile = "src/main/kotlin/com/example/DefaultDao.kt",
+                        declarationLine = 2,
+                    )
+                val reference =
+                    WorkspaceReference(
+                        build = "root",
+                        project = ":app",
+                        sourceSet = "main",
+                        sourceSymbol = implementation,
+                        targetName = iface.name,
+                        targetQualifiedName = iface.qualifiedName,
+                        kind = ReferenceKind.SUPERTYPE,
+                        projectRelativeFile = implementation.projectRelativeFile,
+                        line = 2,
+                        context = "Dao",
+                        evidence = ReferenceEvidence.DIRECT,
+                    )
+                val workspaceIndex =
+                    WorkspaceIndex(
+                        symbols = listOf(iface, implementation),
+                        relationships =
+                            listOf(
+                                WorkspaceRelationship(
+                                    source = implementation,
+                                    target = iface,
+                                    kind = WorkspaceRelationshipKind.IMPLEMENTS,
+                                    sourceEvidence = reference,
+                                    evidence = ReferenceEvidence.DIRECT,
+                                ),
+                            ),
+                    )
                 val summaries =
                     listOf(
                         ProjectSummary(
@@ -354,25 +445,116 @@ class InterfacesRendererTest :
                                         listOf("src/main/kotlin"),
                                     ),
                                 ),
-                            analysis =
-                                AnalysisSummary(
-                                    findings =
-                                        listOf(
-                                            Finding(
-                                                FindingSeverity.INFO,
-                                                "Interface `Dao` has only one implementation",
-                                                "Consider inlining",
-                                            ),
-                                        ),
-                                    hubs = emptyList(),
-                                    cycles = emptyList(),
-                                ),
                         ),
                     )
-                val result = InterfacesRenderer.fromSummaries(summaries)
+                val result = InterfacesRenderer.fromSummaries(summaries, workspaceIndex)
 
-                then("it finds the interface from findings pattern") {
-                    result.any { it.name == "Dao" } shouldBe true
+                then("it documents the interface without parsing anti-pattern prose") {
+                    result shouldHaveSize 1
+                    result[0].name shouldBe "Dao"
+                    result[0].packageName shouldBe "com.example"
+                    result[0].implementationCount shouldBe 1
+                    result[0].build shouldBe "root"
+                    result[0].project shouldBe ":app"
+                    result[0].qualifiedName shouldBe "com.example.Dao"
+                    result[0].identity shouldBe iface.identity
+                }
+            }
+
+            `when`("same-named exact interfaces exist in different workspace scopes") {
+                val billingRepository =
+                    workspaceSymbol("billing-build", ":contracts", "billing.api.Repository")
+                val inventoryRepository =
+                    workspaceSymbol("inventory-build", ":spi", "inventory.spi.Container.Repository").copy(
+                        projectRelativeFile = "src/main/kotlin/inventory/spi/Container.kt",
+                    )
+                val billingImplementation =
+                    workspaceSymbol(
+                        "billing-build",
+                        ":service",
+                        "billing.data.SqlRepository",
+                        SymbolDetailKind.CLASS,
+                    )
+                val firstInventoryImplementation =
+                    workspaceSymbol(
+                        "inventory-build",
+                        ":runtime",
+                        "inventory.data.JdbcRepository",
+                        SymbolDetailKind.CLASS,
+                    )
+                val secondInventoryImplementation =
+                    workspaceSymbol(
+                        "inventory-build",
+                        ":runtime",
+                        "inventory.data.MemoryRepository",
+                        SymbolDetailKind.CLASS,
+                    )
+                val workspaceIndex =
+                    WorkspaceIndex(
+                        symbols =
+                            listOf(
+                                secondInventoryImplementation,
+                                billingRepository,
+                                firstInventoryImplementation,
+                                inventoryRepository,
+                                billingImplementation,
+                            ),
+                        relationships =
+                            listOf(
+                                implementationRelationship(
+                                    secondInventoryImplementation,
+                                    inventoryRepository,
+                                ),
+                                implementationRelationship(billingImplementation, billingRepository),
+                                implementationRelationship(
+                                    firstInventoryImplementation,
+                                    inventoryRepository,
+                                ),
+                            ),
+                    )
+                val summaries =
+                    listOf(
+                        legacyRepositorySummary(
+                            project = ":contracts",
+                            packageName = "billing.api",
+                            filePath = "billing/api/Repository.kt",
+                        ),
+                        legacyRepositorySummary(
+                            project = ":spi",
+                            packageName = "inventory.spi",
+                            filePath = "inventory/spi/Container.kt",
+                        ),
+                    )
+                val result = InterfacesRenderer.fromSummaries(summaries, workspaceIndex)
+                val output = InterfacesRenderer(result.reversed()).render()
+
+                then("both exact identities survive without naming-fallback duplicates") {
+                    result shouldHaveSize 2
+                    result.map { it.identity }.toSet() shouldBe
+                        setOf(billingRepository.identity, inventoryRepository.identity)
+                }
+
+                then("implementation counts remain scoped to each exact target") {
+                    result.single { it.identity == billingRepository.identity }.implementationCount shouldBe 1
+                    result.single { it.identity == inventoryRepository.identity }.implementationCount shouldBe 2
+                }
+
+                then("a nested qualified name is not mislabeled as its enclosing type package") {
+                    val inventory = result.single { it.identity == inventoryRepository.identity }
+                    inventory.qualifiedName shouldBe "inventory.spi.Container.Repository"
+                    inventory.packageName shouldBe "inventory.spi"
+                }
+
+                then("rendering shows distinct scopes in deterministic order") {
+                    val inventoryRow =
+                        "| `Repository` | `inventory.spi.Container.Repository` | " +
+                            "`inventory-build / :spi / main` | 2 | no |"
+                    val billingRow =
+                        "| `Repository` | `billing.api.Repository` | " +
+                            "`billing-build / :contracts / main` | 1 | no |"
+                    output shouldContain inventoryRow
+                    output shouldContain billingRow
+                    (output.indexOf(inventoryRow) < output.indexOf(billingRow)) shouldBe true
                 }
             }
 
@@ -674,3 +856,77 @@ class InterfacesRendererTest :
             }
         }
     })
+
+private fun workspaceSymbol(
+    build: String,
+    project: String,
+    qualifiedName: String,
+    kind: SymbolDetailKind = SymbolDetailKind.INTERFACE,
+): WorkspaceSymbol =
+    WorkspaceSymbol(
+        build = build,
+        project = project,
+        sourceSet = "main",
+        name = qualifiedName.substringAfterLast('.'),
+        qualifiedName = qualifiedName,
+        kind = kind,
+        projectRelativeFile = "src/main/kotlin/${qualifiedName.replace('.', '/')}.kt",
+        declarationLine = 1,
+    )
+
+private fun implementationRelationship(
+    implementation: WorkspaceSymbol,
+    contract: WorkspaceSymbol,
+): WorkspaceRelationship {
+    val reference =
+        WorkspaceReference(
+            build = implementation.build,
+            project = implementation.project,
+            sourceSet = implementation.sourceSet,
+            sourceSymbol = implementation,
+            targetName = contract.name,
+            targetQualifiedName = contract.qualifiedName,
+            kind = ReferenceKind.SUPERTYPE,
+            projectRelativeFile = implementation.projectRelativeFile,
+            line = implementation.declarationLine,
+            context = contract.qualifiedName,
+            evidence = ReferenceEvidence.DIRECT,
+        )
+    return WorkspaceRelationship(
+        source = implementation,
+        target = contract,
+        kind = WorkspaceRelationshipKind.IMPLEMENTS,
+        sourceEvidence = reference,
+        evidence = ReferenceEvidence.DIRECT,
+    )
+}
+
+private fun legacyRepositorySummary(
+    project: String,
+    packageName: String,
+    filePath: String,
+): ProjectSummary =
+    ProjectSummary(
+        projectPath = ProjectPath(project),
+        symbols = emptyList(),
+        dependencies = emptyList(),
+        buildFile = "build.gradle.kts",
+        sourceDirs = emptyList(),
+        subprojects = emptyList(),
+        sourceSets =
+            listOf(
+                SourceSetSummary(
+                    SourceSetName("main"),
+                    listOf(
+                        SymbolEntry(
+                            SymbolName("Repository"),
+                            SymbolKind.CLASS,
+                            PackageName(packageName),
+                            FilePath(filePath),
+                            1,
+                        ),
+                    ),
+                    listOf("src/main/kotlin"),
+                ),
+            ),
+    )

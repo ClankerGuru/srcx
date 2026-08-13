@@ -2,6 +2,7 @@ package zone.clanker.gradle.srcx.analysis
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import java.io.File
 
@@ -52,10 +53,14 @@ class AntiPatternDetailTest :
                         components, edges, rootDir,
                     )
 
-                then("it reports circular dependency") {
-                    patterns.any {
-                        it.message.contains("Circular dependency")
-                    } shouldBe true
+                then("it recommends an acyclic change without prescribing interface extraction") {
+                    val cycle = patterns.single { it.message.contains("Analyzer-inferred component cycle") }
+                    cycle.suggestion shouldBe
+                        "Reverse an edge or move shared policy/data to an acyclic owner. " +
+                        "Introduce a boundary abstraction only when independently justified."
+                    cycle.componentIds shouldContainExactly listOf("com.example.A", "com.example.B")
+                    cycle.componentCycle?.componentIds shouldContainExactly
+                        listOf("com.example.A", "com.example.B", "com.example.A")
                 }
             }
         }

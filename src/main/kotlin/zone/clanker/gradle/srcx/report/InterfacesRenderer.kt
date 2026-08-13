@@ -1,17 +1,21 @@
 package zone.clanker.gradle.srcx.report
 
 import zone.clanker.gradle.srcx.model.ProjectSummary
+import zone.clanker.gradle.srcx.model.SymbolDetailKind
 import zone.clanker.gradle.srcx.model.SymbolEntry
 import zone.clanker.gradle.srcx.model.SymbolKind
+import zone.clanker.gradle.srcx.model.WorkspaceIndex
+import zone.clanker.gradle.srcx.model.WorkspaceRelationshipKind
+import zone.clanker.gradle.srcx.model.WorkspaceSymbol
+import zone.clanker.gradle.srcx.model.WorkspaceSymbolIdentity
 
 /**
  * Renders the interfaces.md file listing all interfaces with implementation counts.
  *
- * Identifies interfaces by naming convention (prefixed with "I" or common interface
- * suffixes) and correlates with implementation classes. Tags mock implementations.
- * Groups by source set (main vs test).
+ * Uses exact workspace symbols when available, with legacy naming conventions as a fallback.
+ * Correlates implementation classes, tags mock implementations, and groups by source set.
  *
- * @property interfaces pre-computed interface data (name, package, impl count, has mock, source set)
+ * @property interfaces pre-computed interface data with declaration scope and implementation coverage
  */
 internal class InterfacesRenderer(
     private val interfaces: List<InterfaceInfo>,
@@ -20,18 +24,47 @@ internal class InterfacesRenderer(
      * Pre-computed interface information.
      *
      * @property name simple class name
-     * @property packageName package containing the interface
+     * @property packageName proven package containing the interface, when available
      * @property implementationCount number of known implementations
      * @property hasMock whether a mock implementation exists
      * @property sourceSet the source set this interface belongs to (main, test, etc.)
+     * @property build owning Gradle build, when exact workspace facts are available
+     * @property project owning Gradle project, when known
+     * @property qualifiedName fully qualified declaration name
+     * @property identity stable workspace declaration identity, when exact facts are available
      */
+    @Suppress("LongParameterList")
     data class InterfaceInfo(
         val name: String,
-        val packageName: String,
+        val packageName: String?,
         val implementationCount: Int,
         val hasMock: Boolean,
         val sourceSet: String = "main",
-    )
+        val build: String? = null,
+        val project: String? = null,
+        val qualifiedName: String =
+            packageName
+                ?.takeUnless { it == "_root_" }
+                ?.let { "$it.$name" }
+                ?: name,
+        val identity: WorkspaceSymbolIdentity? = null,
+    ) {
+        init {
+            require(name.isNotBlank()) { "name must not be blank" }
+            require(packageName == null || packageName.isNotBlank()) { "packageName must not be blank" }
+            require(implementationCount >= 0) { "implementationCount must be >= 0" }
+            require(sourceSet.isNotBlank()) { "sourceSet must not be blank" }
+            require(build == null || build.isNotBlank()) { "build must not be blank" }
+            require(project == null || project.isNotBlank()) { "project must not be blank" }
+            require(qualifiedName.isNotBlank()) { "qualifiedName must not be blank" }
+            identity?.let { exactIdentity ->
+                require(build == exactIdentity.build) { "build must match identity" }
+                require(project == exactIdentity.project) { "project must match identity" }
+                require(sourceSet == exactIdentity.sourceSet) { "sourceSet must match identity" }
+                require(qualifiedName == exactIdentity.qualifiedName) { "qualifiedName must match identity" }
+            }
+        }
+    }
 
     fun render(): String =
         buildString {
@@ -42,8 +75,9 @@ internal class InterfacesRenderer(
                 appendLine()
                 return@buildString
             }
-            val mainInterfaces = interfaces.filter { !it.sourceSet.contains("test", ignoreCase = true) }
-            val testInterfaces = interfaces.filter { it.sourceSet.contains("test", ignoreCase = true) }
+            val ordered = interfaces.sortedWith(interfaceComparator)
+            val mainInterfaces = ordered.filter { !it.sourceSet.contains("test", ignoreCase = true) }
+            val testInterfaces = ordered.filter { it.sourceSet.contains("test", ignoreCase = true) }
 
             if (mainInterfaces.isNotEmpty()) {
                 appendInterfaceTable(mainInterfaces)
@@ -56,24 +90,29 @@ internal class InterfacesRenderer(
         }
 
     private fun StringBuilder.appendInterfaceTable(items: List<InterfaceInfo>) {
-        appendLine("| Interface | Package | Implementations | Has Mock |")
-        appendLine("|-----------|---------|----------------|----------|")
+        appendLine("| Interface | Qualified name | Scope | Implementations | Has Mock |")
+        appendLine("|-----------|----------------|-------|-----------------|----------|")
         for (iface in items) {
             val mockTag = if (iface.hasMock) "yes" else "no"
-            appendLine("| `${iface.name}` | ${iface.packageName} | ${iface.implementationCount} | $mockTag |")
+            val scope = listOfNotNull(iface.build, iface.project, iface.sourceSet).joinToString(" / ")
+            appendLine(
+                "| `${iface.name}` | `${iface.qualifiedName}` | `$scope` | ${iface.implementationCount} | $mockTag |",
+            )
         }
         appendLine()
     }
 
     companion object {
         /**
-         * Build interface info from project summaries by correlating class names.
+         * Build interface info from exact workspace symbols, with a naming fallback for legacy summaries.
          *
-         * Identifies interfaces by common naming patterns and counts implementations
-         * by looking for classes that match the interface name with common suffixes/prefixes.
-         * Excludes enum values and non-interface-like classes.
+         * Exact interface declarations use resolved implementation relationships. Legacy summaries
+         * retain their existing name-based interface and implementation matching.
          */
-        fun fromSummaries(summaries: List<ProjectSummary>): List<InterfaceInfo> {
+        fun fromSummaries(
+            summaries: List<ProjectSummary>,
+            workspaceIndex: WorkspaceIndex = WorkspaceIndex(),
+        ): List<InterfaceInfo> {
             val allClasses =
                 summaries.flatMap { summary ->
                     summary.sourceSets.flatMap { ss ->
@@ -82,59 +121,122 @@ internal class InterfacesRenderer(
                 }
             val classNames = allClasses.map { it.name.value }.toSet()
 
-            // Find interfaces from analysis hubs or naming convention
-            val potentialInterfaces = findInterfacesFromAnalysis(summaries)
+            val potentialInterfaces = findInterfaceCandidates(summaries, workspaceIndex)
             if (potentialInterfaces.isEmpty()) return emptyList()
 
             return potentialInterfaces
-                .map { (name, pkg, sourceSet) ->
-                    val implCount = countImplementations(name, classNames)
-                    val hasMock =
-                        classNames.any { cn ->
-                            cn == "Mock$name" ||
-                                cn == "${name}Mock" ||
-                                cn == "Fake$name" ||
-                                cn == "${name}Fake"
+                .map { candidate ->
+                    val exactImplementations =
+                        candidate.identity?.let { identity ->
+                            workspaceIndex.relationships
+                                .filter {
+                                    it.kind == WorkspaceRelationshipKind.IMPLEMENTS && it.targetIdentity == identity
+                                }.mapNotNull { it.source }
+                                .distinctBy { it.identity }
                         }
-                    InterfaceInfo(name, pkg, implCount, hasMock, sourceSet)
-                }.sortedByDescending { it.implementationCount }
+                    val implCount =
+                        exactImplementations?.count { !isMockOrFake(it.name) }
+                            ?: countImplementations(candidate.name, classNames)
+                    val hasMock =
+                        exactImplementations?.any { isMockOrFake(it.name) }
+                            ?: hasNamedMock(candidate.name, classNames)
+                    InterfaceInfo(
+                        name = candidate.name,
+                        packageName = candidate.packageName,
+                        implementationCount = implCount,
+                        hasMock = hasMock,
+                        sourceSet = candidate.sourceSet,
+                        build = candidate.build,
+                        project = candidate.project,
+                        qualifiedName = candidate.qualifiedName,
+                        identity = candidate.identity,
+                    )
+                }.sortedWith(interfaceComparator)
         }
 
         private data class InterfaceCandidate(
             val name: String,
-            val packageName: String,
+            val packageName: String?,
             val sourceSet: String,
+            val qualifiedName: String,
+            val build: String? = null,
+            val project: String? = null,
+            val identity: WorkspaceSymbolIdentity? = null,
         )
 
-        @Suppress("NestedBlockDepth")
-        private fun findInterfacesFromAnalysis(summaries: List<ProjectSummary>): List<InterfaceCandidate> {
-            // Look at findings that mention interfaces (from single-impl detection)
-            val fromFindings = mutableListOf<InterfaceCandidate>()
-            for (summary in summaries) {
-                val findings = summary.analysis?.findings ?: continue
-                for (finding in findings) {
-                    val match = INTERFACE_PATTERN.find(finding.message)
-                    if (match != null) {
-                        val ifaceName = match.groupValues[1]
-                        if (!isEnumLikeName(ifaceName)) {
-                            fromFindings.add(InterfaceCandidate(ifaceName, summary.projectPath.value, "main"))
-                        }
-                    }
-                }
-            }
+        private fun findInterfaceCandidates(
+            summaries: List<ProjectSummary>,
+            workspaceIndex: WorkspaceIndex,
+        ): List<InterfaceCandidate> {
+            val exactCandidates =
+                workspaceIndex.symbols
+                    .asSequence()
+                    .filter { it.kind == SymbolDetailKind.INTERFACE }
+                    .distinctBy { it.identity }
+                    .map { symbol ->
+                        InterfaceCandidate(
+                            name = symbol.name,
+                            packageName = findPackageName(symbol, summaries),
+                            sourceSet = symbol.sourceSet,
+                            qualifiedName = symbol.qualifiedName,
+                            build = symbol.build,
+                            project = symbol.project,
+                            identity = symbol.identity,
+                        )
+                    }.sortedBy { it.identity?.value }
+                    .toList()
+            if (exactCandidates.isNotEmpty()) return exactCandidates
 
-            // Also detect by naming convention from symbols
-            val fromNaming =
-                summaries.flatMap { summary ->
-                    summary.sourceSets.flatMap { ss ->
-                        ss.symbols
+            return findNamingCandidates(summaries)
+        }
+
+        private fun findNamingCandidates(summaries: List<ProjectSummary>): List<InterfaceCandidate> =
+            summaries
+                .flatMap { summary ->
+                    summary.sourceSets.flatMap { sourceSet ->
+                        sourceSet.symbols
                             .filter { it.kind == SymbolKind.CLASS }
                             .filter { isLikelyInterface(it) }
-                            .map { InterfaceCandidate(it.name.value, it.packageName.value, ss.name.value) }
+                            .map { symbol ->
+                                val name = symbol.name.value
+                                val packageName = symbol.packageName.value
+                                InterfaceCandidate(
+                                    name = name,
+                                    packageName = packageName,
+                                    sourceSet = sourceSet.name.value,
+                                    qualifiedName =
+                                        if (packageName == "_root_") name else "$packageName.$name",
+                                    project = summary.projectPath.value,
+                                )
+                            }
                     }
-                }
+                }.distinctBy { it.name }
 
-            return (fromFindings + fromNaming).distinctBy { it.name }
+        private fun findPackageName(
+            symbol: WorkspaceSymbol,
+            summaries: List<ProjectSummary>,
+        ): String? =
+            summaries
+                .asSequence()
+                .filter { it.projectPath.value == symbol.project }
+                .flatMap { it.sourceSets.asSequence() }
+                .filter { it.name.value == symbol.sourceSet }
+                .flatMap { it.symbols.asSequence() }
+                .filter { it.kind == SymbolKind.CLASS }
+                .filter { it.name.value == symbol.name }
+                .filter { it.lineNumber == symbol.declarationLine }
+                .filter { sameFile(symbol.projectRelativeFile, it.filePath.value) }
+                .map { it.packageName.value }
+                .filter { it == "_root_" || symbol.qualifiedName.startsWith("$it.") }
+                .singleOrNull()
+
+        private fun sameFile(
+            projectRelativeFile: String,
+            sourceRelativeFile: String,
+        ): Boolean {
+            val projectFile = projectRelativeFile.replace('\\', '/')
+            val sourceFile = sourceRelativeFile.replace('\\', '/')
+            return projectFile == sourceFile || projectFile.endsWith("/$sourceFile")
         }
 
         private fun isLikelyInterface(symbol: SymbolEntry): Boolean {
@@ -175,6 +277,14 @@ internal class InterfacesRenderer(
             }
         }
 
+        private fun hasNamedMock(interfaceName: String, classNames: Set<String>): Boolean =
+            classNames.any { className ->
+                className == "Mock$interfaceName" ||
+                    className == "${interfaceName}Mock" ||
+                    className == "Fake$interfaceName" ||
+                    className == "${interfaceName}Fake"
+            }
+
         private fun isMockOrFake(className: String): Boolean {
             val lower = className.lowercase()
             return lower.startsWith("mock") ||
@@ -185,6 +295,12 @@ internal class InterfacesRenderer(
                 lower.endsWith("stub")
         }
 
-        private val INTERFACE_PATTERN = Regex("""Interface `(\w+)` has""")
+        private val interfaceComparator =
+            compareByDescending<InterfaceInfo> { it.implementationCount }
+                .thenBy { it.build.orEmpty() }
+                .thenBy { it.project.orEmpty() }
+                .thenBy { it.sourceSet }
+                .thenBy { it.qualifiedName }
+                .thenBy { it.identity?.value.orEmpty() }
     }
 }

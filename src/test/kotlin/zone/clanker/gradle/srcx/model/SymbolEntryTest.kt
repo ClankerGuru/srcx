@@ -201,6 +201,7 @@ class SymbolEntryTest :
                     sym.name shouldBe "MyService"
                     sym.qualifiedName shouldBe "com.example.MyService"
                     sym.kind shouldBe SymbolDetailKind.CLASS
+                    sym.declarationSemantic shouldBe DeclarationSemantic.CONCRETE_CLASS
                     sym.line shouldBe 5
                     sym.packageName shouldBe "com.example"
                 }
@@ -227,6 +228,27 @@ class SymbolEntryTest :
             }
         }
 
+        given("DeclarationSemantic enum") {
+            `when`("deriving a default from a symbol kind") {
+                then("class-like forms remain factual and functions remain other") {
+                    DeclarationSemantic.from(SymbolDetailKind.INTERFACE) shouldBe DeclarationSemantic.INTERFACE
+                    DeclarationSemantic.from(SymbolDetailKind.CLASS) shouldBe DeclarationSemantic.CONCRETE_CLASS
+                    DeclarationSemantic.from(SymbolDetailKind.DATA_CLASS) shouldBe DeclarationSemantic.CONCRETE_CLASS
+                    DeclarationSemantic.from(SymbolDetailKind.OBJECT) shouldBe DeclarationSemantic.SINGLETON_OBJECT
+                    DeclarationSemantic.from(SymbolDetailKind.ENUM) shouldBe DeclarationSemantic.ENUM
+                    DeclarationSemantic.from(SymbolDetailKind.FUNCTION) shouldBe DeclarationSemantic.OTHER
+                }
+            }
+
+            `when`("reading human-facing descriptions") {
+                then("they describe syntax without inventing architectural intent") {
+                    DeclarationSemantic.INTERFACE.detail shouldContain "does not infer why"
+                    DeclarationSemantic.SINGLETON_OBJECT.detail shouldContain "one language-managed instance"
+                    DeclarationSemantic.CONCRETE_CLASS.detail shouldContain "not its quality"
+                }
+            }
+        }
+
         given("Reference data class") {
             `when`("created with valid data") {
                 val ref =
@@ -242,14 +264,16 @@ class SymbolEntryTest :
                 then("all fields are accessible") {
                     ref.targetName shouldBe "MyService"
                     ref.kind shouldBe ReferenceKind.IMPORT
+                    ref.sourceQualifiedName shouldBe null
+                    ref.evidence shouldBe ReferenceEvidence.DIRECT
                 }
             }
         }
 
         given("ReferenceKind enum") {
             `when`("listing all values") {
-                then("there are six kinds") {
-                    ReferenceKind.entries.size shouldBe 6
+                then("there are nine kinds") {
+                    ReferenceKind.entries.size shouldBe 9
                 }
             }
 
@@ -261,6 +285,9 @@ class SymbolEntryTest :
                     ReferenceKind.TYPE_REF.label shouldBe "type"
                     ReferenceKind.CONSTRUCTOR.label shouldBe "constructor"
                     ReferenceKind.NAME_REF.label shouldBe "reference"
+                    ReferenceKind.PROPERTY_TYPE.label shouldBe "property type"
+                    ReferenceKind.PARAMETER_TYPE.label shouldBe "parameter type"
+                    ReferenceKind.RETURN_TYPE.label shouldBe "return type"
                 }
             }
         }

@@ -13,10 +13,13 @@ import zone.clanker.gradle.srcx.model.ArtifactGroup
 import zone.clanker.gradle.srcx.model.ArtifactName
 import zone.clanker.gradle.srcx.model.ArtifactVersion
 import zone.clanker.gradle.srcx.model.DependencyEntry
+import zone.clanker.gradle.srcx.model.FileFacts
 import zone.clanker.gradle.srcx.model.FilePath
 import zone.clanker.gradle.srcx.model.PackageName
 import zone.clanker.gradle.srcx.model.ProjectPath
 import zone.clanker.gradle.srcx.model.ProjectSummary
+import zone.clanker.gradle.srcx.model.Reference
+import zone.clanker.gradle.srcx.model.SourceSetName
 import zone.clanker.gradle.srcx.model.SourceSetSummary
 import zone.clanker.gradle.srcx.model.Symbol
 import zone.clanker.gradle.srcx.model.SymbolDetailKind
@@ -33,6 +36,7 @@ import java.io.File
  * Extracts symbols (classes, functions, properties) from source directories
  * and dependencies from build files or the Gradle configuration API.
  */
+@Suppress("TooManyFunctions")
 object SymbolExtractor {
     private val logger =
         org.gradle.api.logging.Logging
@@ -61,17 +65,11 @@ object SymbolExtractor {
     /** Minimum number of colon-separated parts in a Maven coordinate (group:artifact:version). */
     private const val MIN_COORDINATE_PARTS = 3
 
+    private const val DEFAULT_BUILD_NAME = "root"
+
     /** Extract symbols from source directories using PSI parsing. */
     internal fun extractSymbolsFromDirs(dirs: List<File>): List<SymbolEntry> {
-        val sourceFiles =
-            dirs
-                .filter { it.exists() }
-                .flatMap { dir ->
-                    dir
-                        .walkTopDown()
-                        .filter { it.isFile && it.extension in SUPPORTED_EXTENSIONS }
-                        .toList()
-                }
+        val sourceFiles = collectSourceFiles(dirs)
         if (sourceFiles.isEmpty()) return emptyList()
 
         val env = PsiEnvironment.shared() ?: return emptyList()
@@ -79,18 +77,26 @@ object SymbolExtractor {
             val parser = PsiParser(env)
             sourceFiles.flatMap { file ->
                 val sourceDir = dirs.first { file.startsWith(it) }
-                runCatching {
-                    parser.extractDeclarations(file).map { symbol ->
-                        symbol.toEntry(sourceDir)
-                    }
-                }.onFailure { e ->
-                    logger.warn("srcx: Symbol extraction failed for '${file.name}': ${e.message}", e)
-                }.getOrDefault(emptyList())
+                extractFacts(parser, file).declarations.map { symbol -> symbol.toEntry(sourceDir) }
             }
         }
     }
 
     private val SUPPORTED_EXTENSIONS = setOf("kt", "java", "kts")
+
+    private fun collectSourceFiles(dirs: List<File>): List<File> =
+        dirs
+            .filter { it.exists() }
+            .flatMap { dir ->
+                dir.walkTopDown().filter { it.isFile && it.extension in SUPPORTED_EXTENSIONS }.toList()
+            }.distinctBy { it.absolutePath }
+            .sortedBy { it.absolutePath }
+
+    private fun extractFacts(parser: PsiParser, file: File): FileFacts =
+        runCatching { parser.extractFacts(file) }
+            .onFailure { error ->
+                logger.warn("srcx: Symbol extraction failed for '${file.name}': ${error.message}", error)
+            }.getOrDefault(FileFacts(emptyList(), emptyList()))
 
     /** Convert a PSI [Symbol] to a [SymbolEntry] for the report pipeline. */
     private fun Symbol.toEntry(sourceDir: File): SymbolEntry =
@@ -111,50 +117,25 @@ object SymbolExtractor {
     internal fun extractProjectSummary(
         project: Project,
         rootProject: Project,
-    ): ProjectSummary {
-        val sourceSets = ProjectScanner.discoverSourceSets(project.projectDir)
-        val allSymbols = mutableListOf<SymbolEntry>()
-        val sourceSetSummaries = mutableListOf<SourceSetSummary>()
+    ): ProjectSummary = extractProjectScan(project, rootProject).summary
 
-        for (sourceSetName in sourceSets) {
-            val dirs = ProjectScanner.sourceSetDirs(project.projectDir, sourceSetName.value)
-            val symbols = extractSymbolsFromDirs(dirs)
-            allSymbols.addAll(symbols)
-            val dirNames = dirs.filter { it.exists() }.map { it.relativeTo(project.projectDir).path }
-            sourceSetSummaries.add(SourceSetSummary(sourceSetName, symbols, dirNames))
-        }
-
-        val allSourceDirNames =
-            sourceSets.flatMap { ssName ->
-                ProjectScanner
-                    .sourceSetDirs(project.projectDir, ssName.value)
-                    .filter { it.exists() }
-                    .map { it.relativeTo(project.projectDir).path }
-            }
-
-        val dependencies = extractDependenciesFromProject(project)
-        val buildFileName = ProjectScanner.buildFileName(project)
+    /** Extract raw project facts using the Gradle Project API. */
+    internal fun extractProjectScan(
+        project: Project,
+        rootProject: Project,
+    ): ProjectScan {
         val subprojectPaths =
             if (project == rootProject) {
-                rootProject.subprojects.map { it.path }
+                rootProject.subprojects.map { it.path }.sorted()
             } else {
                 emptyList()
             }
-        val allDirs = sourceSets.flatMap { ProjectScanner.sourceSetDirs(project.projectDir, it.value) }
-        val projectAnalysis =
-            runCatching {
-                analyzeProject(allDirs, project.projectDir).toSummary()
-            }.getOrElse { e -> handleAnalysisFailure(e, project.name) }
-
-        return ProjectSummary(
-            projectPath = ProjectPath(project.path),
-            symbols = allSymbols,
-            dependencies = dependencies,
-            buildFile = buildFileName,
-            sourceDirs = allSourceDirNames,
-            subprojects = subprojectPaths,
-            sourceSets = sourceSetSummaries,
-            analysis = projectAnalysis,
+        return scanProject(
+            projectDir = project.projectDir,
+            projectPath = project.path,
+            subprojectPaths = subprojectPaths,
+            dependencies = extractDependenciesFromProject(project),
+            build = rootProject.name,
         )
     }
 
@@ -164,41 +145,177 @@ object SymbolExtractor {
         projectPath: String,
         subprojectPaths: List<String>,
         dependencies: List<DependencyEntry>,
-    ): ProjectSummary {
+    ): ProjectSummary =
+        extractProjectScanFromData(projectDir, projectPath, subprojectPaths, dependencies).summary
+
+    /** Extract raw project facts from configuration-time data for a root build project. */
+    internal fun extractProjectScanFromData(
+        projectDir: File,
+        projectPath: String,
+        subprojectPaths: List<String>,
+        dependencies: List<DependencyEntry>,
+        build: String = DEFAULT_BUILD_NAME,
+    ): ProjectScan = scanProject(projectDir, projectPath, subprojectPaths, dependencies, build)
+
+    /** Extract a project summary from a standalone directory (not backed by Gradle Project API). */
+    internal fun extractStandaloneProjectSummary(
+        projectDir: File,
+        projectPath: String,
+    ): ProjectSummary = extractStandaloneProjectScan(projectDir, projectPath).summary
+
+    /** Extract raw project facts from a standalone included-build project. */
+    internal fun extractStandaloneProjectScan(
+        projectDir: File,
+        projectPath: String,
+        build: String = projectDir.name,
+    ): ProjectScan =
+        scanProject(
+            projectDir = projectDir,
+            projectPath = projectPath,
+            subprojectPaths = emptyList(),
+            dependencies = extractDependenciesFromBuildFile(projectDir),
+            build = build,
+        )
+
+    private fun scanProject(
+        projectDir: File,
+        projectPath: String,
+        subprojectPaths: List<String>,
+        dependencies: List<DependencyEntry>,
+        build: String,
+    ): ProjectScan {
         val sourceSets = ProjectScanner.discoverSourceSets(projectDir)
-        val allSymbols = mutableListOf<SymbolEntry>()
-        val sourceSetSummaries = mutableListOf<SourceSetSummary>()
+        val files = scanProjectFiles(projectDir, sourceSets)
+        val summary = buildProjectSummary(projectDir, projectPath, subprojectPaths, dependencies, sourceSets, files)
+        return ProjectScan(
+            build = build,
+            projectPath = ProjectPath(projectPath),
+            files = files,
+            summary = summary,
+        )
+    }
 
-        for (sourceSetName in sourceSets) {
-            val dirs = ProjectScanner.sourceSetDirs(projectDir, sourceSetName.value)
-            val symbols = extractSymbolsFromDirs(dirs)
-            allSymbols.addAll(symbols)
-            val dirNames = dirs.filter { it.exists() }.map { it.relativeTo(projectDir).path }
-            sourceSetSummaries.add(SourceSetSummary(sourceSetName, symbols, dirNames))
-        }
-
-        val allSourceDirNames =
-            sourceSets.flatMap { ssName ->
-                ProjectScanner
-                    .sourceSetDirs(projectDir, ssName.value)
-                    .filter { it.exists() }
-                    .map { it.relativeTo(projectDir).path }
+    private fun scanProjectFiles(
+        projectDir: File,
+        sourceSets: List<SourceSetName>,
+    ): List<ProjectFileScan> {
+        val sourceFiles =
+            sourceSets.flatMap { sourceSet ->
+                collectSourceFiles(ProjectScanner.sourceSetDirs(projectDir, sourceSet.value)).map { sourceSet to it }
             }
+        if (sourceFiles.isEmpty()) return emptyList()
 
-        val buildFileName = buildFileNameFromDir(projectDir)
+        val env = PsiEnvironment.shared()
+        val scans =
+            if (env == null) {
+                sourceFiles.map { (sourceSet, file) ->
+                    scanSourceFile(
+                        projectDir = projectDir,
+                        sourceSet = sourceSet,
+                        file = file,
+                        parser = null,
+                    )
+                }
+            } else {
+                synchronized(env) {
+                    val parser = PsiParser(env)
+                    sourceFiles.map { (sourceSet, file) ->
+                        scanSourceFile(
+                            projectDir = projectDir,
+                            sourceSet = sourceSet,
+                            file = file,
+                            parser = parser,
+                        )
+                    }
+                }
+            }
+        return scans.sortedWith(
+            compareBy<ProjectFileScan> { sourceSets.indexOf(it.sourceSet) }
+                .thenBy { it.projectRelativeFile },
+        )
+    }
+
+    private fun scanSourceFile(
+        projectDir: File,
+        sourceSet: SourceSetName,
+        file: File,
+        parser: PsiParser?,
+    ): ProjectFileScan {
+        val sourceText = file.readText(charset = Charsets.UTF_8)
+        val facts =
+            parser?.let { activeParser ->
+                extractFacts(
+                    parser = activeParser,
+                    file = file,
+                )
+            } ?: FileFacts(
+                declarations = emptyList(),
+                references = emptyList(),
+            )
+        return ProjectFileScan(
+            sourceSet = sourceSet,
+            projectRelativeFile =
+                file
+                    .relativeTo(base = projectDir)
+                    .path
+                    .replace(
+                        oldChar = File.separatorChar,
+                        newChar = '/',
+                    ),
+            declarations = facts.declarations.sortedWith(declarationFactComparator),
+            references = facts.references.sortedWith(referenceFactComparator),
+            sourceText = sourceText,
+        )
+    }
+
+    private val declarationFactComparator =
+        compareBy<Symbol> { it.line }
+            .thenBy { it.qualifiedName }
+            .thenBy { it.kind.name }
+
+    private val referenceFactComparator =
+        compareBy<Reference> { it.line }
+            .thenBy { it.kind.name }
+            .thenBy { it.sourceQualifiedName.orEmpty() }
+            .thenBy { it.targetQualifiedName.orEmpty() }
+            .thenBy { it.targetName }
+            .thenBy { it.context }
+
+    @Suppress("LongParameterList")
+    private fun buildProjectSummary(
+        projectDir: File,
+        projectPath: String,
+        subprojectPaths: List<String>,
+        dependencies: List<DependencyEntry>,
+        sourceSets: List<SourceSetName>,
+        files: List<ProjectFileScan>,
+    ): ProjectSummary {
+        val sourceSetSummaries =
+            sourceSets.map { sourceSet ->
+                val dirs = ProjectScanner.sourceSetDirs(projectDir, sourceSet.value)
+                val symbols =
+                    files
+                        .filter { it.sourceSet == sourceSet }
+                        .flatMap { scan ->
+                            scan.declarations.map { symbol ->
+                                val sourceDir = dirs.firstOrNull { symbol.file.startsWith(it) } ?: projectDir
+                                symbol.toEntry(sourceDir)
+                            }
+                        }
+                val dirNames = dirs.filter { it.exists() }.map { it.relativeTo(projectDir).path }
+                SourceSetSummary(sourceSet, symbols, dirNames)
+            }
         val allDirs = sourceSets.flatMap { ProjectScanner.sourceSetDirs(projectDir, it.value) }
         val projectAnalysis =
-            runCatching {
-                analyzeProject(allDirs, projectDir).toSummary()
-            }.getOrElse { e -> handleAnalysisFailure(e, projectDir.name) }
-
+            runCatching { analyzeProject(allDirs, projectDir).toSummary() }
+                .getOrElse { error -> handleAnalysisFailure(error, projectDir.name) }
         return ProjectSummary(
             projectPath = ProjectPath(projectPath),
-            symbols = allSymbols,
+            symbols = sourceSetSummaries.flatMap { it.symbols },
             dependencies = dependencies,
-            buildFile = buildFileName,
-            sourceDirs = allSourceDirNames,
-            subprojects = subprojectPaths,
+            buildFile = buildFileNameFromDir(projectDir),
+            sourceDirs = sourceSetSummaries.flatMap { it.sourceDirs },
+            subprojects = subprojectPaths.sorted(),
             sourceSets = sourceSetSummaries,
             analysis = projectAnalysis,
         )
@@ -210,61 +327,6 @@ object SymbolExtractor {
             File(projectDir, "build.gradle").exists() -> "build.gradle"
             else -> "none"
         }
-
-    /** Extract a project summary from a standalone directory (not backed by Gradle Project API). */
-    internal fun extractStandaloneProjectSummary(
-        projectDir: File,
-        projectPath: String,
-    ): ProjectSummary {
-        val sourceSets = ProjectScanner.discoverSourceSets(projectDir)
-        val allSymbols = mutableListOf<SymbolEntry>()
-        val sourceSetSummaries = mutableListOf<SourceSetSummary>()
-
-        for (sourceSetName in sourceSets) {
-            val dirs = ProjectScanner.sourceSetDirs(projectDir, sourceSetName.value)
-            val symbols = extractSymbolsFromDirs(dirs)
-            allSymbols.addAll(symbols)
-            val dirNames = dirs.filter { it.exists() }.map { it.relativeTo(projectDir).path }
-            sourceSetSummaries.add(SourceSetSummary(sourceSetName, symbols, dirNames))
-        }
-
-        val buildFileName =
-            when {
-                File(projectDir, "build.gradle.kts").exists() -> "build.gradle.kts"
-                File(projectDir, "build.gradle").exists() -> "build.gradle"
-                else -> "none"
-            }
-
-        val allSourceDirNames =
-            sourceSets.flatMap { ssName ->
-                ProjectScanner
-                    .sourceSetDirs(projectDir, ssName.value)
-                    .filter { it.exists() }
-                    .map { it.relativeTo(projectDir).path }
-            }
-
-        // Subprojects are discovered by the caller via Gradle API
-        val subprojects = emptyList<String>()
-
-        val dependencies = extractDependenciesFromBuildFile(projectDir)
-
-        val allDirs = sourceSets.flatMap { ProjectScanner.sourceSetDirs(projectDir, it.value) }
-        val projectAnalysis =
-            runCatching {
-                analyzeProject(allDirs, projectDir).toSummary()
-            }.getOrElse { e -> handleAnalysisFailure(e, projectDir.name) }
-
-        return ProjectSummary(
-            projectPath = ProjectPath(projectPath),
-            symbols = allSymbols,
-            dependencies = dependencies,
-            buildFile = buildFileName,
-            sourceDirs = allSourceDirNames,
-            subprojects = subprojects,
-            sourceSets = sourceSetSummaries,
-            analysis = projectAnalysis,
-        )
-    }
 
     /** Call expressions in build files that are not dependency declarations. */
     private val PSI_SKIP_CALLS =
@@ -281,6 +343,7 @@ object SymbolExtractor {
         )
 
     /** Extract dependencies from a build file by parsing dependency declarations with PSI. */
+    @Suppress("UnreachableCode")
     internal fun extractDependenciesFromBuildFile(
         projectDir: File,
         excludeScopes: Set<String> = DEFAULT_EXCLUDED_DEP_SCOPES,

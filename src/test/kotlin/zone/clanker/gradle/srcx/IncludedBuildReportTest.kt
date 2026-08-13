@@ -198,7 +198,7 @@ class IncludedBuildReportTest :
             }
         }
 
-        given("generateIncludedBuildReportsFromData") {
+        given("writeIncludedBuildReports") {
 
             `when`("generating from pre-computed data") {
                 val buildDir = tempDir()
@@ -214,9 +214,14 @@ class IncludedBuildReportTest :
                         relPath = "../mylib",
                         projects = listOf(":" to buildDir),
                     )
+                val summary = SymbolExtractor.extractStandaloneProjectSummary(buildDir, ":")
 
                 ReportWriter
-                    .generateIncludedBuildReportsFromData(listOf(info), ".srcx")
+                    .writeIncludedBuildReports(
+                        buildDirectories = mapOf(info.name to info.dir),
+                        summariesByBuild = mapOf("mylib" to listOf(summary)),
+                        outputDir = ".srcx",
+                    )
 
                 then("it creates context.md for the included build") {
                     File(buildDir, ".srcx/context.md").shouldExist()
