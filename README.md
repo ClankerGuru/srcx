@@ -15,6 +15,21 @@ current codebase context.
 > **Recommended skill:** Use the plugin and task guides in [`skills/`](skills/README.md) when generating or consuming
 > SRCX context from an AI coding agent.
 
+## Repository modules
+
+The root build is an aggregator; production code and its tests belong to the module that owns the published artifact.
+
+```text
+srcx/
+├── srcx-gradle-plugin/       # SRCX analysis engine and Gradle settings plugin
+├── docx-gradle-plugin/       # DOCX report configuration and Gradle settings plugin
+├── docx-web/                 # Precompiled Kotlin/Wasm workspace report viewer
+├── docx-service/             # Optional headless multi-workspace HTTP host
+├── docx-index/               # Generation-versioned SQLite query index
+├── workspace-report-model/  # Shared, renderer-neutral serialized workspace contract
+└── build-logic/              # Private Java 17 conventions for the repository modules
+```
+
 ## Quick start
 
 ```kotlin
@@ -34,6 +49,67 @@ srcx {
 ./gradlew srcx-context      # generate context report
 ./gradlew srcx-clean        # delete all .srcx output
 ```
+
+## DOCX static report
+
+DOCX consumes the renderer-neutral snapshot written by `srcx-context` and installs a verified static report at
+`.docx/index.html`. The Kotlin/Wasm viewer is compiled and production-optimized when this repository builds; a consumer
+workspace copies the distribution bundled in the DOCX plugin and does not compile Wasm or install npm dependencies.
+
+```kotlin
+// settings.gradle.kts
+plugins {
+    id("zone.clanker.gradle.srcx") version "<version>"
+    id("zone.clanker.gradle.docx") version "<version>"
+}
+
+docx {
+    preset.set(DocxPreset.FULL)
+    updates {
+        mode.set(DocxUpdateMode.ASYNC)
+        liveReload.set(true)
+    }
+}
+```
+
+```bash
+./gradlew docx-plan    # write the deterministic, serialized projection plan
+./gradlew docx-site    # produce and atomically publish the static report
+./gradlew docx-open    # serve it on an OS-assigned loopback port until Ctrl-C
+./gradlew docx-status  # print the typed last-known publication status
+```
+
+The first vertical slice is static: `docx-site` is the synchronous generation path, and the update policy is recorded in
+the plan for the later incremental lifecycle. Optional kRPC live mode is not started or required. JSON crossing the
+SRCX, DOCX, and browser boundaries is encoded and decoded through the shared Kotlin serialization model.
+The measured pre-incremental build and artifact baseline is retained in
+[`docs/docx-first-slice-baseline.md`](docs/docx-first-slice-baseline.md).
+
+For optional multi-workspace hosting, static deployment, update behavior, ports, authentication, and SQLite query
+architecture, see [`docs/docx-workspace-service.md`](docs/docx-workspace-service.md). The service is headless and
+optional; a generated `.docx/` directory remains independently deployable.
+
+### Opt-in real composite demo
+
+The repository includes a gated demo materializer for measuring DOCX against substantial local Gradle builds without
+writing `.srcx`, `.docx`, or Gradle state into those source checkouts. It copies only source/configuration inputs into
+`build/realCompositeDemo`, excluding generated and VCS directories. The `standard` profile uses the seven repositories
+in `foo-bar-workspace-repos/dev`; `large` also includes `catalog` and `gort`.
+
+```bash
+JAVA_HOME=/path/to/jetbrains-jdk-17 ./gradlew :docx-web:prepareDocxRealCompositeDemo \
+  -Pdocx.realComposite.root=/path/to/clanker \
+  -Pdocx.realComposite.profile=large
+
+JAVA_HOME=/path/to/jetbrains-jdk-17 /path/to/gradle -p build/realCompositeDemo \
+  srcx-context docx-site --no-daemon --console=plain
+```
+
+This profile is deliberately opt-in: normal `build`, `check`, `srcx-context`, and `docx-site` tasks do not materialize
+or scan these repositories. Both commands fail fast unless Gradle itself is running on JetBrains JDK 17. The first
+scan may need network access to populate the normal Gradle dependency cache; later unchanged scans can add
+`--offline`. Reuse the materialized directory between scans because rematerializing intentionally removes copied
+build outputs. The generated `.docx/` remains a static, deployable report after the scan completes.
 
 ## Generated reports
 

@@ -4,6 +4,7 @@ build/
 .idea/
 out/
 .kotlin/
+.docx/
 .DS_Store
 *.hprof
 local.properties

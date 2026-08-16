@@ -9,7 +9,9 @@ repositories {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:${embeddedKotlinVersion}")
+    implementation("org.jetbrains.kotlin:compose-compiler-gradle-plugin:${embeddedKotlinVersion}")
     implementation("org.jetbrains.kotlin:kotlin-serialization:${embeddedKotlinVersion}")
+    implementation("org.jetbrains.compose:compose-gradle-plugin:1.10.3")
     implementation("com.vanniktech:gradle-maven-publish-plugin:0.36.0")
     implementation("org.gradle.toolchains:foojay-resolver:1.0.0")
     implementation("org.jetbrains.kotlinx:kover-gradle-plugin:0.9.1")

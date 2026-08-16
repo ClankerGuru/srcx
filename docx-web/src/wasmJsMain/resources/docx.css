@@ -1,0 +1,1076 @@
+:root {
+    color-scheme: light;
+    font-synthesis: none;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    overflow: hidden;
+}
+
+#docx-app {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#docx-app > canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+template {
+    display: none;
+}
+
+.docx-atlas-interop-host {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+[data-docx-atlas-surface] {
+    width: calc(100% - 12px);
+    height: calc(100% - 14px);
+    min-width: 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overflow-anchor: none;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+[data-docx-atlas-surface] > link {
+    display: none;
+}
+
+[data-docx-atlas-host] {
+    min-height: 420px;
+    overflow: hidden;
+    position: relative;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    > .srcx-dashboard__architecture-graph-head {
+    position: absolute;
+    inset-inline-end: 12px;
+    inset-block-end: 12px;
+    z-index: 14;
+    inline-size: auto;
+    max-inline-size: min(72ch, calc(100% - 24px));
+    min-block-size: 0;
+    padding: 7px 10px;
+    pointer-events: none;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    > .srcx-dashboard__architecture-viewport {
+    position: absolute;
+    inset: 0;
+    block-size: 100% !important;
+    inline-size: 100%;
+    max-block-size: none;
+    min-block-size: 0;
+}
+
+.srcx-dashboard__architecture-canvas[data-docx-atlas-canvas] {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    z-index: 0;
+    touch-action: none;
+    outline: none;
+    cursor: grab;
+}
+
+/* The dev-001 SVG remains available as the fallback, but it must never cover the active Canvas. */
+[data-docx-atlas-host][data-docx-atlas-renderer="canvas"] > .srcx-dashboard__architecture-svg {
+    display: none !important;
+    pointer-events: none !important;
+}
+
+.srcx-dashboard__architecture-canvas[data-docx-atlas-canvas]:focus-visible {
+    outline: 3px solid var(--srcx-accent);
+    outline-offset: -3px;
+}
+
+[data-docx-atlas-host] > .srcx-dashboard__architecture-chart-controls,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-map-toolbar,
+[data-docx-atlas-host] > .srcx-global-search,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-layers-sheet,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-history-toolbar,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-fallback,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-detail-resize,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-detail {
+    z-index: 16;
+}
+
+[data-docx-atlas-host] > .srcx-dashboard__architecture-map-toolbar,
+[data-docx-atlas-host] > .srcx-global-search,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-layers-sheet,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-history-toolbar,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-detail-resize,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-detail {
+    z-index: 32;
+}
+
+[data-docx-atlas-host] > .srcx-dashboard__architecture-map-toolbar,
+[data-docx-atlas-host] > .srcx-global-search,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-layers-sheet,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-filters-sheet,
+[data-docx-atlas-host] > .srcx-dashboard__architecture-history-toolbar {
+    z-index: 80;
+}
+
+/* Keep the map controls usable while source evidence is open. */
+[data-docx-atlas-surface] [data-docx-atlas-host] > .srcx-dashboard__architecture-detail,
+[data-docx-atlas-surface] [data-docx-atlas-host] > .srcx-dashboard__architecture-detail-resize {
+    inset-block-start: 64px;
+}
+
+.srcx-global-search {
+    position: absolute;
+    inset-block-start: 12px;
+    inset-inline-start: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+    inline-size: min(660px, calc(100% - 520px));
+    min-inline-size: 320px;
+    max-block-size: calc(100% - 88px);
+    padding: 8px;
+    overflow: hidden;
+    border: 3px solid var(--srcx-ink, #181818);
+    border-radius: 0;
+    background: var(--srcx-paper, #f6f1e6);
+    box-shadow: 6px 6px 0 var(--srcx-ink, #181818);
+    color: var(--srcx-ink, #181818);
+}
+
+.srcx-global-search__input {
+    grid-column: 1 / -1;
+    min-block-size: 44px;
+    min-inline-size: 0;
+    padding-inline: 12px;
+    border: 2px solid var(--srcx-ink, #181818);
+    border-radius: 0;
+    background: #fffdf7;
+    color: var(--srcx-ink, #181818);
+    font: 700 12px/1.2 var(--srcx-font-mono, monospace);
+}
+
+.srcx-global-search__prefixes {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-inline-size: 0;
+    overflow: hidden;
+}
+
+.srcx-global-search button {
+    min-block-size: 44px;
+    padding-inline: 10px;
+    border: 2px solid var(--srcx-ink, #181818);
+    border-radius: 0;
+    background: var(--srcx-paper, #f6f1e6);
+    color: var(--srcx-ink, #181818);
+    font: 800 10px/1 var(--srcx-font-mono, monospace);
+}
+
+.srcx-global-search button[aria-pressed="true"],
+.srcx-global-search__target[aria-selected="true"] {
+    background: var(--srcx-accent, #53c7e8);
+    box-shadow: 3px 3px 0 var(--srcx-ink, #181818);
+}
+
+.srcx-global-search__selection,
+.srcx-global-search__status {
+    align-self: center;
+    margin: 0;
+    font: 800 10px/1.3 var(--srcx-font-mono, monospace);
+    text-transform: uppercase;
+}
+
+.srcx-global-search__results {
+    grid-column: 1 / -1;
+    position: relative;
+    max-block-size: min(430px, calc(100dvh - 230px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overflow-block: auto;
+    overflow-inline: hidden;
+    border-block-start: 2px solid var(--srcx-ink, #181818);
+    scrollbar-gutter: stable;
+}
+
+.srcx-global-search__virtual-canvas {
+    position: relative;
+    inline-size: 100%;
+    min-inline-size: 0;
+}
+
+.srcx-global-search__group {
+    position: absolute;
+    inset-inline: 0;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-rows: 14px minmax(0, 1fr);
+    gap: 4px;
+    block-size: 72px;
+    padding-block: 3px;
+    overflow: hidden;
+}
+
+.srcx-global-search__group::after {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    block-size: 2px;
+    background: var(--srcx-ink, #181818);
+    content: "";
+}
+
+.srcx-global-search__group-title {
+    margin: 0;
+    font: 900 10px/1 var(--srcx-font-mono, monospace);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.srcx-global-search__result {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 6px;
+    min-inline-size: 0;
+}
+
+.srcx-global-search__target {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-items: start;
+    min-inline-size: 0;
+    text-align: start;
+}
+
+.srcx-global-search__label,
+.srcx-global-search__detail {
+    grid-column: 1;
+}
+
+.srcx-global-search__badges {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    align-self: center;
+    gap: 4px;
+}
+
+.srcx-global-search__badge {
+    padding: 3px 5px;
+    border: 1px solid currentColor;
+    background: color-mix(in srgb, var(--srcx-accent, #53c7e8) 18%, transparent);
+    font: 900 8px/1 var(--srcx-font-mono, monospace);
+    white-space: nowrap;
+}
+
+.srcx-global-search__label,
+.srcx-global-search__detail {
+    max-inline-size: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.srcx-global-search[data-srcx-global-search-open="false"] {
+    grid-template-columns: minmax(0, 1fr);
+    inline-size: min(520px, calc(100% - 520px));
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.srcx-global-search[data-srcx-global-search-open="false"]
+    > :not(.srcx-global-search__input) {
+    display: none;
+}
+
+.srcx-dashboard__architecture-layers-sheet {
+    position: absolute;
+    inset-block-start: 58px;
+    inset-inline-end: 12px;
+    inline-size: min(320px, calc(100% - 24px));
+    max-block-size: calc(100% - 128px);
+    overflow: auto;
+    border: 3px solid var(--srcx-ink, #181818);
+    background: var(--srcx-paper, #f6f1e6);
+    box-shadow: 7px 7px 0 var(--srcx-ink, #181818);
+    color: var(--srcx-ink, #181818);
+    padding: 12px;
+}
+
+.srcx-dashboard__architecture-layers-sheet[hidden] {
+    display: none;
+}
+
+.srcx-dashboard__architecture-layers-sheet > header {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-block-end: 12px;
+    padding-block-end: 10px;
+    border-block-end: 2px solid var(--srcx-ink, #181818);
+}
+
+.srcx-dashboard__architecture-layers-sheet > header div {
+    display: grid;
+    gap: 2px;
+}
+
+.srcx-dashboard__architecture-layers-sheet > header span {
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.srcx-dashboard__architecture-layers-sheet > header strong {
+    font-size: 18px;
+    text-transform: uppercase;
+}
+
+.srcx-dashboard__architecture-layers-sheet button,
+.srcx-dashboard__architecture-history-toolbar button {
+    min-block-size: 44px;
+    border: 2px solid var(--srcx-ink, #181818);
+    border-radius: 0;
+    background: var(--srcx-paper, #f6f1e6);
+    color: var(--srcx-ink, #181818);
+    font: 800 11px/1 var(--srcx-font-mono, monospace);
+}
+
+.srcx-dashboard__architecture-layer-presets,
+.srcx-dashboard__architecture-layer-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.srcx-dashboard__architecture-layer-presets {
+    margin-block-end: 12px;
+}
+
+.srcx-dashboard__architecture-layer-button[aria-pressed="true"] {
+    background: var(--srcx-accent, #53c7e8);
+    box-shadow: 3px 3px 0 var(--srcx-ink, #181818);
+}
+
+[data-docx-atlas-surface] [data-docx-atlas-host] > .srcx-dashboard__architecture-history-toolbar {
+    position: absolute;
+    inset-inline-start: 12px;
+    inset-block-end: 12px;
+    display: flex;
+    align-items: stretch;
+    max-inline-size: calc(100% - 24px);
+    border: 2px solid var(--srcx-ink, #181818);
+    background: var(--srcx-paper, #f6f1e6);
+    box-shadow: 5px 5px 0 var(--srcx-ink, #181818);
+}
+
+.srcx-dashboard__architecture-history-toolbar > button {
+    inline-size: 44px;
+    border: 0;
+    border-inline-end: 2px solid var(--srcx-ink, #181818);
+}
+
+.srcx-dashboard__architecture-history-toolbar > button:disabled {
+    opacity: 0.38;
+}
+
+.srcx-dashboard__architecture-history-toolbar > div {
+    display: flex;
+    min-inline-size: 0;
+    max-inline-size: min(58vw, 720px);
+    overflow: hidden;
+}
+
+.srcx-dashboard__architecture-breadcrumb-button {
+    inline-size: auto;
+    padding-inline: 12px;
+    max-inline-size: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 0 !important;
+    border-inline-end: 1px solid var(--srcx-ink, #181818) !important;
+}
+
+.srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-map-toolbar,
+.srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-global-search,
+.srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-layers-sheet,
+.srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-history-toolbar,
+.srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-detail,
+.srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-detail-resize {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .srcx-global-search,
+    .srcx-global-search[data-srcx-global-search-open="false"] {
+        inline-size: calc(100% - 80px);
+        min-inline-size: 0;
+    }
+
+    .srcx-dashboard__architecture-layers-sheet {
+        inset-block-start: 54px;
+    }
+
+    .srcx-dashboard__architecture-history-toolbar > div {
+        max-inline-size: calc(100vw - 170px);
+    }
+}
+
+.docx-boot {
+    min-height: 100%;
+    padding: 32px;
+    font-family: var(--srcx-font-mono);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-docx-atlas-surface] {
+        scroll-behavior: auto;
+    }
+}
+
+/* Host HUD: search left, semantic scope center, map tools right, and one transient sheet. */
+.srcx-theme[data-docx-atlas-surface] .srcx-dashboard__architecture-graph
+    .srcx-dashboard__architecture-chart-controls {
+    position: absolute;
+    inset-block-start: 12px;
+    inset-inline-start: 50%;
+    inset-inline-end: auto;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    display: block;
+    inline-size: min(380px, 30vw);
+    width: min(380px, 30vw);
+    block-size: 44px;
+    min-inline-size: 300px;
+    max-block-size: 44px;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    pointer-events: none;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-control-bar {
+    display: block;
+    inline-size: 100%;
+    block-size: 44px;
+    min-block-size: 44px;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    pointer-events: auto;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-stepper {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    inline-size: 100%;
+    block-size: 44px;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-stepper > button {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 1fr;
+    align-items: center;
+    gap: 6px;
+    min-inline-size: 0;
+    min-block-size: 44px;
+    block-size: 44px;
+    padding: 5px 8px;
+    overflow: hidden;
+    border: 2px solid var(--srcx-ink, #181818);
+    border-radius: 0;
+    background: var(--srcx-paper, #f6f1e6);
+    box-shadow: 3px 3px 0 var(--srcx-ink, #181818);
+    color: var(--srcx-ink, #181818);
+    font: 900 10px/1 var(--srcx-font-mono, monospace);
+    text-align: start;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-stepper > button > span,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-stepper > button > strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-stepper > button > span {
+    text-transform: uppercase;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-stepper > button > strong {
+    max-inline-size: 7ch;
+    padding: 3px 5px;
+    background: color-mix(in srgb, var(--srcx-accent, #53c7e8) 24%, var(--srcx-paper, #f6f1e6));
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-stepper > button > small {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-stepper > button[aria-expanded="true"] {
+    background: var(--srcx-accent-container, #d9f3fb);
+    box-shadow: 5px 5px 0 var(--srcx-ink, #181818);
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-navigator {
+    position: absolute;
+    inset-block-start: 50px;
+    inset-inline-start: 50%;
+    transform: translateX(-50%);
+    display: block;
+    inline-size: min(680px, calc(100vw - 24px));
+    max-block-size: min(306px, calc(100dvh - 70px));
+    min-inline-size: 0;
+    overflow: visible;
+    pointer-events: auto;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-navigator
+    .srcx-dashboard__architecture-filter-bar {
+    inline-size: 100%;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-control
+    .srcx-dashboard__architecture-filter-rail {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-control
+    .srcx-dashboard__architecture-virtual-canvas,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-scope-control
+    .srcx-dashboard__architecture-filter-button {
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filter-context {
+    display: none;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-map-toolbar {
+    position: absolute;
+    inset-block-start: 12px;
+    inset-inline-end: 12px;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    inline-size: auto;
+    min-inline-size: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-map-toolbar > button {
+    inline-size: 40px;
+    min-inline-size: 40px;
+    block-size: 44px;
+    min-block-size: 44px;
+    padding: 0;
+    border: 2px solid var(--srcx-ink, #181818);
+    border-radius: 0;
+    background: var(--srcx-paper, #f6f1e6);
+    box-shadow: 3px 3px 0 var(--srcx-ink, #181818);
+    color: var(--srcx-ink, #181818);
+    font: 900 17px/1 var(--srcx-font-mono, monospace);
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-map-toolbar
+    > button[aria-expanded="true"],
+[data-docx-atlas-surface] .srcx-dashboard__architecture-map-toolbar
+    > button[aria-pressed="true"] {
+    background: var(--srcx-accent-container, #d9f3fb);
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-layers-sheet {
+    position: absolute;
+    inset-block-start: 62px;
+    inset-inline-end: 12px;
+    overflow: hidden;
+    border: 3px solid var(--srcx-ink, #181818);
+    border-radius: 0;
+    background: color-mix(in srgb, var(--srcx-paper, #f6f1e6) 98%, transparent);
+    box-shadow: 7px 7px 0 var(--srcx-ink, #181818);
+    color: var(--srcx-ink, #181818);
+    padding: 10px;
+    z-index: 32;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet {
+    inline-size: min(900px, calc(100% - 24px));
+    max-block-size: calc(100% - 74px);
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-layers-sheet {
+    inline-size: min(320px, calc(100% - 24px));
+    max-block-size: calc(100% - 74px);
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet[hidden],
+[data-docx-atlas-surface] .srcx-dashboard__architecture-layers-sheet[hidden] {
+    display: none !important;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet > header,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-layers-sheet > header {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 12px;
+    min-block-size: 40px;
+    margin: 0 0 8px;
+    padding: 0 0 8px;
+    border-block-end: 2px solid var(--srcx-ink, #181818);
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet > header div,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-layers-sheet > header div {
+    display: grid;
+    gap: 2px;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet > header span,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-layers-sheet > header span {
+    font: 900 9px/1 var(--srcx-font-mono, monospace);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet > header strong,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-layers-sheet > header strong {
+    font-size: 18px;
+    text-transform: uppercase;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet > header button,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-layers-sheet > header button {
+    inline-size: 38px;
+    min-inline-size: 38px;
+    block-size: 38px;
+    min-block-size: 38px;
+    padding: 0;
+    border: 2px solid var(--srcx-ink, #181818);
+    border-radius: 0;
+    background: var(--srcx-paper, #f6f1e6);
+    color: var(--srcx-ink, #181818);
+    font: 900 18px/1 var(--srcx-font-mono, monospace);
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    > .srcx-dashboard__architecture-controls {
+    display: grid;
+    grid-template-areas:
+        "lenses search"
+        "declarations relationships"
+        "count count"
+        "notice notice";
+    grid-template-columns: minmax(250px, 0.8fr) minmax(0, 1.2fr);
+    grid-template-rows: auto auto auto auto;
+    gap: 8px;
+    inline-size: 100%;
+    block-size: auto;
+    min-inline-size: 0;
+    max-block-size: none;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-lenses {
+    grid-area: lenses;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    min-inline-size: 0;
+    padding: 6px;
+    overflow: hidden;
+    border: 2px solid var(--srcx-ink, #181818);
+    background: var(--srcx-paper, #f6f1e6);
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-search {
+    grid-area: search;
+    display: grid;
+    grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.2fr);
+    gap: 6px;
+    min-inline-size: 0;
+    padding: 6px;
+    overflow: hidden;
+    border: 2px solid var(--srcx-ink, #181818);
+    background: var(--srcx-paper, #f6f1e6);
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-search-field,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-search-targets {
+    min-inline-size: 0;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-search-field {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 5px;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-search input {
+    inline-size: 100%;
+    min-inline-size: 0;
+    block-size: 34px;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-search-targets {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 5px;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-search-targets > header {
+    display: grid;
+    gap: 2px;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    [data-srcx-search-target-options],
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-declaration-filter-rail,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-kind-filter-rail,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    [data-srcx-relationship-count-presets],
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    [data-srcx-relationship-direction-options] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-inline-size: 0;
+    overflow: hidden;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    [data-srcx-control-strip="declarations"] {
+    grid-area: declarations;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    [data-srcx-control-strip="relationships"] {
+    grid-area: relationships;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    [data-srcx-control-strip="relationship-count"] {
+    grid-area: count;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-control-strip {
+    display: grid;
+    grid-template-columns: minmax(104px, 0.28fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    min-inline-size: 0;
+    padding: 6px;
+    overflow: hidden;
+    border: 2px solid var(--srcx-ink, #181818);
+    background: var(--srcx-paper, #f6f1e6);
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-control-strip > header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px;
+    min-inline-size: 0;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-control-strip > header > span {
+    grid-column: 1 / -1;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet button,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet input {
+    border-radius: 0;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-lenses button,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-filter-button,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-search-target-button,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-count-filter-button,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-direction-filter-button {
+    min-inline-size: 0;
+    min-block-size: 32px;
+    block-size: 32px;
+    padding: 4px 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-count-filter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 0.8fr);
+    gap: 6px;
+    align-items: center;
+    min-inline-size: 0;
+    overflow: hidden;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-count-filter > label {
+    display: grid;
+    grid-template-columns: max-content 56px;
+    align-items: center;
+    gap: 4px;
+    min-inline-size: 0;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-count-filter input {
+    inline-size: 56px;
+    block-size: 32px;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+    .srcx-dashboard__architecture-search-recovery {
+    grid-area: notice;
+    min-inline-size: 0;
+}
+
+[data-docx-atlas-surface] .srcx-global-search {
+    inline-size: min(660px, calc(100% - 24px));
+    min-inline-size: 280px;
+}
+
+[data-docx-atlas-surface] .srcx-global-search[data-srcx-global-search-open="false"] {
+    inline-size: clamp(260px, 24vw, 340px);
+    min-inline-size: 0;
+}
+
+[data-docx-atlas-surface] .srcx-global-search[data-srcx-global-search-open="true"] {
+    z-index: 48;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-chart-controls,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-global-search,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-filters-sheet,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-layers-sheet,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-history-toolbar,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-detail,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-detail-resize,
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-graph-head {
+    display: none !important;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-map-toolbar {
+    display: flex !important;
+}
+
+[data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+    .srcx-dashboard__architecture-map-toolbar > :not([data-srcx-chart-controls-toggle]) {
+    display: none !important;
+}
+
+@media (max-width: 1200px) {
+    [data-docx-atlas-surface] [data-docx-atlas-host] > .srcx-dashboard__architecture-detail,
+    [data-docx-atlas-surface] [data-docx-atlas-host] > .srcx-dashboard__architecture-detail-resize {
+        inset-block-start: 118px;
+    }
+
+    [data-docx-atlas-host][data-docx-atlas-renderer="d3"]
+        > .srcx-dashboard__architecture-svg {
+        inset-block-start: 118px;
+        block-size: calc(100% - 118px);
+        min-block-size: 0;
+    }
+
+    .srcx-theme[data-docx-atlas-surface] .srcx-dashboard__architecture-graph
+        .srcx-dashboard__architecture-chart-controls {
+        inset-block-start: 64px;
+        inline-size: min(520px, calc(100% - 24px));
+        width: min(520px, calc(100% - 24px));
+        min-inline-size: 0;
+    }
+
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-navigator {
+        max-block-size: min(306px, calc(100dvh - 122px));
+    }
+
+}
+
+@media (max-width: 760px) {
+    [data-docx-atlas-surface] .srcx-global-search,
+    [data-docx-atlas-surface] .srcx-global-search[data-srcx-global-search-open="false"] {
+        inline-size: calc(100% - 360px);
+        min-inline-size: 220px;
+    }
+
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-map-toolbar > button {
+        inline-size: 36px;
+        min-inline-size: 36px;
+    }
+
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+        > .srcx-dashboard__architecture-controls {
+        grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.28fr);
+    }
+
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+        .srcx-dashboard__architecture-search {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 620px) {
+    [data-docx-atlas-surface] [data-docx-atlas-host] > .srcx-dashboard__architecture-detail,
+    [data-docx-atlas-surface] [data-docx-atlas-host] > .srcx-dashboard__architecture-detail-resize {
+        inset-block-start: 166px;
+    }
+
+    [data-docx-atlas-surface] .srcx-global-search,
+    [data-docx-atlas-surface] .srcx-global-search[data-srcx-global-search-open="false"] {
+        inline-size: calc(100% - 24px);
+        min-inline-size: 0;
+    }
+
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-map-toolbar {
+        inset-block-start: 64px;
+        display: grid;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        gap: 3px;
+        inline-size: calc(100% - 24px);
+    }
+
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-map-toolbar > button {
+        inline-size: auto;
+        min-inline-size: 0;
+    }
+
+    .srcx-theme[data-docx-atlas-surface] .srcx-dashboard__architecture-graph
+        .srcx-dashboard__architecture-chart-controls {
+        inset-block-start: 116px;
+    }
+
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet,
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-layers-sheet {
+        inset-block-start: 166px;
+        max-block-size: calc(100% - 178px);
+    }
+
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+        > .srcx-dashboard__architecture-controls {
+        grid-template-areas:
+            "lenses"
+            "search"
+            "declarations"
+            "relationships"
+            "count"
+            "notice";
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+    }
+
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-filters-sheet
+        .srcx-dashboard__architecture-control-strip {
+        grid-template-columns: 96px minmax(0, 1fr);
+    }
+
+    [data-docx-atlas-surface] .srcx-dashboard__architecture-graph[data-srcx-chart-controls-state="collapsed"]
+        .srcx-dashboard__architecture-map-toolbar {
+        inset-block-start: 12px;
+        display: flex !important;
+        inline-size: auto;
+    }
+}

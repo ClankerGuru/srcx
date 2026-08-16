@@ -38,6 +38,12 @@ jobs:
         with:
           name: test-results
           path: |
-            build/reports/tests/
-            build/reports/kover/
+            docx-gradle-plugin/build/reports/tests/
+            docx-gradle-plugin/build/reports/kover/
+            docx-web/build/test-results/
+            docx-web/build/reports/tests/
+            srcx-gradle-plugin/build/reports/tests/
+            srcx-gradle-plugin/build/reports/kover/
+            workspace-report-model/build/reports/tests/
+            workspace-report-model/build/reports/kover/
           retention-days: 14

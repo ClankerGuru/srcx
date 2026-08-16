@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="color-scheme" content="light">
+        <title>DOCX Workspace Atlas</title>
+        <link rel="stylesheet" href="assets/atlas/theme.css">
+        <link rel="stylesheet" href="assets/atlas/dashboard.css">
+        <link rel="stylesheet" href="assets/docx.css">
+    </head>
+    <body class="srcx-theme">
+        <main id="docx-app" aria-live="polite">
+            <p class="srcx-page docx-boot">Loading workspace atlas…</p>
+        </main>
+
+        <template id="docx-atlas-template">
+            <div
+                class="srcx-theme srcx-page srcx-dashboard"
+                data-docx-atlas-surface
+                aria-label="DOCX workspace source documentation"
+            >
+                <link rel="stylesheet" href="assets/atlas/theme.css" data-docx-atlas-stylesheet="theme">
+                <link rel="stylesheet" href="assets/atlas/dashboard.css" data-docx-atlas-stylesheet="dashboard">
+                <link rel="stylesheet" href="assets/docx.css" data-docx-atlas-stylesheet="host">
+                <span data-docx-selected-project hidden></span>
+                <span data-docx-selected-build-file hidden></span>
+                <span data-docx-generation-label hidden></span>
+
+                <header class="srcx-masthead">
+                    <div class="srcx-masthead__brand">
+                        <strong>SRCX</strong>
+                        <span data-docx-workspace-name>Workspace</span>
+                    </div>
+                    <div class="srcx-masthead__folio">Workspace architecture / source evidence</div>
+                    <div class="srcx-status srcx-tone--success" data-docx-workspace-status>
+                        <i class="srcx-status__dot" aria-hidden="true"></i>
+                        <span data-docx-workspace-status-label>Scan complete</span>
+                    </div>
+                </header>
+
+                <section class="srcx-dashboard__hero" id="top">
+                    <div class="srcx-dashboard__hero-copy">
+                        <div>
+                            <p class="srcx-dashboard__overline">
+                                SRCX / Multi-build architecture report
+                            </p>
+                            <h1>Workspace <strong>atlas.</strong></h1>
+                        </div>
+                        <div class="srcx-dashboard__hero-summary">
+                            <div class="srcx-dashboard__hero-tags">
+                                <span class="srcx-tag srcx-tone--primary" data-docx-workspace-tag>Workspace</span>
+                                <span class="srcx-tag srcx-tone--secondary" data-docx-build-count-tag>0 builds</span>
+                                <span class="srcx-tag srcx-tone--accent">source relationships</span>
+                            </div>
+                            <p class="srcx-dashboard__dek">
+                                This report maps which build owns each file, which files reference one another,
+                                and where each finding came from.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <aside
+                    class="srcx-metric-strip srcx-dashboard__metric-strip"
+                    style="--srcx-metric-count: 4"
+                    aria-label="Workspace summary"
+                >
+                    <div class="srcx-metric-strip__lead">
+                        <strong>Workspace scan</strong>
+                        <span>Root + included builds</span>
+                    </div>
+                    <div class="srcx-metric srcx-tone--primary">
+                        <strong data-docx-project-count>0</strong>
+                        <span>Projects</span>
+                    </div>
+                    <div class="srcx-metric srcx-tone--secondary">
+                        <strong data-docx-symbol-count>0</strong>
+                        <span>Symbols</span>
+                    </div>
+                    <div class="srcx-metric srcx-tone--accent">
+                        <strong data-docx-relationship-count>0</strong>
+                        <span>Dependencies</span>
+                    </div>
+                    <div class="srcx-metric srcx-tone--tertiary">
+                        <strong data-docx-finding-count>0</strong>
+                        <span>Findings</span>
+                    </div>
+                </aside>
+
+                <nav class="srcx-dashboard__nav" aria-label="Documentation sections">
+                    <a href="#architecture"><span>01</span>Architecture</a>
+                    <a href="#builds"><span>02</span>Builds</a>
+                    <a href="#health"><span>03</span>Health</a>
+                    <a href="#findings"><span>04</span>Findings</a>
+                </nav>
+
+                <section class="srcx-dashboard__section" id="architecture">
+                    <header class="srcx-section-heading srcx-tone--tertiary">
+                        <div class="srcx-section-heading__index">01</div>
+                        <div>
+                            <p class="srcx-section-heading__kicker">Source graph</p>
+                            <h2 class="srcx-heading-lg">Architecture</h2>
+                            <p class="srcx-section-heading__summary">
+                                See which build owns each indexed file and how resolved source references connect
+                                files across projects.
+                            </p>
+                        </div>
+                    </header>
+
+                    <div class="srcx-dashboard__architecture-summary">
+                        <p>
+                            <strong>Explore files first.</strong> Arrows point from the file containing a reference
+                            to the file it uses. Switch lenses for symbols, exact file findings, observed file cycles,
+                            or analyzer-inferred component cycles. Select a node or arrow for source evidence; this is
+                            static analysis, not runtime tracing.
+                        </p>
+                        <dl>
+                            <div><dt>Files shown</dt><dd data-docx-files-shown>0</dd></div>
+                            <div><dt>Links shown</dt><dd data-docx-links-shown>0</dd></div>
+                            <div><dt>Symbols shown</dt><dd data-docx-symbols-shown>0</dd></div>
+                            <div><dt>Findings shown</dt><dd data-docx-findings-shown>0</dd></div>
+                        </dl>
+                    </div>
+
+                    <section
+                        class="srcx-dashboard__architecture-graph"
+                        data-srcx-architecture-graph
+                        data-srcx-graph-lens="files"
+                        data-srcx-graph-density="normal"
+                        data-srcx-fullscreen="false"
+                    >
+                        <header class="srcx-dashboard__architecture-graph-head">
+                            <div><span>Interactive source map</span><strong>Workspace atlas</strong></div>
+                            <p data-srcx-graph-status role="status" aria-live="polite">
+                                Preparing the selected project graph…
+                            </p>
+                        </header>
+
+                        <div class="srcx-dashboard__architecture-viewport" data-docx-atlas-host>
+                            <div
+                                id="srcx-atlas-chart-controls"
+                                class="srcx-dashboard__architecture-chart-controls"
+                                data-srcx-chart-controls
+                            >
+                                <div class="srcx-dashboard__architecture-control-bar" data-srcx-control-bar>
+                                    <div
+                                        class="srcx-dashboard__architecture-scope-stepper"
+                                        data-srcx-scope-stepper
+                                        role="group"
+                                        aria-label="Choose an Atlas scope filter"
+                                    >
+                                        <button
+                                            id="srcx-build-filter-tab"
+                                            type="button"
+                                            data-srcx-scope-level-button="build"
+                                            aria-expanded="false"
+                                            aria-controls="srcx-build-filter-panel"
+                                        >
+                                            <span>Builds</span>
+                                            <strong data-srcx-build-filter-summary>All</strong>
+                                            <small id="srcx-build-filter-count" data-srcx-build-filter-count>
+                                                All available · multi-select
+                                            </small>
+                                        </button>
+                                        <button
+                                            id="srcx-project-filter-tab"
+                                            type="button"
+                                            data-srcx-scope-level-button="project"
+                                            aria-expanded="false"
+                                            aria-controls="srcx-project-filter-panel"
+                                        >
+                                            <span>Projects</span>
+                                            <strong data-srcx-project-filter-summary>All</strong>
+                                            <small id="srcx-project-filter-count" data-srcx-project-filter-count>
+                                                All available · multi-select
+                                            </small>
+                                        </button>
+                                        <button
+                                            id="srcx-source-set-filter-tab"
+                                            type="button"
+                                            data-srcx-scope-level-button="source-set"
+                                            aria-expanded="false"
+                                            aria-controls="srcx-source-set-filter-panel"
+                                        >
+                                            <span>Sources</span>
+                                            <strong data-srcx-source-set-filter-summary>All</strong>
+                                            <small id="srcx-source-set-filter-count" data-srcx-source-set-filter-count>
+                                                All available · multi-select
+                                            </small>
+                                        </button>
+                                    </div>
+                                </div>
+                        <nav
+                            class="srcx-dashboard__architecture-navigator"
+                            data-srcx-graph-navigator
+                            aria-label="Atlas build, project, and source-set filters"
+                        >
+                            <div
+                                class="srcx-dashboard__architecture-filter-bar"
+                                data-srcx-scope-panel-host
+                            >
+                                <section
+                                    id="srcx-build-filter-panel"
+                                    class="srcx-dashboard__architecture-scope-control"
+                                    data-srcx-scope-control="build"
+                                    role="region"
+                                    aria-labelledby="srcx-build-filter-tab"
+                                    hidden
+                                >
+                                    <div class="srcx-dashboard__architecture-scope-tools">
+                                        <label class="srcx-dashboard__architecture-chip-search">
+                                            <span>Find build</span>
+                                            <input
+                                                type="search"
+                                                data-srcx-build-filter-search
+                                                aria-controls="srcx-build-filter-options"
+                                                placeholder="Build name..."
+                                            >
+                                        </label>
+                                        <div
+                                            class="srcx-dashboard__architecture-scope-clear"
+                                            data-srcx-build-filter-clear
+                                            role="group"
+                                            aria-label="Clear build selections"
+                                        ></div>
+                                    </div>
+                                    <div
+                                        id="srcx-build-filter-options"
+                                        class="srcx-dashboard__architecture-filter-rail"
+                                        data-srcx-build-filter
+                                        role="group"
+                                        aria-label="Choose one or more builds"
+                                        aria-describedby="srcx-build-filter-count"
+                                    ></div>
+                                    <p data-srcx-build-filter-empty role="status" hidden>No matching builds.</p>
+                                </section>
+                                <section
+                                    id="srcx-project-filter-panel"
+                                    class="srcx-dashboard__architecture-scope-control"
+                                    data-srcx-scope-control="project"
+                                    role="region"
+                                    aria-labelledby="srcx-project-filter-tab"
+                                    hidden
+                                >
+                                    <div class="srcx-dashboard__architecture-scope-tools">
+                                        <label class="srcx-dashboard__architecture-chip-search">
+                                            <span>Find project</span>
+                                            <input
+                                                type="search"
+                                                data-srcx-project-filter-search
+                                                aria-controls="srcx-project-filter-options"
+                                                placeholder="Project path..."
+                                            >
+                                        </label>
+                                        <div
+                                            class="srcx-dashboard__architecture-scope-clear"
+                                            data-srcx-project-filter-clear
+                                            role="group"
+                                            aria-label="Clear project selections"
+                                        ></div>
+                                    </div>
+                                    <div
+                                        id="srcx-project-filter-options"
+                                        class="srcx-dashboard__architecture-filter-rail"
+                                        data-srcx-project-filter
+                                        role="group"
+                                        aria-label="Choose one or more projects"
+                                        aria-describedby="srcx-project-filter-count"
+                                    ></div>
+                                    <p data-srcx-project-filter-empty role="status" hidden>
+                                        No matching projects.
+                                    </p>
+                                </section>
+                                <section
+                                    id="srcx-source-set-filter-panel"
+                                    class="srcx-dashboard__architecture-scope-control"
+                                    data-srcx-scope-control="source-set"
+                                    role="region"
+                                    aria-labelledby="srcx-source-set-filter-tab"
+                                    hidden
+                                >
+                                    <div class="srcx-dashboard__architecture-scope-tools">
+                                        <label class="srcx-dashboard__architecture-chip-search">
+                                            <span>Find source</span>
+                                            <input
+                                                type="search"
+                                                data-srcx-source-set-filter-search
+                                                aria-controls="srcx-source-set-filter-options"
+                                                placeholder="Source name or owner..."
+                                            >
+                                        </label>
+                                        <div
+                                            class="srcx-dashboard__architecture-scope-clear"
+                                            data-srcx-source-set-filter-clear
+                                            role="group"
+                                            aria-label="Clear source-set selections"
+                                        ></div>
+                                    </div>
+                                    <div
+                                        id="srcx-source-set-filter-options"
+                                        class="srcx-dashboard__architecture-filter-rail"
+                                        data-srcx-source-set-filter
+                                        role="group"
+                                        aria-label="Choose one or more source sets"
+                                        aria-describedby="srcx-source-set-filter-count"
+                                    ></div>
+                                    <p data-srcx-source-set-filter-empty role="status" hidden>
+                                        No matching source sets.
+                                    </p>
+                                </section>
+                            </div>
+                            <p
+                                class="srcx-dashboard__architecture-filter-context"
+                                data-srcx-filter-context
+                                role="status"
+                                aria-live="polite"
+                                aria-atomic="true"
+                            >All builds / all projects / all source sets</p>
+                        </nav>
+                            </div>
+                            <div
+                                class="srcx-dashboard__architecture-map-toolbar"
+                                data-srcx-map-toolbar
+                                role="toolbar"
+                                aria-label="Map view controls"
+                            >
+                                <button
+                                    type="button"
+                                    data-srcx-layers-toggle
+                                    aria-label="Choose map layers"
+                                    aria-expanded="false"
+                                    aria-controls="srcx-atlas-layers-sheet"
+                                    title="Layers"
+                                ><span aria-hidden="true">▧</span></button>
+                                <button
+                                    type="button"
+                                    data-srcx-filters-toggle
+                                    aria-label="Choose map filters"
+                                    aria-expanded="false"
+                                    aria-controls="srcx-atlas-filters-sheet"
+                                    title="Filters"
+                                ><span aria-hidden="true">≡</span></button>
+                                <button type="button" data-srcx-graph-action="zoom-in" aria-label="Zoom in" title="Zoom in">
+                                    <span aria-hidden="true">+</span>
+                                </button>
+                                <button type="button" data-srcx-graph-action="zoom-out" aria-label="Zoom out" title="Zoom out">
+                                    <span aria-hidden="true">−</span>
+                                </button>
+                                <button type="button" data-srcx-graph-action="fit" aria-label="Fit map" title="Fit map">
+                                    <span aria-hidden="true">↔</span>
+                                </button>
+                                <button type="button" data-srcx-graph-action="reset" aria-label="Reset map" title="Reset map">
+                                    <span aria-hidden="true">↺</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    data-srcx-graph-fullscreen
+                                    aria-label="Enter full screen"
+                                    aria-pressed="false"
+                                    title="Full screen"
+                                ><span aria-hidden="true">⛶</span></button>
+                                <button
+                                    type="button"
+                                    class="srcx-dashboard__architecture-chrome-toggle"
+                                    data-srcx-chart-controls-toggle
+                                    data-srcx-fullscreen-chrome-toggle
+                                    aria-controls="srcx-atlas-chart-controls"
+                                    aria-expanded="true"
+                                    aria-label="Hide chart controls"
+                                    title="Hide chart controls"
+                                ><span aria-hidden="true" data-srcx-chart-controls-toggle-icon>▴</span></button>
+                            </div>
+                            <section
+                                id="srcx-atlas-filters-sheet"
+                                class="srcx-dashboard__architecture-filters-sheet"
+                                data-srcx-filters-sheet
+                                role="region"
+                                aria-labelledby="srcx-atlas-filters-title"
+                                hidden
+                            >
+                                <header>
+                                    <div>
+                                        <span>Current map</span>
+                                        <strong id="srcx-atlas-filters-title">Filters</strong>
+                                    </div>
+                                    <button type="button" data-srcx-filters-close aria-label="Close filters">×</button>
+                                </header>
+                                <div class="srcx-dashboard__architecture-controls" data-srcx-graph-controls>
+                                    <div class="srcx-dashboard__architecture-lenses" role="group" aria-label="Map lens">
+                                        <button type="button" data-srcx-graph-view="files" aria-pressed="true">
+                                            <span>Files</span><strong data-srcx-graph-view-count="files">0</strong>
+                                        </button>
+                                        <button type="button" data-srcx-graph-view="symbols" aria-pressed="false">
+                                            <span>Symbols</span><strong data-srcx-graph-view-count="symbols">0</strong>
+                                        </button>
+                                        <button type="button" data-srcx-graph-view="problems" aria-pressed="false">
+                                            <span>Problems</span><strong data-srcx-graph-view-count="problems">0</strong>
+                                        </button>
+                                        <button type="button" data-srcx-graph-view="cycles" aria-pressed="false">
+                                            <span>Cycles</span><strong data-srcx-graph-view-count="cycles">?</strong>
+                                        </button>
+                                    </div>
+                                    <div class="srcx-dashboard__architecture-search">
+                                        <label class="srcx-dashboard__architecture-search-field">
+                                            <span>Filter visible map</span>
+                                            <input
+                                                type="search"
+                                                data-srcx-graph-search
+                                                placeholder="Filter the loaded map..."
+                                            >
+                                        </label>
+                                        <section
+                                            class="srcx-dashboard__architecture-search-targets"
+                                            aria-labelledby="srcx-search-target-label"
+                                        >
+                                            <header>
+                                                <span id="srcx-search-target-label">Match</span>
+                                                <strong data-srcx-search-target-summary>Everything</strong>
+                                            </header>
+                                            <div
+                                                data-srcx-search-target-options
+                                                role="group"
+                                                aria-label="Choose one or more search types"
+                                            ></div>
+                                        </section>
+                                    </div>
+                                    <section
+                                        class="srcx-dashboard__architecture-control-strip"
+                                        data-srcx-control-strip="declarations"
+                                        aria-labelledby="srcx-declaration-filter-label"
+                                    >
+                                        <header>
+                                            <span id="srcx-declaration-filter-label">Declarations</span>
+                                            <strong data-srcx-declaration-kind-summary>All declarations</strong>
+                                        </header>
+                                        <div
+                                            class="srcx-dashboard__architecture-declaration-filter-rail"
+                                            data-srcx-declaration-kind-options
+                                            role="group"
+                                            aria-label="Filter symbols by declaration type"
+                                        ></div>
+                                    </section>
+                                    <section
+                                        class="srcx-dashboard__architecture-control-strip"
+                                        data-srcx-control-strip="relationships"
+                                        data-srcx-relationship-kind-filter
+                                        aria-labelledby="srcx-relationship-filter-label"
+                                    >
+                                        <header>
+                                            <span id="srcx-relationship-filter-label">Relationships</span>
+                                            <strong data-srcx-relationship-kind-summary>All relationships</strong>
+                                            <button type="button" data-srcx-relationship-kind-clear>Clear</button>
+                                        </header>
+                                        <div
+                                            class="srcx-dashboard__architecture-kind-filter-rail"
+                                            data-srcx-relationship-kind-options
+                                            role="group"
+                                            aria-label="Filter map by one or more relationship kinds"
+                                        ></div>
+                                    </section>
+                                    <section
+                                        class="srcx-dashboard__architecture-control-strip"
+                                        data-srcx-control-strip="relationship-count"
+                                        aria-labelledby="srcx-relationship-count-label"
+                                    >
+                                        <header>
+                                            <span id="srcx-relationship-count-label">Connection count</span>
+                                            <strong data-srcx-relationship-count-summary>Any count</strong>
+                                        </header>
+                                        <div class="srcx-dashboard__architecture-count-filter">
+                                            <div
+                                                data-srcx-relationship-count-presets
+                                                role="group"
+                                                aria-label="Choose a relationship-count threshold"
+                                            ></div>
+                                            <label>
+                                                <span>Custom &gt;</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="1"
+                                                    inputmode="numeric"
+                                                    data-srcx-relationship-count-input
+                                                    placeholder="Any"
+                                                    aria-label="Show nodes with more than this many relationships"
+                                                >
+                                            </label>
+                                            <div
+                                                data-srcx-relationship-direction-options
+                                                role="group"
+                                                aria-label="Choose which relationship direction to count"
+                                            ></div>
+                                        </div>
+                                    </section>
+                                    <div
+                                        class="srcx-dashboard__architecture-search-recovery"
+                                        data-srcx-search-recovery
+                                        hidden
+                                    >
+                                        <span
+                                            data-srcx-search-recovery-status
+                                            role="status"
+                                            aria-live="polite"
+                                            aria-atomic="true"
+                                        ></span>
+                                        <button type="button" data-srcx-search-recovery-action></button>
+                                    </div>
+                                </div>
+                            </section>
+                            <section
+                                id="srcx-atlas-layers-sheet"
+                                class="srcx-dashboard__architecture-layers-sheet"
+                                data-srcx-layers-sheet
+                                role="region"
+                                aria-labelledby="srcx-atlas-layers-title"
+                                hidden
+                            >
+                                <header>
+                                    <div>
+                                        <span>Map detail</span>
+                                        <strong id="srcx-atlas-layers-title">Layers</strong>
+                                    </div>
+                                    <button type="button" data-srcx-layers-close aria-label="Close layers">×</button>
+                                </header>
+                                <div
+                                    class="srcx-dashboard__architecture-layer-presets"
+                                    data-srcx-layer-presets
+                                    role="group"
+                                    aria-label="Layer presets"
+                                ></div>
+                                <div
+                                    class="srcx-dashboard__architecture-layer-options"
+                                    data-srcx-layer-options
+                                    role="group"
+                                    aria-label="Toggle individual map layers"
+                                ></div>
+                            </section>
+                            <nav
+                                class="srcx-dashboard__architecture-history-toolbar"
+                                data-srcx-history-toolbar
+                                aria-label="Map navigation history"
+                            >
+                                <button type="button" data-srcx-history-back aria-label="Back" title="Back">←</button>
+                                <button type="button" data-srcx-history-forward aria-label="Forward" title="Forward">→</button>
+                                <button type="button" data-srcx-history-home aria-label="Workspace home" title="Home">⌂</button>
+                                <div data-srcx-history-breadcrumb aria-label="Active map hierarchy"></div>
+                            </nav>
+                            <div class="srcx-dashboard__architecture-fallback" data-srcx-graph-fallback hidden>
+                                <p>
+                                    <strong>The interactive map is unavailable.</strong> The typed snapshot remains
+                                    readable while the local graph runtime is restored.
+                                </p>
+                            </div>
+                            <svg
+                                class="srcx-dashboard__architecture-svg"
+                                data-srcx-graph-svg
+                                data-docx-atlas-svg
+                                role="group"
+                                aria-label="Interactive workspace relationship map"
+                            ></svg>
+                            <div
+                                class="srcx-dashboard__architecture-detail-resize"
+                                data-srcx-detail-resize
+                                hidden
+                                role="separator"
+                                aria-label="Resize source details"
+                                aria-orientation="vertical"
+                                aria-valuemin="0"
+                                aria-valuemax="50"
+                                aria-valuenow="44"
+                                aria-valuetext="44 percent of map width"
+                                tabindex="0"
+                            ></div>
+                            <aside
+                                class="srcx-dashboard__architecture-detail"
+                                data-srcx-detail
+                                hidden
+                                role="region"
+                                aria-label="Architecture selection evidence"
+                                tabindex="-1"
+                            >
+                                <header>
+                                    <span data-srcx-detail-kicker>Selection</span>
+                                    <button type="button" data-srcx-detail-close aria-label="Close details">
+                                        Close
+                                    </button>
+                                </header>
+                                <h3 data-srcx-detail-title>Select a file or relationship</h3>
+                                <div data-srcx-detail-fields></div>
+                            </aside>
+                        </div>
+
+                        <details class="srcx-dashboard__architecture-guide" data-srcx-atlas-guide>
+                            <summary>How to read this map</summary>
+                            <div class="srcx-dashboard__architecture-guide-sections">
+                                <section>
+                                    <h4>Node types</h4>
+                                    <ul>
+                                        <li class="srcx-dashboard__architecture-guide-example">
+                                            <div
+                                                class="srcx-dashboard__architecture-ring-guide"
+                                                role="group"
+                                                aria-label="Examples of node marks"
+                                            >
+                                                <strong>On-map examples</strong>
+                                                <span><i class="is-build-fill" aria-hidden="true"></i>Build fill</span>
+                                                <span>
+                                                    <i class="is-interface-kind-ring" aria-hidden="true"></i>Interface
+                                                </span>
+                                                <span>
+                                                    <i class="is-abstract-kind-ring" aria-hidden="true"></i>Abstract
+                                                </span>
+                                                <span>
+                                                    <i class="is-concrete-kind-ring" aria-hidden="true"></i>Concrete
+                                                </span>
+                                                <span>
+                                                    <i class="is-object-kind-ring" aria-hidden="true"></i>Object
+                                                </span>
+                                                <span><i class="is-enum-kind-ring" aria-hidden="true"></i>Enum</span>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            Build-colored fill identifies Gradle-build ownership, not severity,
+                                            quality, or risk.
+                                        </li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Review signals</h4>
+                                    <ul>
+                                        <li class="srcx-dashboard__architecture-guide-example">
+                                            <div
+                                                class="srcx-dashboard__architecture-ring-guide"
+                                                role="group"
+                                                aria-label="Examples of review rings"
+                                            >
+                                                <strong>On-map examples</strong>
+                                                <span>
+                                                    <i class="is-importance-ring" aria-hidden="true"></i>Priority
+                                                </span>
+                                                <span>
+                                                    <i class="is-finding-ring" aria-hidden="true"></i>Exact finding
+                                                </span>
+                                                <span>
+                                                    <i class="is-cycle-ring" aria-hidden="true"></i>Observed cycle
+                                                </span>
+                                                <span>
+                                                    <i class="is-analysis-cycle-ring" aria-hidden="true"></i>
+                                                    Analyzer-inferred cycle
+                                                </span>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            Review rings identify evidence to inspect; they are not quality verdicts.
+                                        </li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Routes</h4>
+                                    <ul>
+                                        <li class="srcx-dashboard__architecture-guide-example">
+                                            <div
+                                                class="srcx-dashboard__architecture-edge-guide"
+                                                role="group"
+                                                aria-label="Examples of map routes"
+                                            >
+                                                <strong>On-map examples</strong>
+                                                <span><i class="is-quiet" aria-hidden="true"></i>Hidden at rest</span>
+                                                <span>
+                                                    <i class="is-active" aria-hidden="true"><b>3</b></i>
+                                                    Highlighted connection
+                                                </span>
+                                                <span>
+                                                    <i class="is-cross-build" aria-hidden="true"></i>Cross-build
+                                                </span>
+                                                <span><i class="is-heuristic" aria-hidden="true"></i>Heuristic</span>
+                                            </div>
+                                        </li>
+                                        <li>
+                                            Hover, focus, or selection reveals the relevant connection neighborhood.
+                                        </li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Build colors</h4>
+                                    <ul class="srcx-dashboard__architecture-guide-builds" data-docx-build-guide></ul>
+                                </section>
+                            </div>
+                        </details>
+                    </section>
+
+                    <details
+                        class="srcx-disclosure srcx-dashboard__architecture-evidence"
+                        data-docx-architecture-evidence
+                    >
+                        <summary data-docx-architecture-evidence-summary>
+                            Map limits and evidence / loading relationship records / expand
+                        </summary>
+                        <div class="srcx-disclosure__body">
+                            <p>
+                                <code>DIRECT</code> is observed syntax, <code>DERIVED</code> is deterministic
+                                resolution, and <code>HEURISTIC</code> is approximate. Import-only facts are
+                                excluded.
+                            </p>
+                            <p data-docx-architecture-evidence-copy>
+                                The typed workspace Atlas frame is loading.
+                            </p>
+                        </div>
+                    </details>
+                </section>
+
+                <section class="srcx-dashboard__section" id="builds">
+                    <header class="srcx-section-heading srcx-tone--primary">
+                        <div class="srcx-section-heading__index">02</div>
+                        <div>
+                            <p class="srcx-section-heading__kicker">Workspace</p>
+                            <h2 class="srcx-heading-lg">Builds</h2>
+                            <p class="srcx-section-heading__summary">
+                                See workspace membership, compare build sizes, and inspect observed cross-build
+                                dependencies.
+                            </p>
+                        </div>
+                    </header>
+
+                    <div class="srcx-dashboard__build-atlas" data-srcx-build-atlas>
+                        <figure
+                            class="srcx-dashboard__build-comparison"
+                            data-srcx-build-comparison
+                            aria-labelledby="build-comparison-title"
+                        >
+                            <figcaption class="srcx-dashboard__build-comparison-head">
+                                <div>
+                                    <span>Unified build matrix</span>
+                                    <h3 id="build-comparison-title">Build comparison</h3>
+                                    <p id="build-comparison-scale">
+                                        Each bar compares builds only within its metric column; the largest value
+                                        fills that column, and the Column maximums cards print those exact largest
+                                        values. One source-set record is one analyzed Gradle project/source-set
+                                        summary; it is not a file, dependency, or relationship record. Every printed
+                                        value is exact. Root and included builds are workspace members, not dependency
+                                        edges.
+                                    </p>
+                                </div>
+                                <div class="srcx-dashboard__build-scale-block">
+                                    <span>Column maximums</span>
+                                    <dl
+                                        class="srcx-dashboard__build-scale"
+                                        aria-label="Largest value in each metric column"
+                                    >
+                                        <div><dt>Projects</dt><dd data-docx-build-max-projects>0</dd></div>
+                                        <div><dt>Symbols</dt><dd data-docx-build-max-symbols>0</dd></div>
+                                        <div><dt>Findings</dt><dd data-docx-build-max-findings>0</dd></div>
+                                        <div>
+                                            <dt>Source-set records</dt><dd data-docx-build-max-source-sets>0</dd>
+                                        </div>
+                                    </dl>
+                                </div>
+                            </figcaption>
+                            <div class="srcx-dashboard__build-matrix-wrap">
+                                <div
+                                    class="srcx-dashboard__build-matrix"
+                                    role="table"
+                                    aria-label="Build metrics comparison"
+                                    aria-describedby="build-comparison-scale"
+                                    data-docx-build-matrix
+                                >
+                                    <div class="srcx-dashboard__build-matrix-header" role="row">
+                                        <span role="columnheader">Build</span>
+                                        <span role="columnheader">Projects</span>
+                                        <span role="columnheader">Symbols</span>
+                                        <span role="columnheader">Findings / severity mix</span>
+                                        <span role="columnheader">Source-set records / mix</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </figure>
+
+                        <section class="srcx-dashboard__build-edge-panel" aria-labelledby="build-edge-title">
+                            <header class="srcx-dashboard__build-atlas-head">
+                                <span>Directed evidence</span><h3 id="build-edge-title">Build dependencies</h3>
+                                <p>
+                                    Arrow direction: consumer build &rarr; active build it depends on. Inclusion above
+                                    records membership only and does not create an arrow.
+                                </p>
+                            </header>
+                            <div class="srcx-dashboard__build-edge-routes" data-docx-build-edge-routes></div>
+                        </section>
+                    </div>
+                </section>
+
+                <section class="srcx-dashboard__section" id="health">
+                    <header class="srcx-section-heading srcx-tone--secondary">
+                        <div class="srcx-section-heading__index">03</div>
+                        <div>
+                            <p class="srcx-section-heading__kicker">Analysis</p>
+                            <h2 class="srcx-heading-lg">Health</h2>
+                            <p class="srcx-section-heading__summary">
+                                Review symbol ownership, finding severity, production hubs, and scan coverage.
+                            </p>
+                        </div>
+                    </header>
+
+                    <div class="srcx-dashboard__chart-grid">
+                        <article class="srcx-dashboard__chart srcx-dashboard__chart--wide">
+                            <header><span>Symbol ownership</span><strong>By build</strong></header>
+                            <div
+                                class="srcx-dashboard__symbol-bar"
+                                role="img"
+                                aria-label="Symbol ownership by build"
+                                data-docx-symbol-bar
+                            ></div>
+                            <div class="srcx-dashboard__chart-legend" data-docx-symbol-legend></div>
+                        </article>
+
+                        <article class="srcx-dashboard__chart srcx-dashboard__chart--severity">
+                            <header><span>Finding severity</span><strong>Project-scoped</strong></header>
+                            <dl class="srcx-dashboard__coverage-grid" data-docx-severity-grid></dl>
+                        </article>
+
+                        <details
+                            class="srcx-dashboard__chart srcx-dashboard__chart--hubs srcx-dashboard__hub-chart"
+                        >
+                            <summary>
+                                <span>Production hubs</span><strong data-docx-hub-summary>0 hubs / expand</strong>
+                            </summary>
+                            <div class="srcx-dashboard__hub-chart-body">
+                                <div class="srcx-dashboard__hub-bars" data-docx-hub-bars></div>
+                            </div>
+                        </details>
+
+                        <article class="srcx-dashboard__chart srcx-dashboard__chart--coverage">
+                            <header><span>Source coverage</span><strong>Scan records</strong></header>
+                            <dl class="srcx-dashboard__coverage-grid" data-docx-coverage-grid></dl>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="srcx-dashboard__section srcx-dashboard__section--finding" id="findings">
+                    <header class="srcx-section-heading srcx-tone--error">
+                        <div class="srcx-section-heading__index">04</div>
+                        <div>
+                            <p class="srcx-section-heading__kicker">Project scopes</p>
+                            <h2 class="srcx-heading-lg">Findings</h2>
+                            <p class="srcx-section-heading__summary">
+                                Each finding stays with the build and project where the scan found it.
+                            </p>
+                        </div>
+                    </header>
+
+                    <details class="srcx-dashboard__finding-controls" data-srcx-finding-controls>
+                        <summary class="srcx-dashboard__finding-filter-toggle">
+                            <span><strong>Filter findings</strong><small>Build / project / severity</small></span>
+                            <output
+                                data-srcx-finding-filter-status
+                                role="status"
+                                aria-live="polite"
+                                aria-atomic="true"
+                            >0 findings shown</output>
+                        </summary>
+                        <div class="srcx-dashboard__finding-filter-body">
+                            <fieldset
+                                class="srcx-dashboard__finding-filter-group"
+                                data-srcx-finding-filter-group="build"
+                            >
+                                <legend>Build</legend>
+                                <div
+                                    class="srcx-dashboard__finding-filter-rail"
+                                    role="toolbar"
+                                    aria-label="Filter findings by build"
+                                    aria-orientation="horizontal"
+                                    data-srcx-finding-filter-rail
+                                    data-srcx-roving-group
+                                ></div>
+                            </fieldset>
+                            <fieldset
+                                class="srcx-dashboard__finding-filter-group"
+                                data-srcx-finding-filter-group="project"
+                            >
+                                <legend>Project</legend>
+                                <div
+                                    class="srcx-dashboard__finding-filter-rail"
+                                    role="toolbar"
+                                    aria-label="Filter findings by project"
+                                    aria-orientation="horizontal"
+                                    data-srcx-finding-filter-rail
+                                    data-srcx-roving-group
+                                ></div>
+                            </fieldset>
+                            <fieldset
+                                class="srcx-dashboard__finding-filter-group"
+                                data-srcx-finding-filter-group="severity"
+                            >
+                                <legend>Severity</legend>
+                                <div
+                                    class="srcx-dashboard__finding-filter-rail"
+                                    role="toolbar"
+                                    aria-label="Filter findings by severity"
+                                    aria-orientation="horizontal"
+                                    data-srcx-finding-filter-rail
+                                    data-srcx-roving-group
+                                ></div>
+                            </fieldset>
+                            <div class="srcx-dashboard__finding-filter-summary">
+                                <button type="button" data-srcx-finding-filter-reset disabled>Reset filters</button>
+                                <small>Select one printed label from each row.</small>
+                            </div>
+                        </div>
+                    </details>
+
+                    <div id="srcx-finding-list" class="srcx-dashboard__finding-list" data-docx-finding-list>
+                        <div class="srcx-empty-state" data-docx-finding-empty>
+                            <strong>Findings are loading.</strong>
+                            <span>The typed workspace dashboard has not arrived yet.</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </template>
+
+        <script src="assets/vendor/d3-7.9.0/d3.min.js"></script>
+        <script src="assets/docx-atlas-d3.js"></script>
+        <script src="assets/docx-atlas-layout.js"></script>
+        <script src="assets/docx-atlas-map.js"></script>
+        <script src="assets/docx-viewer.js"></script>
+    </body>
+</html>

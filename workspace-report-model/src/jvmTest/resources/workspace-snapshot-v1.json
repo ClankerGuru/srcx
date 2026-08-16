@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "workspace": {
+    "id": "workspace:golden",
+    "name": "golden"
+  },
+  "builds": [
+    {
+      "id": "build:root",
+      "name": "golden",
+      "kind": "ROOT",
+      "relativePath": "."
+    }
+  ],
+  "buildEdges": [],
+  "projects": [
+    {
+      "id": "project:root",
+      "buildId": "build:root",
+      "path": ":",
+      "buildFile": "build.gradle.kts",
+      "sourceDirectories": [],
+      "subprojectPaths": []
+    }
+  ],
+  "projectDependencies": [],
+  "sourceSets": [
+    {
+      "id": "source-set:main",
+      "projectId": "project:root",
+      "name": "main",
+      "sourceDirectories": []
+    }
+  ],
+  "files": [
+    {
+      "id": "file:app",
+      "sourceSetId": "source-set:main",
+      "projectRelativePath": "src/main/kotlin/App.kt",
+      "language": "KOTLIN",
+      "content": "class App\n"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "symbol:app",
+      "fileId": "file:app",
+      "name": "App",
+      "qualifiedName": "fixture.App",
+      "packageName": "fixture",
+      "kind": "CLASS",
+      "declarationSemantic": "CONCRETE_CLASS",
+      "declarationLine": 1
+    }
+  ],
+  "references": [],
+  "relationships": [],
+  "relationshipCycles": [],
+  "projectAnalyses": [],
+  "aggregateAnalysisPresent": false,
+  "aggregateFindings": [],
+  "aggregateHubs": [],
+  "aggregateNamedCycles": [],
+  "entryPoints": [],
+  "interfaces": [],
+  "importantSymbols": []
+}
