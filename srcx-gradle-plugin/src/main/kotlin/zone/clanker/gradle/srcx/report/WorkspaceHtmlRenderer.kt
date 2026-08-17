@@ -48,7 +48,7 @@ class WorkspaceHtmlRenderer internal constructor(
             appendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
             appendLine("<title>${workspaceName.escapeWorkspaceHtml()} SRCX source documentation</title>")
             appendLine("</head>")
-            appendLine("<body style=\"margin: 0; padding: 16px\">")
+            appendLine("<body class=\"srcx-atlas-document\" style=\"margin: 0; padding: 0\">")
             appendLine(fragment)
             appendLine("</body>")
             appendLine("</html>")

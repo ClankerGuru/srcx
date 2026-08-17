@@ -70,12 +70,15 @@
         var detail = root.querySelector("[data-srcx-detail]");
         var detailResize = root.querySelector("[data-srcx-detail-resize]");
         var status = root.querySelector("[data-srcx-graph-status]");
-        var search = controls && controls.querySelector("[data-srcx-graph-search]");
-        var relationshipKindFilter = controls && controls.querySelector("[data-srcx-relationship-kind-filter]");
-        var relationshipKindOptions = controls && controls.querySelector("[data-srcx-relationship-kind-options]");
-        var searchRecovery = controls && controls.querySelector("[data-srcx-search-recovery]");
-        var searchRecoveryStatus = controls && controls.querySelector("[data-srcx-search-recovery-status]");
-        var searchRecoveryAction = controls && controls.querySelector("[data-srcx-search-recovery-action]");
+        var search = root.querySelector("[data-srcx-graph-search]");
+        var relationshipKindFilter = root.querySelector("[data-srcx-relationship-kind-filter]");
+        var relationshipKindOptions = root.querySelector("[data-srcx-relationship-kind-options]");
+        var searchRecovery = root.querySelector("[data-srcx-search-recovery]");
+        var searchRecoveryStatus = root.querySelector("[data-srcx-search-recovery-status]");
+        var searchRecoveryAction = root.querySelector("[data-srcx-search-recovery-action]");
+        var clearSelectedButton = root.querySelector("[data-srcx-clear-selected]");
+        var filterToggle = root.querySelector("[data-srcx-filter-toggle]");
+        var filterClose = root.querySelector("[data-srcx-filter-close]");
         var fullscreenButton = controls && controls.querySelector("[data-srcx-graph-fullscreen]");
         var fullscreenChromeToggle = root.querySelector("[data-srcx-fullscreen-chrome-toggle]");
         var detailKicker = detail && detail.querySelector("[data-srcx-detail-kicker]");
@@ -88,7 +91,7 @@
             !fullscreenButton || !fullscreenChromeToggle ||
             !relationshipKindFilter || !relationshipKindOptions || !searchRecovery || !searchRecoveryStatus ||
             !searchRecoveryAction || !detailKicker || !detailTitle || !detailFields || !detailClose ||
-            !detailResize) return false;
+            !detailResize || !clearSelectedButton || !filterToggle) return false;
 
         var data;
         try {
@@ -265,7 +268,9 @@
         root.dataset.srcxEnhancement = "ready";
         fallback.hidden = true;
         controls.hidden = false;
-        navigatorElement.hidden = false;
+        setFiltersOpen(false);
+        wireFilterPanel();
+        wireClearSelected();
 
         if (window.ResizeObserver) {
             resizeObserver = new ResizeObserver(requestResize);
@@ -465,6 +470,9 @@
                 .attr("class", "srcx-dashboard__architecture-svg-node-dot")
                 .attr("r", nodeRadius)
                 .attr("fill", function (node) { return buildColor(node.build, buildByName); });
+            nodeGroups.append("circle")
+                .attr("class", "srcx-dashboard__architecture-svg-node-core")
+                .attr("r", function (node) { return Math.max(2, nodeRadius(node) * 0.36); });
             nodeGroups.append("circle")
                 .attr("class", "srcx-dashboard__architecture-svg-node-ring is-importance-ring")
                 .attr("r", function (node) { return nodeRadius(node) + 4; });
@@ -1100,6 +1108,7 @@
             setRovingNode(node, false);
             renderNodeDetail(node);
             enterNodeNeighborhoodFocus(node.id);
+            syncClearSelectedButton();
             focusOpenedDetail();
         }
 
@@ -1112,6 +1121,7 @@
             state.selectedEdge = edge;
             highlightEdge(edge);
             renderEdgeDetail(edge);
+            syncClearSelectedButton();
             focusOpenedDetail();
         }
 
@@ -1125,7 +1135,41 @@
             exitNodeNeighborhoodFocus(true);
             closeDetail();
             restoreHighlight();
+            syncClearSelectedButton();
             if (restoreFocus && wasOpen) restoreDetailFocus();
+        }
+
+        function setFiltersOpen(open) {
+            root.dataset.srcxFiltersOpen = open ? "true" : "false";
+            navigatorElement.hidden = !open;
+            filterToggle.setAttribute("aria-expanded", String(open));
+            filterToggle.textContent = open ? "Filters open" : "Filter";
+        }
+
+        function wireFilterPanel() {
+            filterToggle.addEventListener("click", function () {
+                setFiltersOpen(root.dataset.srcxFiltersOpen !== "true");
+            });
+            if (filterClose) {
+                filterClose.addEventListener("click", function () { setFiltersOpen(false); });
+            }
+        }
+
+        function hasActiveSelection() {
+            return Boolean(state.selectedId || state.selectedNodeIds.size);
+        }
+
+        function syncClearSelectedButton() {
+            clearSelectedButton.disabled = !hasActiveSelection();
+        }
+
+        function wireClearSelected() {
+            clearSelectedButton.addEventListener("click", function () {
+                clearSelection(true);
+                clearNodeSelection();
+                syncClearSelectedButton();
+            });
+            syncClearSelectedButton();
         }
 
         function setNodeSelection(ids, announcement) {
@@ -4212,6 +4256,7 @@
             selectionStatus.textContent = announcement || (count ? count + (count === 1 ? " node selected" :
                 " nodes selected") + "; drag any selected node to move the group" :
                 "No nodes selected; Shift-drag empty canvas or choose Box select");
+            syncClearSelectedButton();
         }
 
         function setBoxSelectMode(enabled) {

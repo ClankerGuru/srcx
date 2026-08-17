@@ -1,0 +1,451 @@
+/* Map-first Atlas chrome. Last-wins overrides that kill the overlay stack. */
+
+html:has(.srcx-atlas-document),
+body.srcx-atlas-document {
+    background: var(--srcx-paper, #f3efe4);
+    margin: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    padding: 0;
+}
+
+.srcx-theme.srcx-page.srcx-dashboard {
+    border: 0;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    max-width: 100%;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    width: 100%;
+}
+
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__hero,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__hero-copy,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__hero-tags,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__nav,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-masthead {
+    position: static;
+}
+
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__hero {
+    min-height: 0;
+}
+
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__hero::after {
+    display: none;
+}
+
+.srcx-dashboard__report-shell {
+    background: var(--srcx-surface);
+    border-top: var(--srcx-border-heavy) solid var(--srcx-border);
+    margin: 0;
+}
+
+.srcx-dashboard__report-shell > summary {
+    cursor: pointer;
+    font-family: var(--srcx-font-mono);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    list-style: none;
+    padding: 14px 18px;
+    text-transform: uppercase;
+}
+
+.srcx-dashboard__report-shell > summary::-webkit-details-marker {
+    display: none;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-graph {
+    background: var(--srcx-paper);
+    border: 0;
+    box-shadow: none;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    isolation: isolate;
+    margin: 0;
+    max-width: 100%;
+    min-height: min(86dvh, 920px);
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    z-index: 1;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph-head,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-graph-head {
+    align-items: start;
+    background: var(--srcx-ink);
+    color: var(--srcx-surface);
+    display: grid;
+    flex: 0 0 auto;
+    gap: 12px 20px;
+    grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.9fr);
+    justify-content: stretch;
+    padding: 14px 16px 16px;
+    position: relative;
+    width: 100%;
+    z-index: 3;
+}
+
+.srcx-dashboard__architecture-masthead-copy,
+.srcx-dashboard__architecture-masthead-tools,
+.srcx-dashboard__architecture-masthead-status {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+
+.srcx-dashboard__architecture-masthead-tools {
+    align-content: start;
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph-head span,
+.srcx-theme .srcx-dashboard__architecture-graph-head p {
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.45;
+    margin: 0 !important;
+    max-width: none;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    width: 100%;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph-head span {
+    color: var(--srcx-secondary);
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph-head strong {
+    color: var(--srcx-surface);
+    font-size: clamp(22px, 3.2vw, 34px);
+    line-height: 1.05;
+    white-space: normal;
+}
+
+.srcx-dashboard__architecture-masthead-status {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.srcx-dashboard__architecture-clear-selected,
+.srcx-dashboard__architecture-filter-toggle,
+.srcx-dashboard__architecture-filter-close {
+    background: var(--srcx-surface);
+    border: var(--srcx-border-thin) solid var(--srcx-border);
+    color: var(--srcx-ink);
+    cursor: pointer;
+    font-family: var(--srcx-font-mono);
+    font-size: 11px;
+    font-weight: 900;
+    min-height: 36px;
+    padding: 6px 10px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.srcx-dashboard__architecture-filter-toggle {
+    background: var(--srcx-tertiary);
+}
+
+.srcx-dashboard__architecture-clear-selected:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph-head .srcx-dashboard__architecture-search {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    width: 100%;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph-head .srcx-dashboard__architecture-search input {
+    background: var(--srcx-surface);
+    border: 0;
+    color: var(--srcx-ink);
+    font-size: 13px;
+    height: 36px;
+    min-width: 0;
+    padding: 6px 10px;
+    width: 100%;
+}
+
+.srcx-theme .srcx-dashboard__architecture-controls,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-controls,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-controls {
+    align-items: center;
+    background: var(--srcx-surface);
+    border-bottom: var(--srcx-border-thin) solid var(--srcx-border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    grid-template-areas: none;
+    grid-template-columns: none;
+    max-height: none;
+    overflow: visible;
+    padding: 8px 12px;
+    position: relative;
+    width: 100%;
+    z-index: 3;
+}
+
+.srcx-theme .srcx-dashboard__architecture-lenses,
+.srcx-theme .srcx-dashboard__architecture-zoom {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+}
+
+.srcx-theme .srcx-dashboard__architecture-zoom {
+    margin-left: auto;
+}
+
+.srcx-theme .srcx-dashboard__architecture-kind-filter,
+.srcx-theme .srcx-dashboard__architecture-kind-filter-rail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph
+    .srcx-dashboard__architecture-navigator,
+.srcx-theme .srcx-dashboard__architecture-chart-controls
+    .srcx-dashboard__architecture-navigator,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-navigator {
+    background: var(--srcx-surface);
+    border: var(--srcx-border-compact) solid var(--srcx-border);
+    box-shadow: 6px 6px 0 var(--srcx-shadow);
+    display: grid;
+    gap: 10px;
+    inset: auto;
+    left: 12px;
+    max-block-size: min(72dvh, 640px);
+    max-height: min(72dvh, 640px);
+    max-width: min(520px, calc(100% - 24px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 12px;
+    position: absolute;
+    right: auto;
+    top: 12px;
+    width: min(520px, calc(100% - 24px));
+    z-index: 8;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph:not([data-srcx-filters-open="true"])
+    .srcx-dashboard__architecture-navigator,
+.srcx-theme .srcx-dashboard__architecture-navigator[hidden] {
+    display: none !important;
+}
+
+.srcx-dashboard__architecture-filter-panel-head {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+.srcx-dashboard__architecture-filter-panel-head strong {
+    font-family: var(--srcx-font-display);
+    font-size: 18px;
+    text-transform: uppercase;
+}
+
+.srcx-theme .srcx-dashboard__architecture-filter {
+    display: grid;
+    gap: 6px;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.srcx-theme .srcx-dashboard__architecture-filter-label {
+    border-right: 0;
+    padding: 0;
+}
+
+.srcx-theme .srcx-dashboard__architecture-filter-rail,
+.srcx-theme .srcx-dashboard__architecture-kind-filter-rail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    overflow: visible;
+}
+
+.srcx-theme .srcx-dashboard__architecture-filter-button {
+    flex: 1 1 140px;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.srcx-theme .srcx-dashboard__architecture-filter-button strong,
+.srcx-theme .srcx-dashboard__architecture-filter-button small,
+.srcx-theme .srcx-dashboard__architecture-filter-context {
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.srcx-theme .srcx-dashboard__architecture-filter-context {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.srcx-theme .srcx-dashboard__architecture-selection-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.srcx-theme .srcx-dashboard__architecture-viewport {
+    flex: 1 1 auto;
+    height: auto;
+    isolation: isolate;
+    min-height: min(62dvh, 640px);
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    z-index: 1;
+}
+
+.srcx-theme .srcx-dashboard__architecture-legend--atlas,
+.srcx-theme .srcx-dashboard__architecture-legend {
+    left: 10px;
+    max-width: min(280px, calc(100% - 20px));
+    pointer-events: none;
+    right: auto;
+    top: 10px;
+    z-index: 4;
+}
+
+.srcx-theme .srcx-dashboard__architecture-detail,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-detail {
+    box-sizing: border-box;
+    max-width: min(420px, 100%);
+    overflow-x: hidden;
+    overflow-y: auto;
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: min(420px, 92%);
+    z-index: 6;
+}
+
+.srcx-theme .srcx-dashboard__architecture-detail[hidden] {
+    display: none;
+}
+
+.srcx-theme .srcx-dashboard__architecture-detail h3,
+.srcx-theme .srcx-dashboard__architecture-detail dd,
+.srcx-theme .srcx-dashboard__architecture-detail code,
+.srcx-theme .srcx-dashboard__architecture-detail p {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.srcx-theme .srcx-dashboard__architecture-svg-node-dot {
+    fill: var(--srcx-paper) !important;
+    stroke: #c43b7a;
+    stroke-width: 2.4px;
+}
+
+.srcx-theme .srcx-dashboard__architecture-svg-node-core {
+    fill: #c43b7a;
+    pointer-events: none;
+}
+
+.srcx-theme .srcx-dashboard__architecture-svg-node.is-selected .srcx-dashboard__architecture-svg-node-dot,
+.srcx-theme .srcx-dashboard__architecture-svg-node:focus-visible .srcx-dashboard__architecture-svg-node-dot {
+    stroke: #9d2f64;
+    stroke-width: 4px;
+}
+
+.srcx-theme .srcx-dashboard__architecture-svg .srcx-dashboard__architecture-svg-node-label,
+.srcx-theme .srcx-dashboard__architecture-svg .srcx-dashboard__architecture-svg-node.is-label-pinned
+    .srcx-dashboard__architecture-svg-node-label {
+    opacity: 1;
+}
+
+.srcx-theme .srcx-dashboard__architecture-chart-controls {
+    display: none !important;
+}
+
+@media (max-width: 1024px) {
+    .srcx-theme .srcx-dashboard__architecture-graph-head {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .srcx-dashboard__architecture-masthead-tools {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .srcx-theme .srcx-dashboard__architecture-graph {
+        min-height: 100dvh;
+    }
+
+    .srcx-dashboard__architecture-masthead-status,
+    .srcx-dashboard__architecture-masthead-tools {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-controls,
+    .srcx-theme .srcx-dashboard__architecture-lenses,
+    .srcx-theme .srcx-dashboard__architecture-zoom {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-detail,
+    .srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+        .srcx-dashboard__architecture-detail {
+        border-left: 0;
+        border-top: var(--srcx-border-heavy) solid var(--srcx-border);
+        bottom: 0;
+        left: 0;
+        max-height: 52%;
+        max-width: 100%;
+        right: 0;
+        top: auto;
+        width: 100%;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-graph
+        .srcx-dashboard__architecture-navigator {
+        left: 8px;
+        max-width: calc(100% - 16px);
+        top: 8px;
+        width: calc(100% - 16px);
+    }
+}
+
+@media (max-width: 390px) {
+    .srcx-theme .srcx-dashboard__architecture-graph-head {
+        padding: 10px 12px;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-graph-head strong {
+        font-size: 22px;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-lenses,
+    .srcx-theme .srcx-dashboard__architecture-zoom {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+    }
+}

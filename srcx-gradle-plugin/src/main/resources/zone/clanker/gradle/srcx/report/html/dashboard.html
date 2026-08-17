@@ -1,74 +1,78 @@
 <article class="srcx-theme srcx-page srcx-dashboard" aria-label="{{workspaceName}} SRCX source documentation">
-    {{mastheadHtml}}
+    {{architectureGraphHtml}}
 
-    <section class="srcx-dashboard__hero" id="top">
-        <div class="srcx-dashboard__hero-copy">
-            <div>
-                <p class="srcx-dashboard__overline">SRCX / Multi-build architecture report</p>
-                <h1>Workspace <strong>atlas.</strong></h1>
-            </div>
-            <div class="srcx-dashboard__hero-summary">
-                <div class="srcx-dashboard__hero-tags">{{heroTagsHtml}}</div>
-                <p class="srcx-dashboard__dek">
-                    This report maps which build owns each file, which files reference one another,
-                    and where each finding came from.
-                </p>
-            </div>
-        </div>
-    </section>
+    <details class="srcx-dashboard__report-shell">
+        <summary>01 Architecture / 02 Builds / 03 Health / 04 Findings</summary>
+        {{mastheadHtml}}
 
-    {{metricStripHtml}}
-
-    <nav class="srcx-dashboard__nav" aria-label="Documentation sections">
-        <a href="#architecture"><span>01</span>Architecture</a>
-        <a href="#builds"><span>02</span>Builds</a>
-        <a href="#health"><span>03</span>Health</a>
-        <a href="#findings"><span>04</span>Findings</a>
-    </nav>
-
-    <section class="srcx-dashboard__section" id="architecture">
-        {{architectureHeadingHtml}}
-        {{architectureSummaryHtml}}
-        {{architectureGraphHtml}}
-        {{architectureEvidenceHtml}}
-    </section>
-
-    <section class="srcx-dashboard__section" id="builds">
-        {{buildsHeadingHtml}}
-        {{buildsHtml}}
-    </section>
-
-    <section class="srcx-dashboard__section" id="health">
-        {{healthHeadingHtml}}
-        <div class="srcx-dashboard__chart-grid">
-            <article class="srcx-dashboard__chart srcx-dashboard__chart--wide">
-                <header><span>Symbol ownership</span><strong>By build</strong></header>
-                {{symbolOwnershipHtml}}
-            </article>
-
-            <article class="srcx-dashboard__chart srcx-dashboard__chart--severity">
-                <header><span>Finding severity</span><strong>Project-scoped</strong></header>
-                {{severityHtml}}
-            </article>
-
-            <details class="srcx-dashboard__chart srcx-dashboard__chart--hubs srcx-dashboard__hub-chart">
-                <summary><span>Production hubs</span><strong>{{productionHubCount}} / expand</strong></summary>
-                <div class="srcx-dashboard__hub-chart-body">
-                    <div class="srcx-dashboard__hub-bars">{{hubBarsHtml}}</div>
+        <section class="srcx-dashboard__hero" id="top">
+            <div class="srcx-dashboard__hero-copy">
+                <div>
+                    <p class="srcx-dashboard__overline">SRCX / Multi-build architecture report</p>
+                    <h1>Workspace <strong>atlas.</strong></h1>
                 </div>
-            </details>
+                <div class="srcx-dashboard__hero-summary">
+                    <div class="srcx-dashboard__hero-tags">{{heroTagsHtml}}</div>
+                    <p class="srcx-dashboard__dek">
+                        This report maps which build owns each file, which files reference one another,
+                        and where each finding came from.
+                    </p>
+                </div>
+            </div>
+        </section>
 
-            <article class="srcx-dashboard__chart srcx-dashboard__chart--coverage">
-                <header><span>Source coverage</span><strong>Scan records</strong></header>
-                {{coverageHtml}}
-            </article>
-        </div>
-    </section>
+        {{metricStripHtml}}
 
-    <section class="srcx-dashboard__section srcx-dashboard__section--finding" id="findings">
-        {{findingsHeadingHtml}}
-        {{findingsHtml}}
-    </section>
+        <nav class="srcx-dashboard__nav" aria-label="Documentation sections">
+            <a href="#architecture"><span>01</span>Architecture</a>
+            <a href="#builds"><span>02</span>Builds</a>
+            <a href="#health"><span>03</span>Health</a>
+            <a href="#findings"><span>04</span>Findings</a>
+        </nav>
+
+        <section class="srcx-dashboard__section" id="architecture">
+            {{architectureHeadingHtml}}
+            {{architectureSummaryHtml}}
+            {{architectureEvidenceHtml}}
+        </section>
+
+        <section class="srcx-dashboard__section" id="builds">
+            {{buildsHeadingHtml}}
+            {{buildsHtml}}
+        </section>
+
+        <section class="srcx-dashboard__section" id="health">
+            {{healthHeadingHtml}}
+            <div class="srcx-dashboard__chart-grid">
+                <article class="srcx-dashboard__chart srcx-dashboard__chart--wide">
+                    <header><span>Symbol ownership</span><strong>By build</strong></header>
+                    {{symbolOwnershipHtml}}
+                </article>
+
+                <article class="srcx-dashboard__chart srcx-dashboard__chart--severity">
+                    <header><span>Finding severity</span><strong>Project-scoped</strong></header>
+                    {{severityHtml}}
+                </article>
+
+                <details class="srcx-dashboard__chart srcx-dashboard__chart--hubs srcx-dashboard__hub-chart">
+                    <summary><span>Production hubs</span><strong>{{productionHubCount}} / expand</strong></summary>
+                    <div class="srcx-dashboard__hub-chart-body">
+                        <div class="srcx-dashboard__hub-bars">{{hubBarsHtml}}</div>
+                    </div>
+                </details>
+
+                <article class="srcx-dashboard__chart srcx-dashboard__chart--coverage">
+                    <header><span>Source coverage</span><strong>Scan records</strong></header>
+                    {{coverageHtml}}
+                </article>
+            </div>
+        </section>
+
+        <section class="srcx-dashboard__section srcx-dashboard__section--finding" id="findings">
+            {{findingsHeadingHtml}}
+            {{findingsHtml}}
+        </section>
+    </details>
 
     <footer class="srcx-dashboard__footer">
         {{sourceNoteHtml}}

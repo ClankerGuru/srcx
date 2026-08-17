@@ -24,6 +24,9 @@ internal class WorkspaceHtmlResourceRenderer {
             appendLine()
             appendLine()
             append(resources.getValue(DASHBOARD_STYLES).trimEnd())
+            appendLine()
+            appendLine()
+            append(resources.getValue(ATLAS_MAP_STYLES).trimEnd())
         }
 
     fun scripts(): String =
@@ -61,6 +64,7 @@ internal class WorkspaceHtmlResourceRenderer {
 
         const val DASHBOARD = "dashboard.html"
         const val DASHBOARD_STYLES = "dashboard.css"
+        const val ATLAS_MAP_STYLES = "atlas-map.css"
         const val THEME = "theme.css"
         const val ARCHITECTURE_GRAPH_SCRIPT = "architecture-graph.js"
         const val RESOURCE_ROOT = "/zone/clanker/gradle/srcx/report/html/"
@@ -70,6 +74,7 @@ internal class WorkspaceHtmlResourceRenderer {
             listOf(
                 THEME,
                 DASHBOARD_STYLES,
+                ATLAS_MAP_STYLES,
                 DASHBOARD,
                 ARCHITECTURE_GRAPH_SCRIPT,
                 "components/disclosure.html",
