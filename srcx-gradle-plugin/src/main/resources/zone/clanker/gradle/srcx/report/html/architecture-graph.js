@@ -6426,10 +6426,9 @@
             var reviewSignal = nodeReviewPriority(node) / 5;
             var rank = rankById.get(node.id) || 0;
             node.visualSignal = Math.max(recordSignal, importanceSignal * 0.9, reviewSignal);
-            if (node.fileFindingCount > 0) node.visualSignal = 1;
             node.visualRank = rank + 1;
             node.visualPopulation = nodes.length;
-            node.visualTier = node.fileFindingCount > 0 || nodeReviewPriority(node) > 0 ||
+            node.visualTier = nodeReviewPriority(node) > 0 ||
                 node.visualSignal > 0 && rank < highSignalLimit ? "high" :
                 node.visualSignal > 0 && (rank < mediumSignalLimit || node.visualSignal >= 0.24) ?
                     "medium" : "low";

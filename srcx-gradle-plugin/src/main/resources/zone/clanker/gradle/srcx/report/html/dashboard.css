@@ -7125,12 +7125,6 @@
 }
 
 .srcx-dashboard__architecture-graph[data-srcx-graph-density="dense"]
-    .srcx-dashboard__architecture-svg-node.has-finding
-    .srcx-dashboard__architecture-svg-node-dot {
-    opacity: 1;
-}
-
-.srcx-dashboard__architecture-graph[data-srcx-graph-density="dense"]
     .srcx-dashboard__architecture-svg-node.is-signal-medium
     .srcx-dashboard__architecture-svg-node-dot {
     opacity: 0.66;

@@ -1127,13 +1127,6 @@ private fun assertAtlasVisualHierarchyContract(
     script shouldContain "pinnedLabelIds.has(node.id)"
     styles shouldContain ".srcx-dashboard__architecture-subgroup-region rect"
     styles shouldContain "[data-srcx-graph-density=\"dense\"]"
-    styles shouldContain
-        ".srcx-dashboard__architecture-graph[data-srcx-graph-density=\"dense\"]\n" +
-        "    .srcx-dashboard__architecture-svg-node.has-finding\n" +
-        "    .srcx-dashboard__architecture-svg-node-dot {\n" +
-        "    opacity: 1;\n}"
-    script shouldContain "if (node.fileFindingCount > 0) node.visualSignal = 1"
-    script shouldContain "node.visualTier = node.fileFindingCount > 0 || nodeReviewPriority(node) > 0 ||"
     styles shouldContain ".srcx-dashboard__architecture-symbol-file-finding-marker"
     styles shouldContain "fill: var(--srcx-tertiary)"
 }
