@@ -4510,6 +4510,7 @@
                 setBoxSelectMode(!state.boxSelectMode);
             });
             boxSelectButton.setAttribute("aria-pressed", "false");
+            boxSelectButton.title = "Box select";
             selectProjectButton = selectionActionButton("Select project", "select-project", function () {
                 selectScopeNodes("project");
             });
@@ -4524,6 +4525,7 @@
                 frameScope("build");
             });
             clearNodeSelectionButton = selectionActionButton("Clear", "clear-selection", clearNodeSelection);
+            clearNodeSelectionButton.title = "Clear";
             selectionStatus = document.createElement("span");
             selectionStatus.className = "srcx-dashboard__architecture-selection-status";
             selectionStatus.setAttribute("role", "status");
@@ -4538,10 +4540,54 @@
         function selectionActionButton(label, action, activate) {
             var button = document.createElement("button");
             button.type = "button";
-            button.textContent = label;
+            button.title = label;
+            button.setAttribute("aria-label", label);
             button.dataset.srcxGraphSelectionAction = action;
+            if (action === "box-select" || action === "clear-selection") {
+                button.className = "srcx-dashboard__architecture-selection-icon is-" + action;
+                button.appendChild(action === "box-select" ? boxSelectGlyph() : clearSelectionGlyph());
+            } else {
+                button.textContent = label;
+            }
             button.addEventListener("click", activate);
             return button;
+        }
+
+        function boxSelectGlyph() {
+            var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("viewBox", "0 0 24 24");
+            svg.setAttribute("aria-hidden", "true");
+            var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("x", "3.5");
+            rect.setAttribute("y", "4.5");
+            rect.setAttribute("width", "13");
+            rect.setAttribute("height", "11");
+            rect.setAttribute("fill", "none");
+            rect.setAttribute("stroke", "currentColor");
+            rect.setAttribute("stroke-width", "1.7");
+            rect.setAttribute("stroke-dasharray", "2.1 1.5");
+            var arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            arrow.setAttribute("d", "M15.5 17.2 V20.5 H18.8");
+            arrow.setAttribute("fill", "none");
+            arrow.setAttribute("stroke", "currentColor");
+            arrow.setAttribute("stroke-width", "1.7");
+            arrow.setAttribute("stroke-linecap", "square");
+            svg.append(rect, arrow);
+            return svg;
+        }
+
+        function clearSelectionGlyph() {
+            var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("viewBox", "0 0 24 24");
+            svg.setAttribute("aria-hidden", "true");
+            var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", "M7 7 L17 17 M17 7 L7 17");
+            path.setAttribute("fill", "none");
+            path.setAttribute("stroke", "currentColor");
+            path.setAttribute("stroke-width", "1.8");
+            path.setAttribute("stroke-linecap", "square");
+            svg.appendChild(path);
+            return svg;
         }
 
         function updateSelectionToolbar(announcement) {
@@ -4549,7 +4595,7 @@
             var count = state.selectedNodeIds.size;
             var anchor = selectionAnchorNode();
             boxSelectButton.setAttribute("aria-pressed", String(state.boxSelectMode));
-            boxSelectButton.textContent = state.boxSelectMode ? "Cancel box select" : "Box select";
+            boxSelectButton.title = "Box select";
             boxSelectButton.disabled = nodes.length === 0;
             selectProjectButton.disabled = !anchor;
             selectBuildButton.disabled = !anchor;

@@ -652,10 +652,11 @@ body.srcx-atlas-document {
     align-items: center;
     gap: 8px;
     inset: auto;
-    max-height: 44px;
-    overflow-x: auto;
+    max-height: none;
+    min-height: 44px;
+    overflow-x: hidden;
     overflow-y: hidden;
-    padding: 6px 10px;
+    padding: 4px 8px;
     position: relative;
     width: 100%;
     z-index: 8;
@@ -692,7 +693,9 @@ body.srcx-atlas-document {
 .srcx-theme .srcx-dashboard__architecture-selection-toolbar {
     display: flex;
     flex: 0 0 auto;
-    gap: 6px;
+    gap: 4px;
+    grid-column: auto;
+    margin-left: auto;
 }
 @media (min-width: 481px) {
     .srcx-theme .srcx-dashboard__architecture-viewport {
@@ -1146,5 +1149,101 @@ body.srcx-atlas-document {
         font-size: 10px;
         min-height: 26px;
         padding: 2px 6px;
+    }
+}
+
+/* Selection icons: marquee and X, pinned right of the chip rail. */
+.srcx-theme .srcx-dashboard__architecture-graph
+    .srcx-dashboard__architecture-navigator {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+}
+
+.srcx-theme .srcx-dashboard__architecture-filter--builds {
+    flex: 1 1 auto;
+    max-width: calc(100% - 96px);
+    min-width: 0;
+    overflow: hidden;
+}
+
+.srcx-theme .srcx-dashboard__architecture-filter-rail {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.srcx-theme .srcx-dashboard__architecture-selection-toolbar {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    display: flex !important;
+    flex: 0 0 auto;
+    gap: 4px;
+    grid-column: auto !important;
+    margin-inline-start: auto;
+    padding: 0;
+}
+
+.srcx-theme .srcx-dashboard__architecture-selection-icon {
+    align-items: center;
+    background: var(--srcx-surface);
+    border: var(--srcx-border-thin) solid var(--srcx-border);
+    box-sizing: border-box;
+    color: var(--srcx-ink);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 44px;
+    height: 44px;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0;
+    width: 44px;
+}
+
+.srcx-theme .srcx-dashboard__architecture-selection-icon svg {
+    display: block;
+    height: 22px;
+    width: 22px;
+}
+
+.srcx-theme .srcx-dashboard__architecture-selection-icon[aria-pressed="true"] {
+    background: var(--srcx-ink);
+    color: var(--srcx-surface);
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph.is-box-selecting
+    .srcx-dashboard__architecture-selection-icon.is-box-select {
+    background: var(--srcx-tertiary);
+    color: var(--srcx-ink);
+    outline: 2px solid var(--srcx-ink);
+    outline-offset: -2px;
+}
+
+.srcx-theme .srcx-dashboard__architecture-selection-icon:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+@media (max-width: 1440px), (max-width: 1024px), (max-width: 768px), (max-width: 390px) {
+    .srcx-theme .srcx-dashboard__architecture-graph
+        .srcx-dashboard__architecture-navigator {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-selection-toolbar {
+        flex: 0 0 auto;
+        margin-inline-start: auto;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-selection-icon {
+        flex: 0 0 44px;
+        height: 44px;
+        min-height: 44px;
+        min-width: 44px;
+        width: 44px;
     }
 }

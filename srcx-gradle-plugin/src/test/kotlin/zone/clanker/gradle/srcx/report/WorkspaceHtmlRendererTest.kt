@@ -1517,6 +1517,11 @@ private fun assertAtlasDirectManipulationContract(
 ) {
     script shouldContain "function ensureSelectionToolbar()"
     script shouldContain "selectionActionButton(\"Box select\""
+    script shouldContain "function boxSelectGlyph()"
+    script shouldContain "function clearSelectionGlyph()"
+    script shouldContain "button.title = label"
+    script shouldContain "stroke-dasharray"
+    script shouldNotContain "Cancel box select"
     script shouldContain "selectionActionButton(\"Select project\""
     script shouldContain "selectionActionButton(\"Select build\""
     script shouldContain "selectionActionButton(\"Frame selection\""
