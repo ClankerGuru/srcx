@@ -77,8 +77,6 @@
         var searchRecoveryStatus = root.querySelector("[data-srcx-search-recovery-status]");
         var searchRecoveryAction = root.querySelector("[data-srcx-search-recovery-action]");
         var clearSelectedButton = root.querySelector("[data-srcx-clear-selected]");
-        var filterToggle = root.querySelector("[data-srcx-filter-toggle]");
-        var filterClose = root.querySelector("[data-srcx-filter-close]");
         var fullscreenButton = controls && controls.querySelector("[data-srcx-graph-fullscreen]");
         var fullscreenChromeToggle = root.querySelector("[data-srcx-fullscreen-chrome-toggle]");
         var detailKicker = detail && detail.querySelector("[data-srcx-detail-kicker]");
@@ -91,7 +89,7 @@
             !fullscreenButton || !fullscreenChromeToggle ||
             !relationshipKindFilter || !relationshipKindOptions || !searchRecovery || !searchRecoveryStatus ||
             !searchRecoveryAction || !detailKicker || !detailTitle || !detailFields || !detailClose ||
-            !detailResize || !clearSelectedButton || !filterToggle) return false;
+            !detailResize || !clearSelectedButton) return false;
 
         var data;
         try {
@@ -100,6 +98,12 @@
             return false;
         }
         if (!validGraphData(data)) return false;
+        if (root.dataset.srcxAtlasState === "empty" ||
+            ((data.fileNodes.length + data.nodes.length) === 0)) {
+            restoreFallback(root);
+            root.dataset.srcxEnhancement = "empty";
+            return true;
+        }
 
         var state = {
             view: data.defaultView,
@@ -268,7 +272,7 @@
         root.dataset.srcxEnhancement = "ready";
         fallback.hidden = true;
         controls.hidden = false;
-        setFiltersOpen(false);
+        setFiltersOpen(true);
         wireFilterPanel();
         wireClearSelected();
 
@@ -1144,19 +1148,13 @@
         }
 
         function setFiltersOpen(open) {
-            root.dataset.srcxFiltersOpen = open ? "true" : "false";
-            navigatorElement.hidden = !open;
-            filterToggle.setAttribute("aria-expanded", String(open));
-            filterToggle.textContent = open ? "Filters open" : "Filter";
+            root.dataset.srcxFiltersOpen = "true";
+            navigatorElement.hidden = false;
+            requestResize();
         }
 
         function wireFilterPanel() {
-            filterToggle.addEventListener("click", function () {
-                setFiltersOpen(root.dataset.srcxFiltersOpen !== "true");
-            });
-            if (filterClose) {
-                filterClose.addEventListener("click", function () { setFiltersOpen(false); });
-            }
+            setFiltersOpen(true);
         }
 
         function hasActiveSelection() {
@@ -1532,7 +1530,7 @@
         }
 
         function renderFileDetail(node) {
-            openDetail("File source", accessibleNodeName(node));
+            openDetail("FILE SOURCE", node.name);
             var body = detailFields;
             var exactFindings = data.findings.filter(function (finding) {
                 return node.findingIds.includes(finding.id);
@@ -1565,9 +1563,29 @@
             var requestedFinding = evidenceRequest && evidenceRequest.findingId ? findings.find(function (finding) {
                 return finding.id === evidenceRequest.findingId;
             }) : null;
-            var selectedFinding = requestedFinding || (state.view === "problems" ? findings.find(function (finding) {
-                return Number.isInteger(finding.line) && finding.line > 0;
-            }) || findings[0] : null);
+            var selectedFinding = requestedFinding || findings[0] || null;
+            if (state.view !== "problems" && (exactFindings.length || componentFindings.length)) {
+                appendFindingSection(
+                    body,
+                    exactFindings,
+                    true,
+                    node,
+                    selectedFinding && selectedFinding.id,
+                    "Exact file findings",
+                    false,
+                );
+                if (componentFindings.length) {
+                    appendFindingSection(
+                        body,
+                        componentFindings,
+                        false,
+                        node,
+                        selectedFinding && selectedFinding.id,
+                        "Analyzer component findings",
+                        true,
+                    );
+                }
+            }
             var showAnalysisCycleDetail = analysisCycles.length > 0 && (
                 state.view === "problems" || !cycles.length || Boolean(
                     evidenceRequest && evidenceRequest.analysisCycleId,
@@ -1617,17 +1635,6 @@
                     node.importanceReasons.join(", ") : "No ranking signal"],
             ]));
             body.appendChild(fileRecordSummary(node));
-            if (state.view !== "problems" && exactFindings.length) {
-                appendFindingSection(
-                    body,
-                    exactFindings,
-                    false,
-                    node,
-                    selectedFinding && selectedFinding.id,
-                    "Exact file findings",
-                    false,
-                );
-            }
             var unlocated = data.findings.filter(function (finding) {
                 return finding.build === node.build && finding.project === node.project && finding.filePath === null;
             }).length;
@@ -4185,6 +4192,7 @@
         }
 
         function ensureSelectionToolbar() {
+            if (root.dataset.srcxAtlasState === "empty" || !data.fileNodes || data.fileNodes.length === 0) return;
             if (selectionToolbar) return;
             selectionToolbar = document.createElement("div");
             selectionToolbar.className = "srcx-dashboard__architecture-selection-toolbar";

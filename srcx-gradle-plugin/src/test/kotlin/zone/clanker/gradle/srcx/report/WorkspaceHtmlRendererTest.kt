@@ -92,7 +92,9 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain "Workspace architecture / source evidence"
                     article shouldContain "Scan complete"
                     article shouldContain "SRCX / Multi-build architecture report"
-                    article shouldContain "Workspace <strong>atlas.</strong>"
+                    article shouldNotContain "Workspace <strong>atlas.</strong>"
+                    article shouldNotContain "<h1>"
+                    article shouldNotContain "Explore files first ·"
                     article shouldContain "source relationships"
                     article shouldContain "which build owns each file"
                     article shouldContain "which files reference one another"
@@ -249,8 +251,7 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain "data-srcx-graph-view=\"cycles\""
                     article shouldContain "data-srcx-graph-search"
                     article shouldContain "data-srcx-clear-selected"
-                    article shouldContain "data-srcx-filter-toggle"
-                    article shouldContain "Current map filters"
+                    article shouldNotContain "data-srcx-filter-toggle"
                     article shouldContain "data-srcx-map-legend"
                     article shouldContain "srcx-dashboard__report-shell"
                     article shouldContain
@@ -276,14 +277,17 @@ class WorkspaceHtmlRendererTest :
                         "data-srcx-fullscreen-chrome-toggle aria-expanded=\"true\" " +
                         "aria-label=\"Hide map controls and filters\" hidden>Hide map controls</button>"
                     article shouldContain
-                        "data-srcx-graph-navigator hidden " +
+                        "data-srcx-graph-navigator " +
                         "aria-label=\"Atlas build, project, and source-set filters\""
+                    article shouldNotContain "data-srcx-graph-navigator hidden"
                     article shouldContain
                         "srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--builds"
                     article shouldContain
-                        "srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--projects"
+                        "srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--projects\" hidden"
                     article shouldContain
-                        "srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--source-sets"
+                        "srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--source-sets\" hidden"
+                    article shouldContain
+                        "srcx-dashboard__architecture-kind-filter\" hidden"
                     article shouldContain
                         "data-srcx-build-filter role=\"toolbar\" aria-label=\"Filter atlas by build\""
                     article shouldContain
@@ -295,8 +299,8 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain
                         "data-srcx-filter-context role=\"status\" aria-live=\"polite\" aria-atomic=\"true\""
                     article shouldContain "All builds / all projects / all source sets"
-                    article shouldContain "srcx-dashboard__architecture-filter-panel-head"
-                    article shouldContain "data-srcx-filter-close"
+                    article shouldNotContain "srcx-dashboard__architecture-filter-panel-head"
+                    article shouldNotContain "data-srcx-filter-close"
                     article shouldContain "srcx-dashboard__report-shell"
                     article shouldContain "01 Architecture / 02 Builds / 03 Health / 04 Findings"
                     (
@@ -476,13 +480,11 @@ class WorkspaceHtmlRendererTest :
                     (article.indexOf("data-srcx-architecture-graph") < article.indexOf("srcx-dashboard__hero")) shouldBe
                         true
                     styles shouldContain "srcx-dashboard__report-shell"
-                    styles shouldContain "data-srcx-filters-open"
-                    styles shouldContain "display: none !important"
+                    styles shouldNotContain "data-srcx-filters-open"
                     script shouldContain "function setFiltersOpen(open)"
                     script shouldContain "function wireClearSelected()"
                     script shouldContain "root.querySelector(\"[data-srcx-graph-search]\")"
                     script shouldContain "root.querySelector(\"[data-srcx-clear-selected]\")"
-                    script shouldContain "root.querySelector(\"[data-srcx-filter-toggle]\")"
                     script shouldContain "srcx-dashboard__architecture-svg-node-core"
                 }
             }
@@ -494,11 +496,14 @@ class WorkspaceHtmlRendererTest :
 
                 then("the renderer returns complete empty-state documentation") {
                     rendered.fragment shouldContain "empty-workspace"
+                    rendered.fragment shouldContain "data-srcx-atlas-state=\"empty\""
                     rendered.fragment shouldContain "No symbols"
                     rendered.fragment shouldContain "No production hubs"
                     rendered.fragment shouldContain "No scoped findings"
-                    rendered.fragment shouldContain "No cumulative relationship map"
+                    rendered.fragment shouldContain "Index a build"
                     rendered.fragment shouldContain
+                        "Add a Kotlin/Gradle build to this workspace and run srcx-context."
+                    rendered.fragment shouldNotContain
                         "No resolved non-import relationship connects indexed workspace files."
                     rendered.fragment shouldContain "Map limits and evidence / 0 relationship records / expand"
                     rendered.fragment shouldNotContain "Raw edge evidence"
@@ -576,7 +581,7 @@ class WorkspaceHtmlRendererTest :
                 val rendered = WorkspaceHtmlRenderer().render(report)
 
                 then("the workspace graph does not fall back to the legacy component model") {
-                    rendered.fragment shouldContain "No cumulative relationship map"
+                    rendered.fragment shouldContain "Index a build"
                     rendered.fragment shouldNotContain "LegacyArchitectureOnly"
                 }
             }

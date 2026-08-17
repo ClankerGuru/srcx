@@ -3,6 +3,7 @@ package zone.clanker.gradle.srcx.report
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import zone.clanker.gradle.srcx.model.AnalysisSummary
 import zone.clanker.gradle.srcx.model.ArchitectureSummary
 import zone.clanker.gradle.srcx.model.BuildEdge
@@ -44,11 +45,22 @@ class AtlasMapHtmlChromeTest :
 
                 then("the map chrome is present and the graph JSON keeps more than one build") {
                     rendered.document shouldContain "data-srcx-architecture-graph"
+                    rendered.document shouldContain "data-srcx-atlas-state=\"three-builds-with-problems\""
                     rendered.document shouldContain "data-srcx-clear-selected"
-                    rendered.document shouldContain "data-srcx-filter-toggle"
+                    rendered.document shouldNotContain "data-srcx-filter-toggle"
+                    rendered.document shouldNotContain "data-srcx-filter-close"
                     rendered.document shouldContain "data-srcx-map-legend"
                     rendered.document shouldContain "data-srcx-graph-search"
-                    rendered.document shouldContain "Current map filters"
+                    rendered.document shouldContain "data-srcx-graph-navigator"
+                    rendered.document shouldContain "FILE SOURCE"
+                    rendered.document shouldNotContain "data-srcx-graph-navigator hidden"
+                    rendered.document shouldNotContain "Workspace <strong>atlas.</strong>"
+                    rendered.document shouldNotContain "Explore files first ·"
+                    rendered.document shouldContain "srcx-dashboard__architecture-filter--projects\\\" hidden"
+                    rendered.document shouldContain "srcx-dashboard__architecture-filter--source-sets\\\" hidden"
+                    rendered.document shouldNotContain "data-srcx-path-filter"
+                    rendered.document shouldNotContain "data-srcx-path-tree"
+                    rendered.document shouldNotContain "data-srcx-graph-navigator hidden"
                     rendered.document shouldContain "\"name\":\"atlas-root\""
                     rendered.document shouldContain "\"name\":\"atlas-lib\""
                     rendered.document shouldContain "\"name\":\"atlas-plugin\""
@@ -58,7 +70,50 @@ class AtlasMapHtmlChromeTest :
                     rendered.document shouldContain "\"fileNodeCount\":3"
                     rendered.document shouldContain "\"fileNodeCount\":2"
                     rendered.document shouldContain "\"fileNodeCount\":1"
+                    rendered.fragment.substringBefore("</style>") shouldContain
+                        ".srcx-theme .srcx-dashboard__architecture-graph\n" +
+                        "    .srcx-dashboard__architecture-navigator"
+                    rendered.fragment.substringBefore("</style>") shouldContain "position: absolute"
+                    rendered.fragment.substringBefore("</style>") shouldContain "inset: 0 0 auto 0"
+                    rendered.fragment.substringBefore("</style>") shouldContain "overflow-x: auto"
+                    rendered.fragment.substringBefore("</style>") shouldContain "overflow-x: hidden"
+                    rendered.fragment.substringBefore("</style>") shouldContain "@media (max-width: 390px)"
+                    rendered.fragment.substringBefore("</style>") shouldContain "@media (max-width: 768px)"
+                    rendered.fragment.substringBefore("</style>") shouldContain "@media (max-width: 1024px)"
+                    rendered.fragment.substringBefore("</style>") shouldContain "@media (max-width: 1440px)"
+                    rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 390px)"
+                    rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 768px)"
+                    rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 1024px)"
+                    rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 1440px)"
                     Files.exists(preview) shouldBe true
+                }
+            }
+        }
+
+        given("an empty typed workspace report") {
+            `when`("it is rendered as a standalone atlas document") {
+                val rendered = WorkspaceHtmlRenderer().render(emptyAtlasReport())
+
+                then("the atlas publishes the empty data state from the scan") {
+                    rendered.document shouldContain "data-srcx-atlas-state=\"empty\""
+                    rendered.document shouldContain "Index a build"
+                    rendered.document shouldContain
+                        "Add a Kotlin/Gradle build to this workspace and run srcx-context."
+                    rendered.document shouldNotContain "Box select"
+                    rendered.document shouldNotContain "Shift-drag"
+                }
+            }
+        }
+
+        given("a single-build workspace report") {
+            `when`("it is rendered as a standalone atlas document") {
+                val rendered = WorkspaceHtmlRenderer().render(oneBuildAtlasReport())
+
+                then("the atlas publishes the one-build data state from the scan") {
+                    rendered.document shouldContain "data-srcx-atlas-state=\"one-build\""
+                    rendered.document shouldContain "\"name\":\"atlas-root\""
+                    rendered.document shouldNotContain "\"name\":\"atlas-lib\""
+                    rendered.document shouldContain "AtlasApp.kt"
                 }
             }
         }
@@ -70,6 +125,62 @@ private fun writeAtlasPreview(document: String): Path {
     val target = directory.resolve("index.html")
     Files.writeString(target, document)
     return target
+}
+
+private fun emptyAtlasReport(): WorkspaceReport =
+    WorkspaceReport("empty-workspace", emptyList(), emptyList(), emptyList(), null, emptyList(), emptyList())
+
+private fun oneBuildAtlasReport(): WorkspaceReport {
+    val app =
+        atlasSymbol(
+            "atlas-root",
+            ":consumer",
+            "AtlasApp",
+            "demo.atlas.AtlasApp",
+            "src/main/kotlin/demo/atlas/AtlasApp.kt",
+        )
+    val bind =
+        atlasSymbol(
+            "atlas-root",
+            ":consumer",
+            "AtlasBind",
+            "demo.atlas.AtlasBind",
+            "src/main/kotlin/demo/atlas/AtlasBind.kt",
+        )
+    val symbols = listOf(app, bind)
+    val relationships =
+        listOf(
+            atlasRelationship(app, bind, WorkspaceRelationshipKind.CALL, ReferenceKind.CALL, 10, "bind.attach()"),
+        )
+    return WorkspaceReport(
+        name = "atlas-root",
+        rootProjects = listOf(atlasProject(":consumer", symbols, null)),
+        includedBuilds = emptyList(),
+        buildEdges = emptyList(),
+        aggregateAnalysis = AnalysisSummary(emptyList(), emptyList(), emptyList()),
+        entryPoints = emptyList(),
+        interfaces = emptyList(),
+        workspaceIndex =
+            WorkspaceIndex(
+                symbols = symbols,
+                references = relationships.map { it.sourceEvidence },
+                relationships = relationships,
+                usages = symbols.map { symbol -> atlasUsage(symbol, relationships) },
+            ),
+        importantSymbols =
+            listOf(
+                ImportantSymbol(
+                    app,
+                    listOf(ImportantSymbolReason.ENTRY_POINT),
+                    ImportantSymbolReason.ENTRY_POINT.score,
+                    atlasUsage(app, relationships),
+                ),
+            ),
+        sourceFiles =
+            symbols
+                .map(::atlasSourceFile)
+                .sortedWith(compareBy({ it.build }, { it.project }, { it.sourceSet }, { it.projectRelativeFile })),
+    )
 }
 
 @Suppress("LongMethod")

@@ -80,11 +80,12 @@ internal class WorkspaceArchitectureHtmlRenderer(
     private fun renderGraph(graph: WorkspaceArchitectureGraphRenderer): String =
         buildString {
             val totalFileCandidates = graph.fileNodes.size + graph.omittedFileNodeCount
-            appendLine("<section class=\"srcx-dashboard__architecture-graph\" data-srcx-architecture-graph>")
+            appendLine(
+                "<section class=\"srcx-dashboard__architecture-graph\" data-srcx-architecture-graph " +
+                    "data-srcx-atlas-state=\"${atlasDataState(graph)}\">",
+            )
             appendLine("<header class=\"srcx-dashboard__architecture-graph-head\">")
             appendLine("<div class=\"srcx-dashboard__architecture-masthead-copy\">")
-            appendLine("<span>Explore files first · arrows from a file to the file it uses</span>")
-            appendLine("<strong>Workspace atlas</strong>")
             appendLine("<div class=\"srcx-dashboard__architecture-masthead-status\">")
             appendLine(
                 "<p data-srcx-graph-status role=\"status\" aria-live=\"polite\">Files / " +
@@ -99,26 +100,15 @@ internal class WorkspaceArchitectureHtmlRenderer(
                     "data-srcx-clear-selected disabled>Clear selected</button>",
             )
             appendLine("</div></div>")
-            appendLine("<div class=\"srcx-dashboard__architecture-masthead-tools\">")
-            appendLine("<label class=\"srcx-dashboard__architecture-search\"><span>Find</span>")
-            appendLine(
-                "<input type=\"search\" data-srcx-graph-search " +
-                    "placeholder=\"Search everything, or use class:, method:\"></label>",
-            )
-            appendLine(
-                "<button type=\"button\" class=\"srcx-dashboard__architecture-filter-toggle\" " +
-                    "data-srcx-filter-toggle aria-expanded=\"false\" aria-controls=\"srcx-atlas-filters\">" +
-                    "Filter</button>",
-            )
-            appendLine("</div></header>")
+            appendLine("</header>")
             appendLine(
                 "<button type=\"button\" class=\"srcx-dashboard__architecture-chrome-toggle\" " +
                     "data-srcx-fullscreen-chrome-toggle aria-expanded=\"true\" " +
                     "aria-label=\"Hide map controls and filters\" hidden>Hide map controls</button>",
             )
             appendLine(renderControls())
-            appendLine(renderNavigator())
             appendLine("<div class=\"srcx-dashboard__architecture-viewport\">")
+            appendLine(renderNavigator())
             appendLine(renderMapLegend())
             appendLine(renderFallback(graph))
             appendLine(
@@ -140,14 +130,8 @@ internal class WorkspaceArchitectureHtmlRenderer(
         buildString {
             appendLine(
                 "<nav class=\"srcx-dashboard__architecture-navigator\" id=\"srcx-atlas-filters\" " +
-                    "data-srcx-graph-navigator hidden " +
+                    "data-srcx-graph-navigator " +
                     "aria-label=\"Atlas build, project, and source-set filters\">",
-            )
-            appendLine("<header class=\"srcx-dashboard__architecture-filter-panel-head\">")
-            appendLine("<strong>Current map filters</strong>")
-            appendLine(
-                "<button type=\"button\" class=\"srcx-dashboard__architecture-filter-close\" " +
-                    "data-srcx-filter-close>Close</button></header>",
             )
             appendLine(
                 "<div class=\"srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--builds\">",
@@ -159,28 +143,23 @@ internal class WorkspaceArchitectureHtmlRenderer(
                     "role=\"toolbar\" aria-label=\"Filter atlas by build\"></div></div>",
             )
             appendLine(
-                "<div class=\"srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--projects\">",
+                "<div class=\"srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--projects\" hidden>",
             )
-            appendLine("<div class=\"srcx-dashboard__architecture-filter-label\"><strong>Projects</strong>")
-            appendLine("<span>Selected build modules</span></div>")
             appendLine(
                 "<div class=\"srcx-dashboard__architecture-filter-rail\" data-srcx-project-filter " +
                     "role=\"toolbar\" aria-label=\"Filter atlas by project\"></div></div>",
             )
             appendLine(
-                "<div class=\"srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--source-sets\">",
+                "<div class=\"srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--source-sets\" hidden>",
             )
-            appendLine("<div class=\"srcx-dashboard__architecture-filter-label\"><strong>Source sets</strong>")
-            appendLine("<span>Production, test, and custom sources</span></div>")
             appendLine(
                 "<div class=\"srcx-dashboard__architecture-filter-rail\" data-srcx-source-set-filter " +
                     "role=\"toolbar\" aria-label=\"Filter atlas by source set\"></div></div>",
             )
             appendLine(
-                "<div class=\"srcx-dashboard__architecture-kind-filter\" " +
+                "<div class=\"srcx-dashboard__architecture-kind-filter\" hidden " +
                     "data-srcx-relationship-kind-filter aria-label=\"Relationship kind filter\">",
             )
-            appendLine("<span>Relationship kind</span>")
             appendLine(
                 "<div class=\"srcx-dashboard__architecture-kind-filter-rail\" " +
                     "data-srcx-relationship-kind-options role=\"radiogroup\" " +
@@ -361,6 +340,11 @@ internal class WorkspaceArchitectureHtmlRenderer(
             )
             appendLine("<button type=\"button\" data-srcx-graph-view=\"cycles\" aria-pressed=\"false\">Cycles</button>")
             appendLine("</div>")
+            appendLine("<label class=\"srcx-dashboard__architecture-search\"><span>Find</span>")
+            appendLine(
+                "<input type=\"search\" data-srcx-graph-search " +
+                    "placeholder=\"Search everything, or use class:, method:\"></label>",
+            )
             appendLine("<div class=\"srcx-dashboard__architecture-search-recovery\" data-srcx-search-recovery hidden>")
             appendLine(
                 "<span data-srcx-search-recovery-status role=\"status\" " +
@@ -409,8 +393,8 @@ internal class WorkspaceArchitectureHtmlRenderer(
         resources.component(
             "empty-state",
             mapOf(
-                "title" to "No cumulative relationship map",
-                "body" to "No resolved non-import relationship connects indexed workspace files.",
+                "title" to "Index a build",
+                "body" to "Add a Kotlin/Gradle build to this workspace and run srcx-context.",
                 "mark" to "0",
                 "tone" to "neutral",
                 "classes" to "srcx-dashboard__architecture-empty",
@@ -430,7 +414,7 @@ internal class WorkspaceArchitectureHtmlRenderer(
                     "role=\"region\" aria-label=\"Architecture selection evidence\" " +
                     "tabindex=\"-1\">",
             )
-            appendLine("<header><span data-srcx-detail-kicker>Selection</span>")
+            appendLine("<header><span data-srcx-detail-kicker>FILE SOURCE</span>")
             appendLine(
                 "<button type=\"button\" data-srcx-detail-close " +
                     "aria-label=\"Close details\">Close</button></header>",
@@ -462,4 +446,19 @@ internal class WorkspaceArchitectureHtmlRenderer(
             )
             appendLine("</div></details>")
         }
+}
+
+internal fun atlasDataState(graph: WorkspaceArchitectureGraphRenderer): String {
+    val hasIndexedContent =
+        graph.sourceFiles.isNotEmpty() ||
+            graph.fileNodes.isNotEmpty() ||
+            graph.nodes.isNotEmpty() ||
+            graph.findings.isNotEmpty()
+    if (!hasIndexedContent) return "empty"
+    val buildCount = graph.builds.size
+    return when {
+        buildCount <= 1 -> "one-build"
+        buildCount == 3 && graph.findings.isNotEmpty() -> "three-builds-with-problems"
+        else -> "multi-build"
+    }
 }
