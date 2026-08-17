@@ -1030,6 +1030,7 @@ body.srcx-atlas-document {
 }
 
 .srcx-theme .srcx-dashboard__architecture-find-family button[aria-pressed="true"],
+.srcx-theme .srcx-dashboard__architecture-find-chip[aria-pressed="true"],
 .srcx-theme .srcx-dashboard__architecture-legend-toggle[aria-pressed="true"] {
     background: var(--srcx-ink);
     color: var(--srcx-surface);

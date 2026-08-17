@@ -141,6 +141,7 @@
             selectedFindKinds: new Set(),
             usedAtLeast: 0,
             legendOpen: false,
+            classKeep: null,
             cycleStepEdgeId: null,
             detailWidth: null,
             selectedEvidence: null,
@@ -1032,7 +1033,7 @@
                 return retainedQueryIds.has(node.id);
             }) : scopedNodes;
             filteredNodes = filteredNodes.filter(function (node) {
-                return matchesFindKinds(node) && matchesUsedAtLeast(node);
+                return matchesFindKinds(node) && matchesUsedAtLeast(node) && matchesClassKeep(node);
             });
             var filteredCandidateNodeCount = filteredNodes.length;
             var availableInternalRecordCount = filteredNodes.reduce(function (sum, node) {
@@ -1143,6 +1144,7 @@
         }
 
         function selectNode(node, origin) {
+            state.classKeep = null;
             prepareDetailFocus(origin);
             state.cycleStepEdgeId = null;
             state.selectedId = node.id;
@@ -1171,16 +1173,19 @@
 
         function clearSelection(restoreFocus) {
             var wasOpen = !detail.hidden;
+            var hadKeep = Boolean(state.classKeep);
             state.selectedId = null;
             state.selectedType = null;
             state.selectedEdge = null;
             state.cycleStepEdgeId = null;
             state.selectedEvidence = null;
+            state.classKeep = null;
             exitNodeNeighborhoodFocus(true);
             closeDetail();
             restoreHighlight();
             syncClearSelectedButton();
             if (restoreFocus && wasOpen) restoreDetailFocus();
+            if (hadKeep) draw();
         }
 
         function setFiltersOpen(open) {
@@ -1226,10 +1231,17 @@
         }
 
         function clearNodeSelection() {
-            if (!state.selectedNodeIds.size) return updateSelectionToolbar();
+            var hadKeep = Boolean(state.classKeep);
+            state.classKeep = null;
+            if (!state.selectedNodeIds.size) {
+                if (hadKeep) draw();
+                else updateSelectionToolbar();
+                return;
+            }
             state.selectedNodeIds = new Set();
             applyGroupSelectionClasses();
             updateSelectionToolbar("Node selection cleared");
+            if (hadKeep) draw();
         }
 
         function applyGroupSelectionClasses() {
@@ -3658,6 +3670,78 @@
             return records;
         }
 
+        function visibleKeepId(sourceId) {
+            if (!sourceId) return null;
+            if (state.view === "symbols") {
+                return symbolEntityById.has(sourceId) ? sourceId : null;
+            }
+            if (fileEntityById.has(sourceId)) return sourceId;
+            var symbol = symbolEntityById.get(sourceId);
+            if (symbol) {
+                var declaring = fileEntityForSymbol(symbol);
+                if (declaring) return declaring.id;
+            }
+            var host = availableFileNodes.find(function (file) {
+                return (file.symbols || []).some(function (member) { return member.id === sourceId; });
+            });
+            return host ? host.id : null;
+        }
+
+        function classKeepAnchorId(selectedClass) {
+            if (state.view === "symbols") return selectedClass.id;
+            var file = fileEntityForSymbol(selectedClass);
+            if (file) return file.id;
+            var selectedFile = nodes.find(function (node) {
+                return node.entityType === "file" && state.selectedNodeIds.has(node.id);
+            });
+            return selectedFile ? selectedFile.id : selectedClass.id;
+        }
+
+        function classKeepRelatedIds(selectedClass, mode, build) {
+            var records = mode === "uses" ?
+                incomingClassRecords(selectedClass.id).filter(function (record) {
+                    return record.kind !== "IMPLEMENTS" && record.kind !== "EXTENDS";
+                }) :
+                incomingClassRecords(selectedClass.id, ["IMPLEMENTS", "EXTENDS"]);
+            if (mode === "build") {
+                records = records.filter(function (record) { return record.sourceBuild === build; });
+            }
+            var ids = [];
+            records.forEach(function (record) {
+                var id = visibleKeepId(record.sourceId);
+                if (id && ids.indexOf(id) < 0) ids.push(id);
+            });
+            return ids;
+        }
+
+        function matchesClassKeep(node) {
+            if (!state.classKeep || !state.classKeep.ids) return true;
+            return state.classKeep.ids.has(node.id);
+        }
+
+        function applyClassKeep(mode, build) {
+            var selectedClass = selectedClassNode();
+            if (!selectedClass) return;
+            var buildName = build || null;
+            if (state.classKeep && state.classKeep.mode === mode && state.classKeep.build === buildName) {
+                state.classKeep = null;
+                if (typeof exitNodeNeighborhoodFocus === "function") exitNodeNeighborhoodFocus(true);
+                draw();
+                return;
+            }
+            var ids = new Set(classKeepRelatedIds(selectedClass, mode, buildName));
+            ids.add(classKeepAnchorId(selectedClass));
+            state.classKeep = {
+                mode: mode,
+                build: buildName,
+                classId: selectedClass.id,
+                anchorId: classKeepAnchorId(selectedClass),
+                ids: ids,
+            };
+            if (typeof exitNodeNeighborhoodFocus === "function") exitNodeNeighborhoodFocus(true);
+            draw();
+        }
+
         function renderFindSelection() {
             var selectedClass = selectedClassNode();
             findSelection.replaceChildren();
@@ -3674,27 +3758,38 @@
                 if (record.sourceBuild && builds.indexOf(record.sourceBuild) < 0) builds.push(record.sourceBuild);
             });
             findSelection.hidden = false;
-            var useChip = document.createElement("button");
-            useChip.type = "button";
-            useChip.className = "srcx-dashboard__architecture-find-chip";
-            useChip.textContent = "who uses " + uses.length;
-            useChip.disabled = true;
-            var implementChip = document.createElement("button");
-            implementChip.type = "button";
-            implementChip.className = "srcx-dashboard__architecture-find-chip";
-            implementChip.textContent = "who implements " + implementors.length;
-            implementChip.disabled = true;
-            findSelection.append(useChip, implementChip);
+            findSelection.appendChild(classKeepChip("uses", "who uses " + uses.length, uses.length, null));
+            findSelection.appendChild(classKeepChip("implements", "who implements " + implementors.length,
+                implementors.length, null));
             builds.forEach(function (buildName) {
-                var chip = document.createElement("button");
-                chip.type = "button";
-                chip.className = "srcx-dashboard__architecture-find-chip is-build";
-                chip.textContent = buildName;
-                chip.disabled = true;
+                var count = implementors.filter(function (record) {
+                    return record.sourceBuild === buildName;
+                }).length;
+                var chip = classKeepChip("build", buildName, count, buildName);
+                chip.classList.add("is-build");
                 var color = buildColor(buildName, buildByName);
                 if (color) chip.style.setProperty("--srcx-build-color", color);
                 findSelection.appendChild(chip);
             });
+        }
+
+        function classKeepChip(mode, label, count, build) {
+            var chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "srcx-dashboard__architecture-find-chip";
+            chip.textContent = label;
+            chip.dataset.srcxClassKeep = mode;
+            if (build) chip.dataset.srcxClassKeepBuild = build;
+            var pressed = Boolean(state.classKeep && state.classKeep.mode === mode &&
+                state.classKeep.build === (build || null));
+            chip.setAttribute("aria-pressed", String(pressed));
+            chip.disabled = count === 0;
+            chip.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                applyClassKeep(mode, build);
+            });
+            return chip;
         }
 
         function renderFindChrome() {
@@ -3725,6 +3820,7 @@
         function clearFindChrome() {
             state.selectedFindKinds = new Set();
             state.usedAtLeast = 0;
+            state.classKeep = null;
             state.query = "";
             search.value = "";
             renderFindChrome();
