@@ -248,6 +248,11 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain "data-srcx-graph-view=\"problems\""
                     article shouldContain "data-srcx-graph-view=\"cycles\""
                     article shouldContain "data-srcx-graph-search"
+                    article shouldContain "data-srcx-clear-selected"
+                    article shouldContain "data-srcx-filter-toggle"
+                    article shouldContain "Current map filters"
+                    article shouldContain "data-srcx-map-legend"
+                    article shouldContain "srcx-dashboard__report-shell"
                     article shouldContain
                         "data-srcx-relationship-kind-filter aria-label=\"Relationship kind filter\""
                     article shouldContain
@@ -290,10 +295,10 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain
                         "data-srcx-filter-context role=\"status\" aria-live=\"polite\" aria-atomic=\"true\""
                     article shouldContain "All builds / all projects / all source sets"
-                    article shouldContain "srcx-dashboard__architecture-filter-panel"
-                    article shouldContain "<strong>Filter</strong>"
-                    article shouldContain "srcx-dashboard__doc-nav"
-                    article shouldContain "01–04 sections"
+                    article shouldContain "srcx-dashboard__architecture-filter-panel-head"
+                    article shouldContain "data-srcx-filter-close"
+                    article shouldContain "srcx-dashboard__report-shell"
+                    article shouldContain "01 Architecture / 02 Builds / 03 Health / 04 Findings"
                     (
                         article.indexOf("data-srcx-architecture-graph") in
                             0 until article.indexOf("class=\"srcx-dashboard__hero\"")
@@ -455,6 +460,30 @@ class WorkspaceHtmlRendererTest :
                 then("all resource template slots are resolved") {
                     rendered.fragment shouldNotContain "{{"
                     rendered.document shouldNotContain "{{"
+                }
+
+                then("the map-first chrome keeps filters off the hero and exposes FILTER controls") {
+                    val styles = rendered.fragment.substringBefore("</style>")
+                    val script =
+                        WorkspaceHtmlResourceRenderer.readClasspathResource(
+                            WorkspaceHtmlResourceRenderer.ARCHITECTURE_GRAPH_SCRIPT,
+                        )
+                    rendered.document shouldContain "class=\"srcx-atlas-document\""
+                    article.indexOf("data-srcx-architecture-graph") shouldBe
+                        article.indexOf("data-srcx-architecture-graph").coerceAtMost(
+                            article.indexOf("srcx-dashboard__hero"),
+                        )
+                    (article.indexOf("data-srcx-architecture-graph") < article.indexOf("srcx-dashboard__hero")) shouldBe
+                        true
+                    styles shouldContain "srcx-dashboard__report-shell"
+                    styles shouldContain "data-srcx-filters-open"
+                    styles shouldContain "display: none !important"
+                    script shouldContain "function setFiltersOpen(open)"
+                    script shouldContain "function wireClearSelected()"
+                    script shouldContain "root.querySelector(\"[data-srcx-graph-search]\")"
+                    script shouldContain "root.querySelector(\"[data-srcx-clear-selected]\")"
+                    script shouldContain "root.querySelector(\"[data-srcx-filter-toggle]\")"
+                    script shouldContain "srcx-dashboard__architecture-svg-node-core"
                 }
             }
         }
@@ -1571,7 +1600,6 @@ private fun assertAtlasNavigatorStyleContract(styles: String) {
     styles shouldContain "@container (max-width: 768px)"
     styles shouldContain "@container (max-width: 1024px)"
     styles shouldContain "@container (max-width: 1440px)"
-    styles shouldContain ".srcx-dashboard__doc-nav"
     styles shouldContain "overflow-y: visible"
 }
 

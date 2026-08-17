@@ -82,7 +82,10 @@ internal class WorkspaceArchitectureHtmlRenderer(
             val totalFileCandidates = graph.fileNodes.size + graph.omittedFileNodeCount
             appendLine("<section class=\"srcx-dashboard__architecture-graph\" data-srcx-architecture-graph>")
             appendLine("<header class=\"srcx-dashboard__architecture-graph-head\">")
-            appendLine("<div><span>Interactive source map</span><strong>Workspace atlas</strong></div>")
+            appendLine("<div class=\"srcx-dashboard__architecture-masthead-copy\">")
+            appendLine("<span>Explore files first · arrows from a file to the file it uses</span>")
+            appendLine("<strong>Workspace atlas</strong>")
+            appendLine("<div class=\"srcx-dashboard__architecture-masthead-status\">")
             appendLine(
                 "<p data-srcx-graph-status role=\"status\" aria-live=\"polite\">Files / " +
                     "${graph.fileNodes.size} of $totalFileCandidates relationship or exact-finding file candidates " +
@@ -91,7 +94,23 @@ internal class WorkspaceArchitectureHtmlRenderer(
                     "${graph.shownRelationshipRecordCount} of ${graph.totalRelationshipRecordCount} relationship " +
                     "records shown from the total workspace set</p>",
             )
-            appendLine("</header>")
+            appendLine(
+                "<button type=\"button\" class=\"srcx-dashboard__architecture-clear-selected\" " +
+                    "data-srcx-clear-selected disabled>Clear selected</button>",
+            )
+            appendLine("</div></div>")
+            appendLine("<div class=\"srcx-dashboard__architecture-masthead-tools\">")
+            appendLine("<label class=\"srcx-dashboard__architecture-search\"><span>Find</span>")
+            appendLine(
+                "<input type=\"search\" data-srcx-graph-search " +
+                    "placeholder=\"Search everything, or use class:, method:\"></label>",
+            )
+            appendLine(
+                "<button type=\"button\" class=\"srcx-dashboard__architecture-filter-toggle\" " +
+                    "data-srcx-filter-toggle aria-expanded=\"false\" aria-controls=\"srcx-atlas-filters\">" +
+                    "Filter</button>",
+            )
+            appendLine("</div></header>")
             appendLine(
                 "<button type=\"button\" class=\"srcx-dashboard__architecture-chrome-toggle\" " +
                     "data-srcx-fullscreen-chrome-toggle aria-expanded=\"true\" " +
@@ -100,6 +119,7 @@ internal class WorkspaceArchitectureHtmlRenderer(
             appendLine(renderControls())
             appendLine(renderNavigator())
             appendLine("<div class=\"srcx-dashboard__architecture-viewport\">")
+            appendLine(renderMapLegend())
             appendLine(renderFallback(graph))
             appendLine(
                 "<svg class=\"srcx-dashboard__architecture-svg\" data-srcx-graph-svg hidden " +
@@ -119,16 +139,16 @@ internal class WorkspaceArchitectureHtmlRenderer(
     private fun renderNavigator(): String =
         buildString {
             appendLine(
-                "<nav class=\"srcx-dashboard__architecture-navigator\" data-srcx-graph-navigator hidden " +
+                "<nav class=\"srcx-dashboard__architecture-navigator\" id=\"srcx-atlas-filters\" " +
+                    "data-srcx-graph-navigator hidden " +
                     "aria-label=\"Atlas build, project, and source-set filters\">",
             )
-            appendLine("<details class=\"srcx-dashboard__architecture-filter-panel\" open>")
-            appendLine("<summary class=\"srcx-dashboard__architecture-filter-summary\"><strong>Filter</strong>")
+            appendLine("<header class=\"srcx-dashboard__architecture-filter-panel-head\">")
+            appendLine("<strong>Current map filters</strong>")
             appendLine(
-                "<span data-srcx-filter-context role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">" +
-                    "All builds / all projects / all source sets</span></summary>",
+                "<button type=\"button\" class=\"srcx-dashboard__architecture-filter-close\" " +
+                    "data-srcx-filter-close>Close</button></header>",
             )
-            appendLine("<div class=\"srcx-dashboard__architecture-filter-groups\">")
             appendLine(
                 "<div class=\"srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--builds\">",
             )
@@ -156,9 +176,37 @@ internal class WorkspaceArchitectureHtmlRenderer(
                 "<div class=\"srcx-dashboard__architecture-filter-rail\" data-srcx-source-set-filter " +
                     "role=\"toolbar\" aria-label=\"Filter atlas by source set\"></div></div>",
             )
-            appendLine("</div></details>")
+            appendLine(
+                "<div class=\"srcx-dashboard__architecture-kind-filter\" " +
+                    "data-srcx-relationship-kind-filter aria-label=\"Relationship kind filter\">",
+            )
+            appendLine("<span>Relationship kind</span>")
+            appendLine(
+                "<div class=\"srcx-dashboard__architecture-kind-filter-rail\" " +
+                    "data-srcx-relationship-kind-options role=\"radiogroup\" " +
+                    "aria-label=\"Filter map by relationship kind\"></div></div>",
+            )
+            appendLine(
+                "<p class=\"srcx-dashboard__architecture-filter-context\" data-srcx-filter-context " +
+                    "role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">" +
+                    "All builds / all projects / all source sets</p>",
+            )
             appendLine("</nav>")
         }
+
+    private fun renderMapLegend(): String =
+        """
+        <aside class="srcx-dashboard__architecture-legend srcx-dashboard__architecture-legend--atlas" data-srcx-map-legend>
+        <strong>Edges</strong>
+        <span><i class="is-arrow" aria-hidden="true"></i>Call</span>
+        <span><i class="is-heuristic-line" aria-hidden="true"></i>Type / heuristic</span>
+        <span><i class="is-cross-build-line" aria-hidden="true"></i>Cross-build</span>
+        <strong>Rings / size</strong>
+        <span><i class="is-importance-ring" aria-hidden="true"></i>Core = file</span>
+        <span><i class="is-finding-ring" aria-hidden="true"></i>Red = finding</span>
+        <span><i class="is-cycle-ring" aria-hidden="true"></i>Cycle</span>
+        </aside>
+        """.trimIndent() + "\n"
 
     private fun renderAtlasGuide(graph: WorkspaceArchitectureGraphRenderer): String =
         buildString {
@@ -313,21 +361,6 @@ internal class WorkspaceArchitectureHtmlRenderer(
             )
             appendLine("<button type=\"button\" data-srcx-graph-view=\"cycles\" aria-pressed=\"false\">Cycles</button>")
             appendLine("</div>")
-            appendLine(
-                "<div class=\"srcx-dashboard__architecture-kind-filter\" " +
-                    "data-srcx-relationship-kind-filter aria-label=\"Relationship kind filter\">",
-            )
-            appendLine("<span>Relationship kind</span>")
-            appendLine(
-                "<div class=\"srcx-dashboard__architecture-kind-filter-rail\" " +
-                    "data-srcx-relationship-kind-options role=\"radiogroup\" " +
-                    "aria-label=\"Filter map by relationship kind\"></div></div>",
-            )
-            appendLine("<label class=\"srcx-dashboard__architecture-search\"><span>Find</span>")
-            appendLine(
-                "<input type=\"search\" data-srcx-graph-search " +
-                    "placeholder=\"file, class, function...\"></label>",
-            )
             appendLine("<div class=\"srcx-dashboard__architecture-search-recovery\" data-srcx-search-recovery hidden>")
             appendLine(
                 "<span data-srcx-search-recovery-status role=\"status\" " +
