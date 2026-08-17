@@ -529,8 +529,10 @@
             subgroupGroups = renderSubgroupRegions(subgroupLayer, layout.subgroups, layout.subgroupCells);
             initializeNodes(nodes, layout);
             restorePinnedNodePositions(nodes);
-            assignLabelDirections(nodes, layout.cells, layout.subgroupCells);
-            constrainNodesToBuildCells(nodes, layout.cells, layout.projectCells, layout.subgroupCells);
+            if (width > 480) {
+                assignLabelDirections(nodes, layout.cells, layout.subgroupCells);
+                constrainNodesToBuildCells(nodes, layout.cells, layout.projectCells, layout.subgroupCells);
+            }
             positionLabels(nodeGroups);
             updateBuildRegions(nodes, buildGroups, layout.cells);
             updateProjectRegions(projectGroups, layout.projectCells, nodes);
@@ -1108,8 +1110,10 @@
 
         function ticked() {
             var positionedNodes = graphLayoutNodes();
-            assignLabelDirections(positionedNodes, layout.cells, layout.subgroupCells);
-            constrainNodesToBuildCells(positionedNodes, layout.cells, layout.projectCells, layout.subgroupCells);
+            if (width > 480) {
+                assignLabelDirections(positionedNodes, layout.cells, layout.subgroupCells);
+                constrainNodesToBuildCells(positionedNodes, layout.cells, layout.projectCells, layout.subgroupCells);
+            }
             nodeGroups.attr("transform", function (node) { return "translate(" + node.x + "," + node.y + ")"; });
             positionLabels(nodeGroups);
             positionRenderedEdges(edgeGroups, renderedLinks, positionedNodes);
@@ -5926,7 +5930,13 @@
     function layoutSeedToViewport(nodes, width, height, buildByName) {
         var gap = 8;
         var pad = 6;
-        var frame = { x: pad, y: pad, w: Math.max(1, width - pad * 2), h: Math.max(1, height - pad * 2) };
+        var overlay = 44;
+        var frame = {
+            x: pad,
+            y: pad + overlay,
+            w: Math.max(1, width - pad * 2),
+            h: Math.max(1, height - pad * 2 - overlay),
+        };
         var projects = Array.from(d3.group(nodes, function (node) {
             return projectKey(node.build, node.project);
         }), function (entry) {
@@ -5964,7 +5974,30 @@
                 weight: members.reduce(function (sum, project) { return sum + project.weight; }, 0),
             };
         }).sort(function (left, right) { return left.key.localeCompare(right.key); });
-        var buildTiles = tileWeightedRects(buildItems, frame.x, frame.y, frame.w, frame.h, gap);
+        var cols = seedLabelColumns(frame.w);
+        var heading = 10;
+        var bandGap = 2;
+        var totalRows = buildItems.reduce(function (sum, item) {
+            return sum + Math.max(1, Math.ceil(item.weight / Math.max(1, cols)));
+        }, 0);
+        var reserved = buildItems.length * (heading + bandGap);
+        var rowH = Math.max(26, Math.min(28, (frame.h - reserved) / Math.max(1, totalRows)));
+        var cursor = frame.y;
+        var buildTiles = new Map();
+        buildItems.forEach(function (buildItem) {
+            var rows = Math.max(1, Math.ceil(buildItem.weight / Math.max(1, cols)));
+            var band = heading + rows * rowH;
+            buildTiles.set(buildItem.key, {
+                x: frame.x,
+                y: cursor,
+                w: frame.w,
+                h: band,
+                cols: cols,
+                heading: heading,
+                rowH: rowH,
+            });
+            cursor += band + bandGap;
+        });
         var cells = new Map();
         var centers = new Map();
         var projectCells = new Map();
@@ -5977,39 +6010,42 @@
             var buildCell = { minX: tile.x, minY: tile.y, maxX: tile.x + tile.w, maxY: tile.y + tile.h };
             cells.set(buildItem.build, buildCell);
             centers.set(buildItem.build, rectangleCenter(buildCell));
-            var projectTiles = tileWeightedRects(buildItem.projects, tile.x + 4, tile.y + 18, tile.w - 8, tile.h - 22, 6);
+            var allRects = [];
             buildItem.projects.forEach(function (project) {
-                var projectTile = projectTiles.get(project.key);
-                var projectCell = {
-                    minX: projectTile.x,
-                    minY: projectTile.y,
-                    maxX: projectTile.x + projectTile.w,
-                    maxY: projectTile.y + projectTile.h,
+                allRects = allRects.concat(project.rectangles);
+            });
+            var packed = packLabeledSeedGrid(allRects, tile);
+            buildItem.projects.forEach(function (project) {
+                var memberHomes = [];
+                project.members.forEach(function (node) {
+                    var placed = packed.get(node.id);
+                    if (!placed) return;
+                    var own = project.subgroups.find(function (subgroup) {
+                        return subgroup.members.indexOf(node) >= 0;
+                    });
+                    node.subgroupKey = (own && own.key) || project.key;
+                    node.labelDirection = placed.direction;
+                    node.seedLabelLocked = true;
+                    node.fx = placed.x;
+                    node.fy = placed.y;
+                    homes.set(node.id, { x: placed.x, y: placed.y });
+                    memberHomes.push(placed);
+                });
+                var projectCell = memberHomes.length ? paddedHomeCell(memberHomes, buildCell, 10) : {
+                    minX: tile.x + 4,
+                    minY: tile.y + 18,
+                    maxX: tile.x + tile.w - 4,
+                    maxY: tile.y + tile.h - 4,
                 };
                 projectCells.set(project.key, projectCell);
-                var packed = packSeedIntoTile(project.rectangles, projectTile);
                 project.subgroups.forEach(function (subgroup) {
-                    var memberHomes = [];
+                    var subgroupHomes = [];
                     subgroup.members.forEach(function (node) {
                         var placed = packed.get(node.id);
-                        if (!placed) return;
-                        node.subgroupKey = subgroup.key;
-                        node.labelDirection = "right";
-                        homes.set(node.id, { x: placed.x, y: placed.y });
-                        memberHomes.push(placed);
+                        if (placed) subgroupHomes.push(placed);
                     });
-                    if (!memberHomes.length) return;
-                    var minX = Math.min.apply(null, memberHomes.map(function (home) { return home.x - 16; }));
-                    var maxX = Math.max.apply(null, memberHomes.map(function (home) { return home.x + 16; }));
-                    var minY = Math.min.apply(null, memberHomes.map(function (home) { return home.y - 14; }));
-                    var maxY = Math.max.apply(null, memberHomes.map(function (home) { return home.y + 14; }));
-                    var subgroupCell = {
-                        minX: Math.max(projectCell.minX + 2, minX),
-                        minY: Math.max(projectCell.minY + 2, minY),
-                        maxX: Math.min(projectCell.maxX - 2, maxX),
-                        maxY: Math.min(projectCell.maxY - 2, maxY),
-                    };
-                    subgroupCells.set(subgroup.key, subgroupCell);
+                    if (!subgroupHomes.length) return;
+                    subgroupCells.set(subgroup.key, paddedHomeCell(subgroupHomes, projectCell, 6));
                     subgroupByKey.set(subgroup.key, subgroup);
                     laidSubgroups.push(subgroup);
                 });
@@ -6026,6 +6062,17 @@
         };
     }
 
+    function seedLabelColumns(width) {
+        var cols = Math.max(1, Math.floor(Math.max(1, width) / 168));
+        if (width >= 220 && cols < 2) cols = 2;
+        return cols;
+    }
+
+    function seedLabelStackHeight(count, width) {
+        var cols = seedLabelColumns(width);
+        return Math.ceil(Math.max(1, count) / cols) * 28 + 16;
+    }
+
     function tileWeightedRects(items, x, y, w, h, gap) {
         var tiles = new Map();
         if (!items.length) return tiles;
@@ -6036,20 +6083,33 @@
         var ranked = items.slice().sort(function (left, right) {
             return right.weight - left.weight || left.key.localeCompare(right.key);
         });
-        var totalWeight = ranked.reduce(function (sum, item) { return sum + item.weight; }, 0) || 1;
-        var heavy = ranked[0];
-        if (heavy && heavy.weight / totalWeight >= 0.34 && ranked.length > 1) {
-            var band = Math.max(96, (h - gap) * heavy.weight / totalWeight);
-            tiles.set(heavy.key, { x: x, y: y, w: w, h: band });
-            tileWeightedRects(ranked.slice(1), x, y + band + gap, w, h - band - gap, gap)
-                .forEach(function (tile, key) { tiles.set(key, tile); });
+        var bands = [];
+        var rest = [];
+        ranked.forEach(function (item) {
+            if (item.weight >= 8) bands.push(item);
+            else rest.push(item);
+        });
+        var cursor = y;
+        var remaining = h;
+        bands.forEach(function (item) {
+            var need = seedLabelStackHeight(item.weight, w);
+            var band = Math.min(remaining, Math.max(need, 48));
+            tiles.set(item.key, { x: x, y: cursor, w: w, h: band });
+            cursor += band + gap;
+            remaining = y + h - cursor;
+        });
+        if (!rest.length) return tiles;
+        if (remaining <= 0) {
+            rest.forEach(function (item) {
+                tiles.set(item.key, { x: x, y: cursor, w: w, h: 28 });
+            });
             return tiles;
         }
         var left = [];
         var right = [];
         var leftWeight = 0;
         var rightWeight = 0;
-        ranked.forEach(function (item) {
+        rest.forEach(function (item) {
             if (leftWeight <= rightWeight) {
                 left.push(item);
                 leftWeight += item.weight;
@@ -6058,12 +6118,16 @@
                 rightWeight += item.weight;
             }
         });
-        if (!right.length) return stackWeightedRects(ranked, x, y, w, h, gap);
+        if (!right.length) {
+            stackWeightedRects(rest, x, cursor, w, remaining, gap)
+                .forEach(function (tile, key) { tiles.set(key, tile); });
+            return tiles;
+        }
         var colWidth = (w - gap) / 2;
-        stackWeightedRects(left, x, y, colWidth, h, gap).forEach(function (tile, key) { tiles.set(key, tile); });
-        stackWeightedRects(right, x + colWidth + gap, y, colWidth, h, gap).forEach(function (tile, key) {
-            tiles.set(key, tile);
-        });
+        stackWeightedRects(left, x, cursor, colWidth, remaining, gap)
+            .forEach(function (tile, key) { tiles.set(key, tile); });
+        stackWeightedRects(right, x + colWidth + gap, cursor, colWidth, remaining, gap)
+            .forEach(function (tile, key) { tiles.set(key, tile); });
         return tiles;
     }
 
@@ -6073,41 +6137,44 @@
         var available = h - gap * Math.max(0, items.length - 1);
         var cursor = y;
         items.forEach(function (item) {
-            var itemHeight = Math.max(28, available * item.weight / total);
+            var need = seedLabelStackHeight(item.weight, w);
+            var itemHeight = Math.max(need, available * item.weight / total);
             tiles.set(item.key, { x: x, y: cursor, w: w, h: itemHeight });
             cursor += itemHeight + gap;
         });
         return tiles;
     }
 
-    function packSeedIntoTile(rectangles, tile) {
+    function paddedHomeCell(homes, parent, pad) {
+        var minX = Math.min.apply(null, homes.map(function (home) { return home.x - 18; }));
+        var maxX = Math.max.apply(null, homes.map(function (home) { return home.x + 18; }));
+        var minY = Math.min.apply(null, homes.map(function (home) { return home.y - 14; }));
+        var maxY = Math.max.apply(null, homes.map(function (home) { return home.y + 14; }));
+        return {
+            minX: Math.max(parent.minX + 2, minX - pad),
+            minY: Math.max(parent.minY + 2, minY - pad),
+            maxX: Math.min(parent.maxX - 2, maxX + pad),
+            maxY: Math.min(parent.maxY - 2, maxY + pad),
+        };
+    }
+
+    function packLabeledSeedGrid(rectangles, tile) {
         var placed = new Map();
         if (!rectangles.length) return placed;
-        var availW = Math.max(48, tile.w - 12);
-        var availH = Math.max(28, tile.h - 16);
-        var best = null;
-        var maxCols = Math.max(1, rectangles.length);
-        for (var cols = 1; cols <= maxCols; cols += 1) {
-            var pack = packVariableRectangles(rectangles, cols, 6, cols);
-            if (!pack || !pack.width) continue;
-            var fits = pack.width <= availW + 1 && pack.height <= availH + 1;
-            var overflow = Math.max(0, pack.width - availW) + Math.max(0, pack.height - availH);
-            if (!best || (fits && !best.fits) || (fits === best.fits && overflow < best.overflow) ||
-                (fits === best.fits && overflow === best.overflow && pack.height < best.pack.height)) {
-                best = { pack: pack, fits: fits, overflow: overflow };
-            }
-            if (fits && pack.height <= availH) break;
-        }
-        var chosen = (best && best.pack) || packVariableRectangles(rectangles, 1, 6, 1);
-        var scale = Math.min(availW / Math.max(1, chosen.width), availH / Math.max(1, chosen.height), 1);
-        var originX = tile.x + 6 + Math.max(0, (availW - chosen.width * scale) / 2);
-        var originY = tile.y + 10 + Math.max(0, (availH - chosen.height * scale) / 2);
-        rectangles.forEach(function (rectangle) {
-            var spot = chosen.placements.get(rectangle.key);
-            if (!spot) return;
+        var ordered = rectangles.slice().sort(function (left, right) { return left.key.localeCompare(right.key); });
+        var cols = tile.cols || seedLabelColumns(tile.w);
+        var heading = tile.heading || 18;
+        var rows = Math.max(1, Math.ceil(ordered.length / Math.max(1, cols)));
+        var rowH = tile.rowH || Math.max(18, (tile.h - heading) / rows);
+        var mid = tile.x + tile.w / 2;
+        ordered.forEach(function (rectangle, index) {
+            var col = index % cols;
+            var row = Math.floor(index / cols);
+            var leftCol = cols > 1 && col === 0;
             placed.set(rectangle.key, {
-                x: originX + (spot.x + rectangle.nodeRadius + 8) * scale,
-                y: originY + (spot.y + rectangle.height / 2) * scale,
+                x: leftCol ? mid - 14 : (cols > 1 ? mid + 14 : tile.x + 16),
+                y: tile.y + heading + row * rowH + rowH / 2,
+                direction: leftCol ? "left" : "right",
             });
         });
         return placed;
@@ -7684,13 +7751,13 @@
     }
 
     function appendBuildRegionLabel(text, build) {
+        if (typeof window !== "undefined" && window.matchMedia &&
+            window.matchMedia("(max-width: 480px)").matches) return;
         text.append("tspan").text(build.name);
         var count = Number.isInteger(build.visibleNodeCount) ? build.visibleNodeCount : build.fileNodeCount;
         var entityType = build.visibleEntityType || "file";
         var noun = count === 1 ? entityType : entityType + "s";
         var context = build.context + " / " + count + " " + noun + " in this frame";
-        if (typeof window !== "undefined" && window.matchMedia &&
-            window.matchMedia("(max-width: 480px)").matches) return;
         text.append("tspan").attr("dx", 7).attr("class", "srcx-dashboard__architecture-build-context")
             .text(context);
     }
@@ -7715,6 +7782,10 @@
     }
 
     function wrappedNodeLabel(node) {
+        if (typeof window !== "undefined" && window.matchMedia &&
+            window.matchMedia("(max-width: 480px)").matches) {
+            return wrapVisibleLabel(nodeLabel(node), 22);
+        }
         return wrapVisibleLabel(nodeLabel(node), node.entityType === "file" ? 20 : 22);
     }
 

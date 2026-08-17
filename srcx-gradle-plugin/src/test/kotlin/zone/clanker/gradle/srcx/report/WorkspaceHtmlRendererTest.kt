@@ -1638,6 +1638,13 @@ private fun assertAtlasLabelFitContract(
     script shouldContain "var viewportAspect = Math.max(0.75, width / Math.max(1, height))"
     script shouldContain "var compactSeed = width <= 480"
     script shouldContain "function layoutSeedToViewport(nodes, width, height, buildByName)"
+    script shouldContain "function packLabeledSeedGrid(rectangles, tile)"
+    script shouldContain "function seedLabelColumns(width)"
+    script shouldContain "function seedLabelStackHeight(count, width)"
+    script shouldContain "var cols = tile.cols || seedLabelColumns(tile.w)"
+    script shouldContain "wrapVisibleLabel(nodeLabel(node), 22)"
+    script shouldContain "if (width > 480) {\n" +
+        "                assignLabelDirections(positionedNodes, layout.cells, layout.subgroupCells)"
     script shouldContain "if (compactSeed) return layoutSeedToViewport(nodes, width, height, buildByName)"
     script shouldContain "if (window.matchMedia(\"(max-width: 480px)\").matches) {\n" +
         "                svg.call(zoom.transform, d3.zoomIdentity);"
