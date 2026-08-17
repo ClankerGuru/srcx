@@ -65,25 +65,25 @@ Each included build also receives its own configured output directory with a das
 - Read local, workspace, and cross-build inbound separately. Local zero with workspace inbound is still workspace-referenced.
 - Treat zero resolved workspace inbound as absence of observed evidence, not proof that a symbol is unused.
 - The Atlas narrows Build → Project → Source set. Files opens with one globally bounded overview of at most 42 files.
-  Selecting a scope refills from the complete typed file catalog and deterministically pages at most 42 files plus
-  incident cross-scope endpoints; it does not merely filter the global overview.
-- Symbols likewise refills from the typed declaration and exact non-import relationship catalogs. Each page has at most
-  42 unique declaration/endpoint nodes. Hubs or cross-scope endpoints may repeat to keep both endpoints together, while
-  every exact relationship edge appears on exactly one page. Indexed, available, displayed, and not-on-page counts stay
-  distinct.
+  42 is All seed + Symbols-lens cap + hub-survival, not a pager. Selecting a scope refills from the complete typed file
+  catalog; it does not merely filter the global overview.
+- Symbols likewise refills from the typed declaration and exact non-import relationship catalogs. The All overview uses
+  the same 42 hub-survival cap. Hubs or cross-scope endpoints may remain to keep both endpoints together. Indexed,
+  available, and displayed counts stay distinct. Exact file findings stay reserved so Problems does not drop them behind
+  relationship-heavy files.
 - In the Atlas, `A -> B` means source in A has a resolved relationship record to a declaration in B. Arrows route around
   labels and rings; each badge counts displayed non-import records in that direction, and kind controls filter the
   categories present in the projection. “Call / construct records” are captured call or construction occurrences, not
   distinct callers or runtime executions; one line may contribute multiple records. Files aggregates records assigned
-  to the current page. Symbols shows only exact edges assigned to the current page and can show
-  fewer arrows even when hubs repeat across pages. A heavier arrow represents more displayed records, not greater
+  to the current Files or Symbols projection. Symbols shows only exact edges assigned to that
+  projection. A heavier arrow represents more displayed records, not greater
   certainty. Imports are excluded.
 - Selecting a file opens its complete embedded source in a horizontally resizable pane capped at 50% of the Atlas.
   Only the active symbol, relationship occurrence, or finding evidence is emphasized. Hover may preview one relationship
   occurrence, and Previous/Next pages repeated records; unrelated evidence remains unhighlighted.
 - Cycles exposes two distinct models. Observed file cycles are resolved strongly connected components in the complete
   available file-relationship catalog. Analyzer-inferred component cycles are closed, directed routes through qualified
-  analysis components and may contain participants without matched typed source or outside the current page. Their
+  analysis components and may contain participants without matched typed source or outside the current projection. Their
   explanatory route arrows are not resolved relationship records and do not contribute to relationship-count badges.
 - A finding deep-links to the Problems map or source only when it carries typed file, component, or component-cycle
   evidence. A project-scoped review prompt without that evidence remains visible without inventing a graph target.
@@ -107,15 +107,15 @@ Each included build also receives its own configured output directory with a das
 - The unified Build comparison counts one source-set record per analyzed Gradle project/source-set summary; its column
   maxima are exact values, while bar lengths are independently scaled visual comparisons.
 - Atlas node radius uses attached totals, not only currently drawn edges: file nodes use their payload's total workspace
-  inbound, outbound, and internal records; symbol nodes use records reconstructed across the available symbol pages.
+  inbound, outbound, and internal records; symbol nodes use records reconstructed across the available symbol catalog.
 - Embedded Atlas source is the full typed source-file set supplied by the immutable workspace report; the HTML renderer
   never performs arbitrary filesystem reads. Declaration lines keep subtle location marks; only the active declaration,
   relationship occurrence, or finding receives a strong highlight.
 - PSI parsing is static and does not model reflection, generated code, runtime DI graphs, Android lifecycle, or dynamic
   dispatch. Java/Kotlin support is limited to relationship kinds the current extractors can identify reliably.
 - Relationship pages are capped at 100 important symbols. The All-build Files overview is capped at 42 nodes; selected
-  scopes refill into deterministic pages of at most 42. Symbols pages also contain at most 42 unique nodes; hubs may
-  repeat, but every exact edge belongs to one page.
+  scopes refill from the typed catalog. The Symbols All overview also uses the 42 hub-survival cap. Hubs may remain so
+  both endpoints stay together. The map does not invent omitted relationship targets.
 
 ## Automatic generation
 

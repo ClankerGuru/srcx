@@ -164,16 +164,16 @@ metric, and the Column maximums cards print the exact largest value used by each
 ### Reading the Workspace Atlas
 
 The HTML Atlas opens with Files, one globally bounded overview of at most 42 relationship-connected files or files with
-exact findings. Its navigator narrows Build → Project → Source set. Selecting a scope refills Files from the complete
-typed source catalog instead of filtering the global overview, then creates deterministic pages of at most 42 files and
-incident cross-scope endpoints. Dense scopes report exact indexed, available, displayed, and not-on-this-page counts.
-Exact file findings are prioritized so Problems does not silently drop them behind relationship-heavy files.
+exact findings. 42 is the All seed, Symbols-lens cap, and hub-survival budget — not a pager. Its navigator narrows
+Build → Project → Source set. Selecting a scope refills Files from the complete typed source catalog instead of
+filtering the global overview. Exact file findings are reserved ahead of relationship-heavy files so Problems stays
+first-class and does not drop them. Omitted relationship targets stay as source-line evidence; the map does not invent
+graph nodes for them.
 
 Symbols refills from the typed declaration and exact non-import relationship catalogs for the selected scope, then
-paginates at no more than 42 unique declaration/endpoint nodes per page. A cross-scope endpoint or hub may repeat so an
-edge always keeps both endpoints, while every exact relationship edge is assigned to exactly one page. Declarations
-without a relationship remain reachable on later pages. Indexed, available, displayed, and not-on-this-page counts stay
-separate; none is presented as a runtime call count.
+applies the same 42 hub-survival cap in the All overview. A cross-scope endpoint or hub may remain so an edge always
+keeps both endpoints. Indexed, available, and displayed counts stay separate; none is presented as a runtime call
+count.
 
 An arrow points from source to dependency. Routes bend around node rings and labels, and the badge on an arrow is the
 number of displayed, non-import relationship records in that direction; a heavier arrow means more such records. Kind
@@ -182,8 +182,8 @@ fact: source declaration—or the owning build/project/source-set/file for an im
 line. Facts with that same address collapse to one record, retaining the most-specific relationship kind and then the
 strongest evidence. “Call / construct records” are captured source occurrences resolved as a call or construction
 relationship; the number is not a count of distinct callers or runtime executions, and one source line can contribute
-more than one distinct record. Files aggregates records between files assigned to the current page. Symbols shows the
-exact edges assigned to its current page, so it can show fewer arrows even when a repeated hub connects several pages.
+more than one distinct record. Files aggregates records between files in the current projection. Symbols shows the
+exact edges assigned to that projection.
 `DIRECT` means SRCX observed the source syntax, `DERIVED` means it resolved a target by
 deterministically composing source facts, and `HEURISTIC` means approximate syntax evidence needs review. None of these
 labels claims compiler-semantic or runtime certainty. Import facts may help resolution, but they are currently excluded
@@ -191,7 +191,7 @@ from relationship counts and arrows.
 
 Node radius uses attached totals rather than only the edges currently drawn. File nodes use their payload's total
 workspace inbound, outbound, and internal records; symbol nodes use inbound and outbound records reconstructed across
-the available symbol pages. Radius is not a measure of importance, severity, quality, traffic, or runtime frequency.
+the available symbol catalog. Radius is not a measure of importance, severity, quality, traffic, or runtime frequency.
 
 Selecting a file opens its complete embedded source in a horizontally resizable pane capped at half of the Atlas width.
 The source payload is the full, typed set of exact source files supplied by the immutable workspace report. The HTML
@@ -203,7 +203,7 @@ remains horizontally scrollable, and repeated records can be paged without leavi
 The cycle views deliberately keep two evidence models separate. An **observed file cycle** is a strongly connected
 component of the complete available file-relationship catalog. An **analyzer-inferred component cycle** is a closed,
 directed route of qualified analysis components and may include participants without matched typed source or outside
-the current page. Analyzer route arrows are explanatory overlays, not resolved relationship records, so they do not
+the current projection. Analyzer route arrows are explanatory overlays, not resolved relationship records, so they do not
 increase the arrow badges. The Atlas lists the complete typed route even when it cannot draw every participant.
 
 Findings deep-link into the Problems map or source pane only when the report carries typed evidence such as an exact file

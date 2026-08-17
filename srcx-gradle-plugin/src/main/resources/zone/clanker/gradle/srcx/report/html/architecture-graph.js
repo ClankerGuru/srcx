@@ -720,10 +720,14 @@
             }
             var analysisProjection = analysisCycleProjection(fileNodes, symbolNodes);
             if (state.view === "problems") {
+                var exactFindingFiles = fileNodes.filter(function (node) {
+                    return node.fileFindingCount > 0;
+                });
                 fileNodes = fileNodes.filter(function (node) {
                     return node.fileFindingCount > 0 || cycleMembers.has(node.id) ||
                         analysisFileMembers.has(node.id) || findingFileMembers.has(node.id);
                 });
+                fileNodes = mergeNodes(exactFindingFiles, fileNodes);
                 var problemIds = new Set(fileNodes.map(function (node) { return node.id; }));
                 fileLinks = fileLinks.filter(function (edge) {
                     return problemIds.has(edge.source) && problemIds.has(edge.target);
@@ -4175,7 +4179,8 @@
                 clearNodeSelectionButton,
                 selectionStatus,
             );
-            navigatorElement.insertBefore(selectionToolbar, filterContext);
+            var filterPanel = navigatorElement.querySelector(".srcx-dashboard__architecture-filter-panel");
+            navigatorElement.insertBefore(selectionToolbar, filterPanel || filterContext);
             updateSelectionToolbar();
         }
 
@@ -6376,9 +6381,10 @@
             var reviewSignal = nodeReviewPriority(node) / 5;
             var rank = rankById.get(node.id) || 0;
             node.visualSignal = Math.max(recordSignal, importanceSignal * 0.9, reviewSignal);
+            if (node.fileFindingCount > 0) node.visualSignal = 1;
             node.visualRank = rank + 1;
             node.visualPopulation = nodes.length;
-            node.visualTier = nodeReviewPriority(node) > 0 ||
+            node.visualTier = node.fileFindingCount > 0 || nodeReviewPriority(node) > 0 ||
                 node.visualSignal > 0 && rank < highSignalLimit ? "high" :
                 node.visualSignal > 0 && (rank < mediumSignalLimit || node.visualSignal >= 0.24) ?
                     "medium" : "low";

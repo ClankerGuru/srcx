@@ -290,6 +290,14 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain
                         "data-srcx-filter-context role=\"status\" aria-live=\"polite\" aria-atomic=\"true\""
                     article shouldContain "All builds / all projects / all source sets"
+                    article shouldContain "srcx-dashboard__architecture-filter-panel"
+                    article shouldContain "<strong>Filter</strong>"
+                    article shouldContain "srcx-dashboard__doc-nav"
+                    article shouldContain "01–04 sections"
+                    (
+                        article.indexOf("data-srcx-architecture-graph") in
+                            0 until article.indexOf("class=\"srcx-dashboard__hero\"")
+                    ) shouldBe true
                     article shouldContain "data-srcx-atlas-guide"
                     article shouldContain "How to read this map"
                     article shouldContain "The colored square beside a symbol name"
@@ -395,6 +403,12 @@ class WorkspaceHtmlRendererTest :
                     article shouldNotContain "SRCX WorkspaceReport"
                     article shouldNotContain "Direct render"
                     article shouldNotContain "WorkspaceReport"
+                    article shouldNotContain "extract an interface"
+                    article shouldNotContain "use the concrete class"
+                    rendered.fragment shouldNotContain "WorkspaceReport"
+                    rendered.fragment shouldNotContain "Typed source"
+                    rendered.fragment shouldNotContain "Direct render"
+                    rendered.fragment shouldNotContain "Direct model"
                 }
 
                 then("the compact sections follow the dashboard sequence and findings finish the content") {
@@ -1084,6 +1098,13 @@ private fun assertAtlasVisualHierarchyContract(
     script shouldContain "pinnedLabelIds.has(node.id)"
     styles shouldContain ".srcx-dashboard__architecture-subgroup-region rect"
     styles shouldContain "[data-srcx-graph-density=\"dense\"]"
+    styles shouldContain
+        ".srcx-dashboard__architecture-graph[data-srcx-graph-density=\"dense\"]\n" +
+        "    .srcx-dashboard__architecture-svg-node.has-finding\n" +
+        "    .srcx-dashboard__architecture-svg-node-dot {\n" +
+        "    opacity: 1;\n}"
+    script shouldContain "if (node.fileFindingCount > 0) node.visualSignal = 1"
+    script shouldContain "node.visualTier = node.fileFindingCount > 0 || nodeReviewPriority(node) > 0 ||"
     styles shouldContain ".srcx-dashboard__architecture-symbol-file-finding-marker"
     styles shouldContain "fill: var(--srcx-tertiary)"
 }
@@ -1118,7 +1139,9 @@ private fun assertSourceViewerContract(
     styles shouldContain ".srcx-dashboard__architecture-source-line"
     styles shouldContain ".is-active-relationship"
     script shouldNotContain "Source outline"
+    script shouldNotContain "Relationship flow"
     script shouldNotContain "Relationship neighborhood"
+    script shouldNotContain "detailSection(\"Declarations\")"
     script shouldNotContain "Full source text is unavailable"
 }
 
@@ -1542,6 +1565,14 @@ private fun assertAtlasNavigatorStyleContract(styles: String) {
     styles shouldContain ".srcx-dashboard__architecture-filter--source-sets"
     styles shouldContain ".srcx-dashboard__architecture-filter-button[aria-pressed=\"true\"]"
     styles shouldContain "inset 0 0 0 3px var(--srcx-accent)"
+    styles shouldContain ".srcx-dashboard__architecture-filter-panel"
+    styles shouldContain ".srcx-dashboard__architecture-filter-groups"
+    styles shouldContain "@container (max-width: 390px)"
+    styles shouldContain "@container (max-width: 768px)"
+    styles shouldContain "@container (max-width: 1024px)"
+    styles shouldContain "@container (max-width: 1440px)"
+    styles shouldContain ".srcx-dashboard__doc-nav"
+    styles shouldContain "overflow-y: visible"
 }
 
 private fun assertAtlasLabelFitContract(
@@ -1616,6 +1647,15 @@ private fun assertAtlasCycleAndProblemContract(
     (script.indexOf("Exact file findings") < script.indexOf("Cycle participation")) shouldBe true
     script shouldContain
         "No exact file findings. This participant is in Problems because of cycle evidence."
+    script shouldContain "var exactFindingFiles = fileNodes.filter(function (node) {"
+    script shouldContain "return node.fileFindingCount > 0;"
+    script shouldContain "fileNodes = mergeNodes(exactFindingFiles, fileNodes)"
+    script shouldContain "state.view === \"problems\" || state.view === \"cycles\" || Boolean("
+    script shouldContain "never invent an omitted target"
+    script shouldContain
+        "if (!nodesById.has(occurrence.sourceSymbolId) || !nodesById.has(occurrence.targetSymbolId)) return"
+    script shouldNotContain "extract an interface"
+    script shouldNotContain "use the concrete class"
     script shouldContain "function appendCycleRoutes(parent, node, cycles)"
     script shouldContain "Directed cycle routes"
     script shouldContain "Route "

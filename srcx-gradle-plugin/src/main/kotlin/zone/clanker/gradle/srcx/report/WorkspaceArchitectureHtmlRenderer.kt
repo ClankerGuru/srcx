@@ -122,6 +122,13 @@ internal class WorkspaceArchitectureHtmlRenderer(
                 "<nav class=\"srcx-dashboard__architecture-navigator\" data-srcx-graph-navigator hidden " +
                     "aria-label=\"Atlas build, project, and source-set filters\">",
             )
+            appendLine("<details class=\"srcx-dashboard__architecture-filter-panel\" open>")
+            appendLine("<summary class=\"srcx-dashboard__architecture-filter-summary\"><strong>Filter</strong>")
+            appendLine(
+                "<span data-srcx-filter-context role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">" +
+                    "All builds / all projects / all source sets</span></summary>",
+            )
+            appendLine("<div class=\"srcx-dashboard__architecture-filter-groups\">")
             appendLine(
                 "<div class=\"srcx-dashboard__architecture-filter srcx-dashboard__architecture-filter--builds\">",
             )
@@ -149,11 +156,7 @@ internal class WorkspaceArchitectureHtmlRenderer(
                 "<div class=\"srcx-dashboard__architecture-filter-rail\" data-srcx-source-set-filter " +
                     "role=\"toolbar\" aria-label=\"Filter atlas by source set\"></div></div>",
             )
-            appendLine(
-                "<p class=\"srcx-dashboard__architecture-filter-context\" data-srcx-filter-context " +
-                    "role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">" +
-                    "All builds / all projects / all source sets</p>",
-            )
+            appendLine("</div></details>")
             appendLine("</nav>")
         }
 
