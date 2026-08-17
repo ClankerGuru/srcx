@@ -829,6 +829,10 @@ body.srcx-atlas-document {
 .srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
     .srcx-dashboard__architecture-search,
 .srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-find-chrome,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-search-recovery,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
     .srcx-dashboard__architecture-legend,
 .srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
     .srcx-dashboard__architecture-chrome-toggle,
@@ -907,4 +911,240 @@ body.srcx-atlas-document {
     -webkit-text-fill-color: transparent !important;
     width: 44px !important;
     z-index: 2147483647;
+}
+
+/* FIND chrome: kind families, used-at-least, KEY. Keep it in the top bar, off the map. */
+.srcx-theme .srcx-dashboard__architecture-controls,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-controls {
+    align-items: start;
+    display: grid !important;
+    flex-wrap: unset;
+    gap: 8px 10px;
+    grid-template-areas:
+        "lenses search actions"
+        "find find find"
+        "legend legend legend"
+        "notice notice notice";
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    overflow: visible;
+}
+
+.srcx-theme .srcx-dashboard__architecture-lenses {
+    grid-area: lenses;
+}
+
+.srcx-theme .srcx-dashboard__architecture-search,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-search {
+    grid-area: search;
+    min-width: 0;
+}
+
+.srcx-theme .srcx-dashboard__architecture-zoom {
+    grid-area: actions;
+}
+
+.srcx-theme .srcx-dashboard__architecture-find-chrome {
+    align-items: start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    grid-area: find;
+    min-width: 0;
+    width: 100%;
+}
+
+.srcx-theme .srcx-dashboard__architecture-search-recovery {
+    align-items: center;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    grid-area: notice;
+    min-width: 0;
+}
+
+.srcx-theme .srcx-dashboard__architecture-search-recovery[hidden] {
+    display: none !important;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph
+    > .srcx-dashboard__architecture-controls
+    > .srcx-dashboard__architecture-legend--atlas,
+.srcx-theme .srcx-dashboard__architecture-legend--atlas {
+    background: var(--srcx-surface);
+    bottom: auto !important;
+    flex-wrap: wrap;
+    grid-area: legend;
+    inset: auto !important;
+    left: auto !important;
+    max-width: none !important;
+    pointer-events: auto;
+    position: static !important;
+    right: auto !important;
+    top: auto !important;
+    width: 100%;
+    z-index: 3;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph:not([data-srcx-legend="open"])
+    > .srcx-dashboard__architecture-controls
+    > .srcx-dashboard__architecture-legend--atlas {
+    display: none !important;
+}
+
+.srcx-theme .srcx-dashboard__architecture-find-kinds,
+.srcx-theme .srcx-dashboard__architecture-find-family {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+}
+
+.srcx-theme .srcx-dashboard__architecture-find-family > span,
+.srcx-theme .srcx-dashboard__architecture-used-at-least > span {
+    color: var(--srcx-ink);
+    font-family: var(--srcx-font-mono);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.srcx-theme .srcx-dashboard__architecture-find-family button,
+.srcx-theme .srcx-dashboard__architecture-find-chip,
+.srcx-theme .srcx-dashboard__architecture-legend-toggle,
+.srcx-theme .srcx-dashboard__architecture-used-at-least button {
+    background: var(--srcx-surface);
+    border: var(--srcx-border-thin) solid var(--srcx-border);
+    color: var(--srcx-ink);
+    cursor: pointer;
+    font-family: var(--srcx-font-mono);
+    font-size: 11px;
+    font-weight: 800;
+    min-height: 28px;
+    padding: 3px 8px;
+    white-space: nowrap;
+}
+
+.srcx-theme .srcx-dashboard__architecture-find-family button[aria-pressed="true"],
+.srcx-theme .srcx-dashboard__architecture-legend-toggle[aria-pressed="true"] {
+    background: var(--srcx-ink);
+    color: var(--srcx-surface);
+}
+
+.srcx-theme .srcx-dashboard__architecture-used-at-least {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 4px;
+}
+
+.srcx-theme .srcx-dashboard__architecture-used-at-least strong {
+    font-family: var(--srcx-font-mono);
+    font-size: 13px;
+    min-width: 1.4em;
+    text-align: center;
+}
+
+.srcx-theme .srcx-dashboard__architecture-find-selection {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.srcx-theme .srcx-dashboard__architecture-find-selection[hidden] {
+    display: none !important;
+}
+
+.srcx-theme .srcx-dashboard__architecture-find-chip.is-build {
+    border-color: var(--srcx-build-color, var(--srcx-border));
+    box-shadow: inset 0 -3px 0 var(--srcx-build-color, transparent);
+}
+
+.srcx-theme .srcx-dashboard__architecture-viewport
+    > .srcx-dashboard__architecture-legend {
+    display: none !important;
+}
+
+@media (max-width: 1440px) {
+    .srcx-theme .srcx-dashboard__architecture-controls,
+    .srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-controls {
+        grid-template-areas:
+            "lenses search actions"
+            "find find find"
+            "legend legend legend"
+            "notice notice notice";
+        grid-template-columns: max-content minmax(0, 1fr) max-content;
+    }
+}
+
+@media (max-width: 1024px) {
+    .srcx-theme .srcx-dashboard__architecture-controls,
+    .srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-controls {
+        grid-template-areas:
+            "search actions"
+            "lenses lenses"
+            "find find"
+            "legend legend"
+            "notice notice";
+        grid-template-columns: minmax(0, 1fr) max-content;
+    }
+}
+
+@media (max-width: 768px) {
+    .srcx-theme .srcx-dashboard__architecture-controls,
+    .srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-controls {
+        grid-template-areas:
+            "search actions"
+            "lenses lenses"
+            "find find"
+            "legend legend"
+            "notice notice";
+        grid-template-columns: minmax(0, 1fr) max-content;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-find-chrome,
+    .srcx-theme .srcx-dashboard__architecture-find-kinds,
+    .srcx-theme .srcx-dashboard__architecture-find-family {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .srcx-theme .srcx-dashboard__architecture-controls,
+    .srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-controls {
+        display: grid !important;
+        grid-template-areas:
+            "search actions"
+            "find find"
+            "legend legend"
+            "notice notice";
+        grid-template-columns: minmax(0, 1fr) max-content;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-lenses {
+        display: none !important;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-find-chrome,
+    .srcx-theme .srcx-dashboard__architecture-find-kinds,
+    .srcx-theme .srcx-dashboard__architecture-find-family {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        overflow: visible;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-find-family > span {
+        flex: 0 0 auto;
+    }
+
+    .srcx-theme .srcx-dashboard__architecture-find-family button,
+    .srcx-theme .srcx-dashboard__architecture-find-chip,
+    .srcx-theme .srcx-dashboard__architecture-legend-toggle,
+    .srcx-theme .srcx-dashboard__architecture-used-at-least button {
+        font-size: 10px;
+        min-height: 26px;
+        padding: 2px 6px;
+    }
 }

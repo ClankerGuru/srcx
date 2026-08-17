@@ -109,7 +109,6 @@ internal class WorkspaceArchitectureHtmlRenderer(
             appendLine(renderControls())
             appendLine("<div class=\"srcx-dashboard__architecture-viewport\">")
             appendLine(renderNavigator())
-            appendLine(renderMapLegend())
             appendLine(renderFallback(graph))
             appendLine(
                 "<svg class=\"srcx-dashboard__architecture-svg\" data-srcx-graph-svg hidden " +
@@ -325,6 +324,93 @@ internal class WorkspaceArchitectureHtmlRenderer(
             appendLine("</ul></section>")
         }
 
+    private fun renderFindChrome(): String =
+        buildString {
+            appendLine("<div class=\"srcx-dashboard__architecture-find-chrome\" data-srcx-find-chrome>")
+            appendLine(
+                "<div class=\"srcx-dashboard__architecture-find-kinds\" data-srcx-find-kinds " +
+                    "aria-label=\"Find by declaration or file kind\">",
+            )
+            appendFindFamily(
+                "type",
+                "Type",
+                listOf(
+                    "class" to "class",
+                    "interface" to "interface",
+                    "fun-interface" to "functional interface",
+                    "object" to "object",
+                    "enum" to "enum",
+                    "sealed-class" to "sealed class",
+                ),
+            )
+            appendFindFamily(
+                "member",
+                "Member",
+                listOf(
+                    "function" to "function",
+                    "property" to "property",
+                    "variable" to "variable",
+                ),
+            )
+            appendFindFamily(
+                "file",
+                "File",
+                listOf(
+                    "file" to "file",
+                    "kotlin" to "Kotlin",
+                    "java" to "Java",
+                    "gradle-kts" to "Gradle KTS",
+                ),
+            )
+            appendLine("</div>")
+            appendLine(
+                "<div class=\"srcx-dashboard__architecture-used-at-least\" data-srcx-used-at-least " +
+                    "role=\"group\" aria-label=\"Used at least\">",
+            )
+            appendLine("<span>Used at least</span>")
+            appendLine(
+                "<button type=\"button\" data-srcx-used-at-least-dec " +
+                    "aria-label=\"Decrease used-at-least\">\u2212</button>",
+            )
+            appendLine("<strong data-srcx-used-at-least-value>0</strong>")
+            appendLine(
+                "<button type=\"button\" data-srcx-used-at-least-inc " +
+                    "aria-label=\"Increase used-at-least\">+</button>",
+            )
+            appendLine("</div>")
+            appendLine(
+                "<button type=\"button\" class=\"srcx-dashboard__architecture-legend-toggle\" " +
+                    "data-srcx-legend-toggle aria-pressed=\"false\" aria-expanded=\"false\">KEY</button>",
+            )
+            appendLine(
+                "<div class=\"srcx-dashboard__architecture-find-selection\" " +
+                    "data-srcx-find-selection hidden></div>",
+            )
+            appendLine("</div>")
+        }
+
+    private fun StringBuilder.appendFindFamily(
+        family: String,
+        label: String,
+        chips: List<Pair<String, String>>,
+    ) {
+        appendLine(
+            "<div class=\"srcx-dashboard__architecture-find-family\" data-srcx-find-family=\"$family\" " +
+                "role=\"group\" aria-label=\"$label family\">",
+        )
+        appendLine("<span>$label</span>")
+        chips.forEach { (id, title) ->
+            append("<button type=\"button\" data-srcx-find-kind=\"")
+            append(id)
+            append("\" data-srcx-find-family=\"")
+            append(family)
+            append("\" aria-pressed=\"false\">")
+            append(title)
+            appendLine("</button>")
+        }
+        appendLine("</div>")
+    }
+
     private fun renderControls(): String =
         buildString {
             appendLine("<div class=\"srcx-dashboard__architecture-controls\" data-srcx-graph-controls hidden>")
@@ -347,14 +433,16 @@ internal class WorkspaceArchitectureHtmlRenderer(
             appendLine("<label class=\"srcx-dashboard__architecture-search\"><span>Find</span>")
             appendLine(
                 "<input type=\"search\" data-srcx-graph-search " +
-                    "placeholder=\"Search everything, or use class:, method:\"></label>",
+                    "placeholder=\"Search names, or pick a kind chip\"></label>",
             )
+            appendLine(renderFindChrome())
             appendLine("<div class=\"srcx-dashboard__architecture-search-recovery\" data-srcx-search-recovery hidden>")
             appendLine(
                 "<span data-srcx-search-recovery-status role=\"status\" " +
                     "aria-live=\"polite\" aria-atomic=\"true\"></span>",
             )
-            appendLine("<button type=\"button\" data-srcx-search-recovery-action></button></div>")
+            appendLine("<button type=\"button\" data-srcx-search-recovery-action>Clear</button></div>")
+            appendLine(renderMapLegend())
             appendLine("<div class=\"srcx-dashboard__architecture-zoom\">")
             appendLine("<button type=\"button\" data-srcx-graph-action=\"zoom-in\" aria-label=\"Zoom in\">+</button>")
             appendLine("<button type=\"button\" data-srcx-graph-action=\"zoom-out\" aria-label=\"Zoom out\">-</button>")

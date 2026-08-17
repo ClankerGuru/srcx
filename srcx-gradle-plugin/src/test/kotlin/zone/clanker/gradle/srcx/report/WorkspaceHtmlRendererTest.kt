@@ -250,6 +250,16 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain "data-srcx-graph-view=\"problems\""
                     article shouldContain "data-srcx-graph-view=\"cycles\""
                     article shouldContain "data-srcx-graph-search"
+                    article shouldContain "data-srcx-find-chrome"
+                    article shouldContain "data-srcx-find-kind=\"class\""
+                    article shouldContain "data-srcx-find-kind=\"fun-interface\""
+                    article shouldContain "data-srcx-find-kind=\"sealed-class\""
+                    article shouldContain "data-srcx-find-kind=\"function\""
+                    article shouldContain "data-srcx-find-kind=\"gradle-kts\""
+                    article shouldContain "data-srcx-used-at-least"
+                    article shouldContain "data-srcx-legend-toggle"
+                    article shouldContain "placeholder=\"Search names, or pick a kind chip\""
+                    article shouldNotContain "data-srcx-find-kind=\"json\""
                     article shouldContain "data-srcx-clear-selected"
                     article shouldNotContain "data-srcx-filter-toggle"
                     article shouldContain "data-srcx-map-legend"
@@ -1026,6 +1036,10 @@ private fun BehaviorSpec.registerAtlasUxContractTests() {
             WorkspaceHtmlResourceRenderer.readClasspathResource(
                 WorkspaceHtmlResourceRenderer.THEME,
             )
+        val mapStyles =
+            WorkspaceHtmlResourceRenderer.readClasspathResource(
+                WorkspaceHtmlResourceRenderer.ATLAS_MAP_STYLES,
+            )
 
         then("file, symbol, and relationship selections render exact embedded source") {
             assertSourceViewerContract(script, styles)
@@ -1049,6 +1063,10 @@ private fun BehaviorSpec.registerAtlasUxContractTests() {
 
         then("the Atlas toolbar stays compact while search and small copy remain readable") {
             assertAtlasToolbarReadabilityContract(styles, themeStyles)
+        }
+
+        then("FIND chrome exposes kind families, used-at-least, and a KEY legend") {
+            assertAtlasFindChromeContract(script, mapStyles)
         }
 
         then("the navigator scopes builds, projects, and source sets accessibly") {
@@ -2017,6 +2035,23 @@ private fun assertAtlasSelectionOnlyEvidenceContract(script: String) {
     script shouldNotContain "openDetail(\"Relationship preview\""
 }
 
+private fun assertAtlasFindChromeContract(
+    script: String,
+    styles: String,
+) {
+    script shouldContain "selectedFindKinds: new Set()"
+    script shouldContain "usedAtLeast: 0"
+    script shouldContain "function matchesFindKinds(node)"
+    script shouldContain "function matchesUsedAtLeast(node)"
+    script shouldContain "Same family"
+    script shouldContain "function stepUsedAtLeast(delta)"
+    script shouldContain "who uses "
+    script shouldContain "who implements "
+    script shouldContain "function wireFindChrome()"
+    styles shouldContain ".srcx-dashboard__architecture-find-chrome"
+    styles shouldContain "data-srcx-legend=\"open\""
+}
+
 private fun assertAtlasToolbarReadabilityContract(
     styles: String,
     themeStyles: String,
@@ -2103,9 +2138,8 @@ private fun assertAtlasRelationshipKindFilterContract(script: String) {
     script shouldContain "clearSelection(false)"
     script shouldContain "state.selectedRelationshipKind = categoryId"
     script shouldContain "filterEdgeToRelationshipKind(edge, relationshipKind)"
-    script shouldContain "Show all bounded matches"
-    script shouldContain
-        "hidden by the current build, project, source-set, or relationship-kind filters."
+    script shouldContain "No match."
+    script shouldContain "searchRecoveryAction.textContent = \"Clear\""
     script shouldContain "state.selectedSourceSet = null"
     script shouldContain "state.selectedRelationshipKind = \"all\""
     script shouldContain "var occurrences = (edge.occurrences || []).filter"

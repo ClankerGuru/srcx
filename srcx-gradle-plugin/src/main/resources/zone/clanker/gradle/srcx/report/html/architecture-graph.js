@@ -73,6 +73,15 @@
         var search = root.querySelector("[data-srcx-graph-search]");
         var relationshipKindFilter = root.querySelector("[data-srcx-relationship-kind-filter]");
         var relationshipKindOptions = root.querySelector("[data-srcx-relationship-kind-options]");
+        var findChrome = root.querySelector("[data-srcx-find-chrome]");
+        var findKinds = root.querySelector("[data-srcx-find-kinds]");
+        var usedAtLeastRoot = root.querySelector("[data-srcx-used-at-least]");
+        var usedAtLeastValue = root.querySelector("[data-srcx-used-at-least-value]");
+        var usedAtLeastDec = root.querySelector("[data-srcx-used-at-least-dec]");
+        var usedAtLeastInc = root.querySelector("[data-srcx-used-at-least-inc]");
+        var legendToggle = root.querySelector("[data-srcx-legend-toggle]");
+        var findSelection = root.querySelector("[data-srcx-find-selection]");
+        var mapLegend = root.querySelector("[data-srcx-map-legend]");
         var searchRecovery = root.querySelector("[data-srcx-search-recovery]");
         var searchRecoveryStatus = root.querySelector("[data-srcx-search-recovery-status]");
         var searchRecoveryAction = root.querySelector("[data-srcx-search-recovery-action]");
@@ -88,7 +97,10 @@
             !projectFilter || !sourceSetFilter || !filterContext || !viewport ||
             !detail || !status || !search ||
             !fullscreenButton || !fullscreenChromeToggle ||
-            !relationshipKindFilter || !relationshipKindOptions || !searchRecovery || !searchRecoveryStatus ||
+            !relationshipKindFilter || !relationshipKindOptions || !findChrome || !findKinds ||
+            !usedAtLeastRoot || !usedAtLeastValue || !usedAtLeastDec || !usedAtLeastInc ||
+            !legendToggle || !findSelection || !mapLegend ||
+            !searchRecovery || !searchRecoveryStatus ||
             !searchRecoveryAction || !detailKicker || !detailTitle || !detailFields || !detailClose ||
             !detailResize || !clearSelectedButton) return false;
 
@@ -126,6 +138,9 @@
             pathChipPage: 0,
             pathRovingEntryId: null,
             selectedRelationshipKind: "all",
+            selectedFindKinds: new Set(),
+            usedAtLeast: 0,
+            legendOpen: false,
             cycleStepEdgeId: null,
             detailWidth: null,
             selectedEvidence: null,
@@ -265,6 +280,7 @@
         svg.attr("viewBox", "0 0 " + width + " " + height).call(zoom).on("dblclick.zoom", null);
         draw();
         wireControls();
+        wireFindChrome();
         wireLassoSelection();
         ensureSelectionToolbar();
         wireDetailResize();
@@ -569,6 +585,7 @@
             if (retainedSelection) restoreSelection(retainedSelection);
             updateStatus(projection);
             renderSearchRecovery(projection);
+            renderFindChrome();
             updateSelectionToolbar();
         }
 
@@ -1014,6 +1031,9 @@
             var filteredNodes = query ? scopedNodes.filter(function (node) {
                 return retainedQueryIds.has(node.id);
             }) : scopedNodes;
+            filteredNodes = filteredNodes.filter(function (node) {
+                return matchesFindKinds(node) && matchesUsedAtLeast(node);
+            });
             var filteredCandidateNodeCount = filteredNodes.length;
             var availableInternalRecordCount = filteredNodes.reduce(function (sum, node) {
                 return sum + scopedInternalRecordCount(node, relationshipKind);
@@ -3464,6 +3484,264 @@
             applyRelationshipKindFilter(buttons[nextIndex].dataset.srcxRelationshipKind, true);
         }
 
+        function findKindFamily(kindId) {
+            var button = findKinds.querySelector("[data-srcx-find-kind='" + kindId + "']");
+            return button ? button.dataset.srcxFindFamily : "";
+        }
+
+        function nodeFilePath(node) {
+            return String((node && (node.path || node.file)) || "");
+        }
+
+        function fileLanguageKind(path) {
+            var value = String(path || "").toLowerCase();
+            if (value.endsWith(".gradle.kts")) return "gradle-kts";
+            if (value.endsWith(".kt")) return "kotlin";
+            if (value.endsWith(".java")) return "java";
+            return "file";
+        }
+
+        function sourceBlobForNode(node) {
+            var source = node.entityType === "file" ?
+                (sourceFileById.get(node.id) || sourceFileByScopePath.get(
+                    scopePathKey(node.build, node.project, node.sourceSet, node.path),
+                )) :
+                sourceFileByScopePath.get(scopePathKey(node.build, node.project, node.sourceSet, node.file));
+            return source && source.content ? String(source.content) : "";
+        }
+
+        function declarationLooksSealed(subject) {
+            if (declarationSemantic(subject) !== "ABSTRACT_CLASS") return false;
+            var blob = [subject.kind, subject.declarationSemanticLabel, subject.declarationSemanticDetail,
+                subject.name, subject.qualifiedName].join(" ");
+            if (/\bsealed\b/i.test(blob)) return true;
+            var source = sourceBlobForNode(subject);
+            if (!source || !subject.name) return declarationSemantic(subject) === "ABSTRACT_CLASS";
+            return new RegExp("sealed\\s+class\\s+" + String(subject.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+                .test(source);
+        }
+
+        function declarationLooksFunInterface(subject) {
+            if (declarationSemantic(subject) !== "INTERFACE") return false;
+            var blob = [subject.kind, subject.declarationSemanticLabel, subject.name].join(" ");
+            if (/fun\s*interface/i.test(blob)) return true;
+            var source = sourceBlobForNode(subject);
+            if (!source || !subject.name) return false;
+            return new RegExp("fun\\s+interface\\s+" + String(subject.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+                .test(source);
+        }
+
+        function kindSubjects(node) {
+            if (node.entityType === "file") return (node.symbols || []).concat([node]);
+            return [node];
+        }
+
+        function subjectMatchesFindKind(subject, kindId, host) {
+            var semantic = declarationSemantic(subject);
+            var kind = String(subject.kind || "").toLowerCase();
+            var path = nodeFilePath(subject.entityType === "file" ? subject : host || subject);
+            if (kindId === "class") {
+                return semantic === "CONCRETE_CLASS" || semantic === "ABSTRACT_CLASS" ||
+                    semantic === "ENUM" || semantic === "SINGLETON_OBJECT";
+            }
+            if (kindId === "interface") return semantic === "INTERFACE";
+            if (kindId === "fun-interface") return declarationLooksFunInterface(subject);
+            if (kindId === "object") return semantic === "SINGLETON_OBJECT";
+            if (kindId === "enum") return semantic === "ENUM";
+            if (kindId === "sealed-class") return declarationLooksSealed(subject);
+            if (kindId === "function") return kind === "fun" || kind === "function";
+            if (kindId === "property") return kind === "val/var" || kind === "property" || kind === "val";
+            if (kindId === "variable") return kind === "val/var" || kind === "variable" || kind === "var";
+            if (kindId === "file") return Boolean(path);
+            if (kindId === "kotlin" || kindId === "java" || kindId === "gradle-kts") {
+                return fileLanguageKind(path) === kindId;
+            }
+            return false;
+        }
+
+        function matchesFindKinds(node) {
+            // Same family = OR. Across families = AND.
+            if (!state.selectedFindKinds.size) return true;
+            var byFamily = { type: [], member: [], file: [] };
+            state.selectedFindKinds.forEach(function (kindId) {
+                var family = findKindFamily(kindId);
+                if (byFamily[family]) byFamily[family].push(kindId);
+            });
+            return Object.keys(byFamily).every(function (family) {
+                if (!byFamily[family].length) return true;
+                return byFamily[family].some(function (kindId) {
+                    return kindSubjects(node).some(function (subject) {
+                        return subjectMatchesFindKind(subject, kindId, node);
+                    });
+                });
+            });
+        }
+
+        function nodeUsedCount(node) {
+            if (node.entityType === "file") {
+                return Number(node.totalIncomingRecordCount || node.shownIncomingRecordCount || 0);
+            }
+            return Number(node.workspaceInbound || node.localInbound || 0);
+        }
+
+        function matchesUsedAtLeast(node) {
+            if (!state.usedAtLeast) return true;
+            return nodeUsedCount(node) >= state.usedAtLeast;
+        }
+
+        function syncFindKindButtons() {
+            findKinds.querySelectorAll("[data-srcx-find-kind]").forEach(function (button) {
+                button.setAttribute("aria-pressed", String(state.selectedFindKinds.has(button.dataset.srcxFindKind)));
+            });
+        }
+
+        function syncUsedAtLeastChrome() {
+            usedAtLeastValue.textContent = String(state.usedAtLeast);
+            usedAtLeastDec.disabled = state.usedAtLeast <= 0;
+            usedAtLeastRoot.setAttribute("data-srcx-used-at-least-active", String(state.usedAtLeast > 0));
+        }
+
+        function syncLegendChrome() {
+            root.dataset.srcxLegend = state.legendOpen ? "open" : "closed";
+            legendToggle.setAttribute("aria-pressed", String(state.legendOpen));
+            legendToggle.setAttribute("aria-expanded", String(state.legendOpen));
+            mapLegend.hidden = !state.legendOpen;
+        }
+
+        function classLikeNode(node) {
+            if (!node || node.entityType === "file") return null;
+            var semantic = declarationSemantic(node);
+            if (semantic === "CONCRETE_CLASS" || semantic === "ABSTRACT_CLASS" || semantic === "ENUM" ||
+                semantic === "SINGLETON_OBJECT" || semantic === "INTERFACE") return node;
+            return null;
+        }
+
+        function selectedClassNode() {
+            var selected = nodes.filter(function (node) { return state.selectedNodeIds.has(node.id); });
+            var direct = selected.map(classLikeNode).filter(Boolean);
+            if (direct.length) return direct[0];
+            var file = selected.find(function (node) { return node.entityType === "file"; });
+            if (!file) return null;
+            var symbols = (file.symbols || []).map(function (symbol) {
+                return Object.assign({}, symbol, {
+                    entityType: "symbol",
+                    build: file.build,
+                    project: file.project,
+                    sourceSet: file.sourceSet,
+                    file: file.path,
+                });
+            });
+            return symbols.map(classLikeNode).filter(Boolean)[0] || null;
+        }
+
+        function incomingClassRecords(targetId, kinds) {
+            var accepted = kinds ? new Set(kinds) : null;
+            var records = [];
+            availableSymbolEdges.concat(availableFileEdges).forEach(function (edge) {
+                if (endpointId(edge.target) !== targetId &&
+                    !(edge.occurrences || []).some(function (occurrence) {
+                        return occurrence.targetSymbolId === targetId;
+                    })) return;
+                (edge.occurrences || [{ kind: edge.kind, sourceSymbolId: endpointId(edge.source) }]).forEach(
+                    function (occurrence) {
+                        var kind = occurrence.kind || edge.kind;
+                        if (accepted && !accepted.has(kind)) return;
+                        records.push({
+                            kind: kind,
+                            sourceId: occurrence.sourceSymbolId || endpointId(edge.source),
+                            sourceBuild: ((symbolEntityById.get(occurrence.sourceSymbolId || endpointId(edge.source)) ||
+                                fileEntityById.get(endpointId(edge.source)) || {})).build,
+                        });
+                    },
+                );
+            });
+            return records;
+        }
+
+        function renderFindSelection() {
+            var selectedClass = selectedClassNode();
+            findSelection.replaceChildren();
+            if (!selectedClass) {
+                findSelection.hidden = true;
+                return;
+            }
+            var uses = incomingClassRecords(selectedClass.id).filter(function (record) {
+                return record.kind !== "IMPLEMENTS" && record.kind !== "EXTENDS";
+            });
+            var implementors = incomingClassRecords(selectedClass.id, ["IMPLEMENTS", "EXTENDS"]);
+            var builds = [];
+            implementors.forEach(function (record) {
+                if (record.sourceBuild && builds.indexOf(record.sourceBuild) < 0) builds.push(record.sourceBuild);
+            });
+            findSelection.hidden = false;
+            var useChip = document.createElement("button");
+            useChip.type = "button";
+            useChip.className = "srcx-dashboard__architecture-find-chip";
+            useChip.textContent = "who uses " + uses.length;
+            useChip.disabled = true;
+            var implementChip = document.createElement("button");
+            implementChip.type = "button";
+            implementChip.className = "srcx-dashboard__architecture-find-chip";
+            implementChip.textContent = "who implements " + implementors.length;
+            implementChip.disabled = true;
+            findSelection.append(useChip, implementChip);
+            builds.forEach(function (buildName) {
+                var chip = document.createElement("button");
+                chip.type = "button";
+                chip.className = "srcx-dashboard__architecture-find-chip is-build";
+                chip.textContent = buildName;
+                chip.disabled = true;
+                var color = buildColor(buildName, buildByName);
+                if (color) chip.style.setProperty("--srcx-build-color", color);
+                findSelection.appendChild(chip);
+            });
+        }
+
+        function renderFindChrome() {
+            syncFindKindButtons();
+            syncUsedAtLeastChrome();
+            syncLegendChrome();
+            renderFindSelection();
+        }
+
+        function toggleFindKind(kindId) {
+            if (state.selectedFindKinds.has(kindId)) state.selectedFindKinds.delete(kindId);
+            else state.selectedFindKinds.add(kindId);
+            renderFindChrome();
+            draw();
+        }
+
+        function stepUsedAtLeast(delta) {
+            state.usedAtLeast = Math.max(0, state.usedAtLeast + delta);
+            renderFindChrome();
+            draw();
+        }
+
+        function toggleLegend() {
+            state.legendOpen = !state.legendOpen;
+            renderFindChrome();
+        }
+
+        function clearFindChrome() {
+            state.selectedFindKinds = new Set();
+            state.usedAtLeast = 0;
+            state.query = "";
+            search.value = "";
+            renderFindChrome();
+        }
+
+        function wireFindChrome() {
+            findKinds.querySelectorAll("[data-srcx-find-kind]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    toggleFindKind(button.dataset.srcxFindKind);
+                });
+            });
+            usedAtLeastDec.addEventListener("click", function () { stepUsedAtLeast(-1); });
+            usedAtLeastInc.addEventListener("click", function () { stepUsedAtLeast(1); });
+            legendToggle.addEventListener("click", toggleLegend);
+            renderFindChrome();
+        }
+
         function renderNavigator(focusKind) {
             var builds = data.builds.slice();
             var totalFiles = builds.reduce(function (sum, build) { return sum + build.fileNodeCount; }, 0);
@@ -4292,6 +4570,7 @@
                     " nodes selected") : "");
             }
             syncClearSelectedButton();
+            renderFindSelection();
         }
 
         function setBoxSelectMode(enabled) {
@@ -4430,8 +4709,7 @@
                     state.selectedRelationshipKind = "all";
                     renderNavigator();
                 } else {
-                    state.query = "";
-                    search.value = "";
+                    clearFindChrome();
                 }
                 renderRelationshipKindFilter();
                 draw();
@@ -4972,8 +5250,9 @@
 
         function renderSearchRecovery(projection) {
             var query = state.query.trim();
+            var findActive = state.selectedFindKinds.size > 0 || state.usedAtLeast > 0;
             var hasVisibleMatch = projection.nodes.length > 0;
-            if (!query || hasVisibleMatch) {
+            if (hasVisibleMatch || (!query && !findActive)) {
                 searchRecovery.hidden = true;
                 searchRecoveryStatus.textContent = "";
                 searchRecoveryAction.textContent = "";
@@ -4981,17 +5260,14 @@
                 return;
             }
             searchRecovery.hidden = false;
-            if (projection.boundedQueryMatchCount === 0) {
-                searchRecoveryStatus.textContent = "No bounded match for “" + query + "” in this map lens.";
-                searchRecoveryAction.textContent = "Clear search";
-                searchRecoveryAction.dataset.srcxSearchRecoveryAction = "clear-search";
+            searchRecoveryAction.textContent = "Clear";
+            if (query && projection.hiddenQueryMatchCount > 0) {
+                searchRecoveryStatus.textContent = "No match in this scope.";
+                searchRecoveryAction.dataset.srcxSearchRecoveryAction = "show-scope";
                 return;
             }
-            searchRecoveryStatus.textContent = projection.hiddenQueryMatchCount + " bounded " +
-                (projection.hiddenQueryMatchCount === 1 ? "match is" : "matches are") +
-                " hidden by the current build, project, source-set, or relationship-kind filters.";
-            searchRecoveryAction.textContent = "Show all bounded matches";
-            searchRecoveryAction.dataset.srcxSearchRecoveryAction = "show-scope";
+            searchRecoveryStatus.textContent = "No match.";
+            searchRecoveryAction.dataset.srcxSearchRecoveryAction = "clear-search";
         }
 
         function graphContextLabel() {
