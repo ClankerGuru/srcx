@@ -478,6 +478,23 @@ body.srcx-atlas-document {
 }
 
 /* Filter stays a top bar; FILE SOURCE drawer stays unclipped; metrics wrap. */
+.srcx-dashboard__architecture-source-reveal {
+    display: block;
+    margin-top: 12px;
+}
+.srcx-dashboard__architecture-source-reveal > summary {
+    cursor: pointer;
+    display: inline-flex;
+    font-family: var(--srcx-font-mono);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    padding: 6px 10px;
+    text-transform: uppercase;
+}
+.srcx-dashboard__architecture-source-section {
+    display: block;
+}
 .srcx-dashboard__architecture-source-viewer {
     max-width: 100%;
     overflow-x: auto;
@@ -677,19 +694,217 @@ body.srcx-atlas-document {
     flex: 0 0 auto;
     gap: 6px;
 }
-.srcx-theme .srcx-dashboard__architecture-viewport {
-    min-height: min(70dvh, 720px);
+@media (min-width: 481px) {
+    .srcx-theme .srcx-dashboard__architecture-viewport {
+        min-height: min(70dvh, 720px);
+    }
 }
-@media (max-width: 390px) {
-    .srcx-theme .srcx-dashboard__architecture-graph
-        .srcx-dashboard__architecture-navigator,
+.srcx-theme .srcx-dashboard__architecture-controls,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-controls {
+    align-items: center;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    width: 100%;
+}
+.srcx-theme .srcx-dashboard__architecture-lenses,
+.srcx-theme .srcx-dashboard__architecture-zoom,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-lenses,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-zoom {
+    flex: 0 0 auto;
+    width: auto;
+}
+.srcx-theme .srcx-dashboard__architecture-search,
+.srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-search {
+    align-items: center;
+    display: flex;
+    flex: 1 1 180px;
+    gap: 6px;
+    min-width: 140px;
+    width: auto;
+}
+.srcx-theme .srcx-dashboard__architecture-scope-toggle {
+    display: none;
+}
+.srcx-theme .srcx-dashboard__architecture-detail[hidden],
+.srcx-theme .srcx-dashboard__architecture-detail:not(.is-open),
+.srcx-theme .srcx-dashboard__architecture-evidence {
+    display: none !important;
+}
+
+/* 390 roast can land a few CSS px over 390. Lock the page; keep FIND/chips. */
+@media (max-width: 480px) {
+    html,
+    html:has(.srcx-atlas-document),
+    body,
+    body.srcx-atlas-document,
+    .srcx-theme.srcx-page.srcx-dashboard,
+    .srcx-theme .srcx-dashboard__architecture-graph,
+    .srcx-theme .srcx-dashboard__architecture-graph:not([data-srcx-fullscreen="true"]) {
+        block-size: 100dvh !important;
+        height: 100dvh !important;
+        max-block-size: 100dvh !important;
+        max-height: 100dvh !important;
+        min-block-size: 0 !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+    .srcx-dashboard__hero,
+    .srcx-dashboard__nav,
+    .srcx-masthead,
+    .srcx-dashboard__report-shell,
+    .srcx-dashboard__architecture-guide,
+    [data-srcx-atlas-guide],
     .srcx-theme .srcx-dashboard__architecture-selection-toolbar,
-    .srcx-theme .srcx-dashboard__architecture-controls,
-    .srcx-theme .srcx-dashboard__architecture-legend {
+    .srcx-theme .srcx-dashboard__architecture-lenses,
+    .srcx-theme .srcx-dashboard__architecture-legend,
+    .srcx-theme .srcx-dashboard__architecture-scope-toggle {
         display: none !important;
     }
-    .srcx-theme .srcx-dashboard__architecture-viewport,
     .srcx-theme .srcx-dashboard__architecture-graph {
-        min-height: 100dvh;
+        display: flex !important;
+        flex-direction: column;
+        inset: 0 !important;
+        position: fixed !important;
+        z-index: 2;
     }
+    .srcx-theme .srcx-dashboard__architecture-graph
+        .srcx-dashboard__architecture-navigator,
+    .srcx-theme .srcx-dashboard__architecture-search {
+        display: flex !important;
+    }
+    .srcx-theme .srcx-dashboard__architecture-controls,
+    .srcx-theme.srcx-page.srcx-dashboard .srcx-dashboard__architecture-controls {
+        display: flex !important;
+        flex-wrap: nowrap;
+    }
+    .srcx-theme .srcx-dashboard__architecture-graph:not([data-srcx-fullscreen="true"])
+        > .srcx-dashboard__architecture-viewport,
+    .srcx-theme .srcx-dashboard__architecture-viewport,
+    .srcx-theme .srcx-dashboard__architecture-viewport svg,
+    .srcx-theme .srcx-dashboard__architecture-svg {
+        block-size: auto !important;
+        flex: 1 1 auto !important;
+        height: auto !important;
+        max-block-size: none !important;
+        max-height: none !important;
+        min-block-size: 0 !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+    .srcx-theme .srcx-dashboard__architecture-detail[hidden],
+    .srcx-theme .srcx-dashboard__architecture-detail:not(.is-open) {
+        display: none !important;
+    }
+    .srcx-theme .srcx-dashboard__architecture-project-region text,
+    .srcx-theme .srcx-dashboard__architecture-subgroup-region text {
+        display: none !important;
+    }
+}
+
+@media (max-width: 390px) {
+    .srcx-theme .srcx-dashboard__architecture-graph:not([data-srcx-fullscreen="true"])
+        .srcx-dashboard__architecture-zoom {
+        display: flex !important;
+        gap: 0;
+        margin-left: auto;
+    }
+    .srcx-theme .srcx-dashboard__architecture-graph:not([data-srcx-fullscreen="true"])
+        .srcx-dashboard__architecture-zoom [data-srcx-graph-action] {
+        display: none !important;
+    }
+    .srcx-theme .srcx-dashboard__architecture-graph:not([data-srcx-fullscreen="true"])
+        .srcx-dashboard__architecture-zoom [data-srcx-graph-fullscreen] {
+        display: inline-flex !important;
+    }
+}
+
+/* One-layer map mode. Hide height/390-fit chrome so the photo stays in front. */
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-graph-head,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-navigator,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-lenses,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-search,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-legend,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-chrome-toggle,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-scope-toggle,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-selection-toolbar,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    [data-srcx-graph-action],
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    [data-srcx-graph-status],
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-detail:not(.is-open),
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-detail[hidden] {
+    display: none !important;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-viewport {
+    inset: 0 !important;
+    position: relative !important;
+    z-index: 1;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-controls,
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    .srcx-dashboard__architecture-zoom {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    display: block !important;
+    height: 0 !important;
+    inset: 0 0 auto auto !important;
+    margin: 0 !important;
+    max-height: 0 !important;
+    max-width: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    pointer-events: none;
+    position: absolute !important;
+    width: 0 !important;
+    z-index: 2147483647;
+}
+
+.srcx-theme .srcx-dashboard__architecture-graph[data-srcx-fullscreen="true"]
+    [data-srcx-graph-fullscreen] {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: transparent !important;
+    display: block !important;
+    font-size: 0 !important;
+    height: 44px !important;
+    inline-size: 44px !important;
+    inset: 0 0 auto auto !important;
+    letter-spacing: 0 !important;
+    line-height: 0 !important;
+    max-height: 44px !important;
+    max-inline-size: 44px !important;
+    max-width: 44px !important;
+    min-height: 44px !important;
+    min-inline-size: 44px !important;
+    min-width: 44px !important;
+    outline: none !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    pointer-events: auto;
+    position: absolute !important;
+    right: 0 !important;
+    text-indent: 0 !important;
+    text-shadow: none !important;
+    top: 0 !important;
+    -webkit-text-fill-color: transparent !important;
+    width: 44px !important;
+    z-index: 2147483647;
 }

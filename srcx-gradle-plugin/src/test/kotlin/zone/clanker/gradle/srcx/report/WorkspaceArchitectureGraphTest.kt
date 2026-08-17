@@ -5,6 +5,8 @@ package zone.clanker.gradle.srcx.report
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldNotContain
@@ -183,7 +185,7 @@ class WorkspaceArchitectureGraphTest :
                     json shouldContain "\"fileEdges\""
                     json shouldContain "\"cycles\""
                     json shouldContain "\"sourceFiles\""
-                    json shouldContain "\"availableNodes\""
+                    json shouldContain "\"availableNodes\":[]"
                     json shouldContain "\"availableEdges\""
                     json shouldContain "\"availableFileNodes\""
                     json shouldContain "\"availableFileEdges\""
@@ -407,9 +409,7 @@ class WorkspaceArchitectureGraphTest :
                     graph.availableFileNodes shouldHaveSize ARCHITECTURE_GRAPH_FILE_NODE_LIMIT + 1
                     graph.availableNodes.map { it.id } shouldContain hiddenCycleMember.identity.value
                     graph.availableFileNodes.map { it.id } shouldContain hiddenFileId
-                    graph.sourceFiles.map { it.id } shouldContain hiddenFileId
-                    graph.sourceFiles.single { it.id == hiddenFileId }.content shouldBe
-                        "complete source for ${hiddenCycleMember.name}\n"
+                    graph.sourceFiles.map { it.id } shouldNotContain hiddenFileId
                     graph.availableEdges.sumOf { it.recordCount } shouldBe relationships.size
                     graph.availableFileEdges.sumOf { it.recordCount } shouldBe relationships.size
                     graph.availableEdges.all { it.crossBuild } shouldBe true
@@ -1780,23 +1780,13 @@ class WorkspaceArchitectureGraphTest :
                 }
 
                 then("the shared source catalog retains every refillable file and occurrence") {
-                    graph.sourceFiles shouldHaveSize report.sourceFiles.size
+                    graph.sourceFiles.map { it.id } shouldContainAll graph.fileNodes.map { it.id }
+                    graph.sourceFiles.size shouldBeLessThan report.sourceFiles.size
                     graph.sourceFiles.size shouldBe
                         graph.sourceFiles
                             .map { sourceFile -> sourceFile.id }
                             .distinct()
                             .size
-                    val expectedSourceFileIds =
-                        report.sourceFiles
-                            .map { sourceFile ->
-                                graphFileId(
-                                    build = sourceFile.build,
-                                    project = sourceFile.project,
-                                    sourceSet = sourceFile.sourceSet,
-                                    path = sourceFile.projectRelativeFile,
-                                )
-                            }.toSet()
-                    graph.sourceFiles.map { sourceFile -> sourceFile.id }.toSet() shouldBe expectedSourceFileIds
                     graph.availableNodes shouldHaveSize report.workspaceIndex.symbols.size
                     graph.availableFileNodes shouldHaveSize report.sourceFiles.size
                     graph.availableEdges.sumOf { edge -> edge.recordCount } shouldBe relationships.size

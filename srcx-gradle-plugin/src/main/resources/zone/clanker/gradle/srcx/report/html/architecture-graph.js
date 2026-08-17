@@ -78,6 +78,7 @@
         var searchRecoveryAction = root.querySelector("[data-srcx-search-recovery-action]");
         var clearSelectedButton = root.querySelector("[data-srcx-clear-selected]");
         var fullscreenButton = controls && controls.querySelector("[data-srcx-graph-fullscreen]");
+        var scopeToggle = root.querySelector("[data-srcx-scope-toggle]");
         var fullscreenChromeToggle = root.querySelector("[data-srcx-fullscreen-chrome-toggle]");
         var detailKicker = detail && detail.querySelector("[data-srcx-detail-kicker]");
         var detailTitle = detail && detail.querySelector("[data-srcx-detail-title]");
@@ -98,6 +99,8 @@
             return false;
         }
         if (!validGraphData(data)) return false;
+        lockNarrowPage();
+        closeIdleEvidence();
         if (root.dataset.srcxAtlasState === "empty" ||
             ((data.fileNodes.length + data.nodes.length) === 0)) {
             restoreFallback(root);
@@ -171,11 +174,14 @@
             return [scopePathKey(sourceFile.build, sourceFile.project, sourceFile.sourceSet, sourceFile.path), sourceFile];
         }));
         var declarationById = declarationIndex(data);
-        var availableFileNodes = data.availableFileNodes || data.fileNodes;
-        var availableFileEdges = data.availableFileEdges || data.fileEdges;
-        var availableSymbolNodes = data.availableNodes || data.nodes;
-        var availableSymbolEdges = data.availableEdges || data.edges;
-        var availableObservedCycles = data.availableCycles || data.cycles;
+        function catalogOrShown(catalog, shown) {
+            return (catalog && catalog.length) ? catalog : shown;
+        }
+        var availableFileNodes = catalogOrShown(data.availableFileNodes, data.fileNodes);
+        var availableFileEdges = catalogOrShown(data.availableFileEdges, data.fileEdges);
+        var availableSymbolNodes = catalogOrShown(data.availableNodes, data.nodes);
+        var availableSymbolEdges = catalogOrShown(data.availableEdges, data.edges);
+        var availableObservedCycles = catalogOrShown(data.availableCycles, data.cycles);
         var fileEntityById = new Map(availableFileNodes.map(function (node) { return [node.id, node]; }));
         var fileEntityByScopePath = new Map(availableFileNodes.map(function (node) {
             return [scopePathKey(node.build, node.project, node.sourceSet, node.path), node];
@@ -237,7 +243,7 @@
         var minimumZoomScale = 0.01;
         var minReadableScale = 0.86;
         var maximumZoomScale = 4;
-        var expandedSymbols = data.availableNodes ? {
+        var expandedSymbols = (data.availableNodes && data.availableNodes.length) ? {
             nodes: availableSymbolNodes,
             edges: availableSymbolEdges,
         } : expandedSymbolProjection();
@@ -281,6 +287,7 @@
             resizeObserver.observe(viewport);
         }
         window.addEventListener("resize", requestResize, { passive: true });
+        scheduleIdleSeedFit();
         return true;
 
         function draw() {
@@ -420,6 +427,9 @@
             renderEdgeSubset([]);
 
             pinnedLabelIds = persistentLabelIds(nodes);
+            if (width <= 480) {
+                pinnedLabelIds = new Set(nodes.map(function (node) { return node.id; }));
+            }
             ensureRovingNode();
             nodeGroups = zoomLayer.append("g")
                 .selectAll("g")
@@ -530,7 +540,9 @@
                 connectedNodeSimulation(nodes, links, layout);
             simulation.stop();
             if (nodes.length <= staticLayoutNodeThreshold) {
-                for (var tick = 0; tick < 180; tick += 1) simulation.tick();
+                if (width > 480) {
+                    for (var tick = 0; tick < 180; tick += 1) simulation.tick();
+                }
             }
             ticked();
             fitGraph(false);
@@ -1664,6 +1676,24 @@
             } else {
                 appendFileRelationshipEvidenceBrowser(body, node, sourceFileForNode(node));
             }
+            appendFileSourceReveal(body, node);
+        }
+
+        function appendFileSourceReveal(parent, node) {
+            var details = document.createElement("details");
+            details.className = "srcx-dashboard__architecture-source-reveal";
+            var summary = document.createElement("summary");
+            summary.textContent = "Show source";
+            details.appendChild(summary);
+            appendSourceViewer(details, sourceFileForNode(node), {
+                activeLine: null,
+                activeType: null,
+                focusViewer: false,
+                relationshipLineCounts: new Map(),
+                relationshipCountSingular: "displayed relationship record",
+                relationshipCountPlural: "displayed relationship records",
+            });
+            parent.appendChild(details);
         }
 
         function renderSymbolDetail(node) {
@@ -4413,6 +4443,13 @@
                 });
             });
             fullscreenButton.addEventListener("click", toggleArchitectureFullscreen);
+            if (scopeToggle) {
+                scopeToggle.addEventListener("click", function () {
+                    var open = root.getAttribute("data-srcx-scope-open") === "true";
+                    root.setAttribute("data-srcx-scope-open", open ? "false" : "true");
+                    scopeToggle.setAttribute("aria-pressed", String(!open));
+                });
+            }
             fullscreenChromeToggle.addEventListener("click", toggleFullscreenChrome);
             document.addEventListener("fullscreenchange", handleFullscreenChange);
             document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
@@ -4724,7 +4761,7 @@
             var active = architectureFullscreenActive();
             var nextCollapsed = active && collapsed;
             root.dataset.srcxFullscreenChrome = nextCollapsed ? "collapsed" : "expanded";
-            fullscreenChromeToggle.hidden = !active;
+            fullscreenChromeToggle.hidden = true;
             fullscreenChromeToggle.textContent = nextCollapsed ? "Show map controls" : "Hide map controls";
             fullscreenChromeToggle.setAttribute("aria-expanded", String(!nextCollapsed));
             fullscreenChromeToggle.setAttribute(
@@ -4834,7 +4871,7 @@
             fullscreenButton.textContent = active ? "Exit full screen" : "Full screen";
             fullscreenButton.setAttribute("aria-pressed", String(active));
             root.dataset.srcxFullscreen = String(active);
-            setFullscreenChromeCollapsed(active && root.dataset.srcxFullscreenChrome === "collapsed");
+            setFullscreenChromeCollapsed(active);
             if (active) lockDocumentScroll();
             else {
                 restoreDocumentScroll();
@@ -4985,11 +5022,19 @@
         function fitGraph(animate) {
             if (!zoomLayer || !zoomLayer.node()) return;
             cancelScheduledFit();
+            if (window.matchMedia("(max-width: 480px)").matches) {
+                svg.call(zoom.transform, d3.zoomIdentity);
+                return;
+            }
             var renderedBounds = renderedGraphBounds(zoomLayer.node());
             var measuredBounds = graphBounds(nodes, data.builds, links);
             var bounds = unionGraphBounds(renderedBounds, measuredBounds);
+            if (window.matchMedia("(max-width: 480px)").matches && measuredBounds && measuredBounds.width) {
+                bounds = measuredBounds;
+            }
             if (!bounds.width || !bounds.height) return;
             var measuredBoundaryPadding = 48;
+            if (window.matchMedia("(max-width: 480px)").matches) measuredBoundaryPadding = 16;
             var fitRect = graphFitRect(measuredBoundaryPadding);
             var fittedScale = Math.min(fitRect.width / bounds.width, fitRect.height / bounds.height);
             if (!Number.isFinite(fittedScale) || fittedScale <= 0) return;
@@ -5004,9 +5049,6 @@
             var transform = d3.zoomIdentity.translate(x, y).scale(scale);
             if (animate === false || reducedMotion()) svg.call(zoom.transform, transform);
             else svg.transition().duration(180).call(zoom.transform, transform);
-            if (fittedScale < minReadableScale) {
-                status.textContent = "Fit shows the complete frame; zoom or hover to read labels on small nodes.";
-            }
         }
 
         function frameSelection() {
@@ -5615,6 +5657,39 @@
             if (roving) roving.focus({ preventScroll: true });
         }
 
+        function lockNarrowPage() {
+            if (!window.matchMedia("(max-width: 480px)").matches) return;
+            document.documentElement.style.setProperty("overflow", "hidden", "important");
+            document.documentElement.style.setProperty("height", "100dvh", "important");
+            document.body.style.setProperty("overflow", "hidden", "important");
+            document.body.style.setProperty("height", "100dvh", "important");
+        }
+
+        function closeIdleEvidence() {
+            if (!detail) return;
+            detail.hidden = true;
+            detail.classList.remove("is-open");
+        }
+
+        function scheduleIdleSeedFit() {
+            window.requestAnimationFrame(function () {
+                window.requestAnimationFrame(function () {
+                    if (destroyed || userNavigated) return;
+                    lockNarrowPage();
+                    closeIdleEvidence();
+                    var size = viewportSize(viewport);
+                    if (size.width !== width || size.height !== height) {
+                        width = size.width;
+                        height = size.height;
+                        svg.attr("viewBox", "0 0 " + width + " " + height);
+                        draw();
+                        return;
+                    }
+                    fitGraph(false);
+                });
+            });
+        }
+
         function scheduleFit(generation, delay) {
             cancelScheduledFit();
             fitTimer = window.setTimeout(function () {
@@ -5697,9 +5772,24 @@
 
     function buildCellLayout(nodes, width, height, buildByName) {
         var viewportAspect = Math.max(0.75, width / Math.max(1, height));
+        var compactSeed = width <= 480;
+        if (compactSeed) return layoutSeedToViewport(nodes, width, height, buildByName);
         var subgroupGap = 14;
         var projectGap = 24;
         var buildGap = 40;
+        var nodeBoxPad = 24;
+        var subgroupMinWidth = 132;
+        var subgroupMinHeight = 86;
+        var projectMinWidth = 190;
+        var projectMinHeight = 130;
+        var buildMinWidth = 260;
+        var buildMinHeight = 190;
+        var projectInsetX = 24;
+        var projectInsetY = 52;
+        var subgroupInsetX = 18;
+        var subgroupInsetY = 38;
+        var nodeInsetX = 14;
+        var nodeInsetY = 34;
         var projects = Array.from(d3.group(nodes, function (node) {
             return projectKey(node.build, node.project);
         }), function (entry) {
@@ -5708,10 +5798,12 @@
                 var bounds = labelBounds(node);
                 var labelWidth = node.labelPinned ? bounds.width + 10 : 0;
                 var labelHeight = node.labelPinned ? bounds.height : 0;
+                var boxWidth = outerNodeRadius(node) * 2 + labelWidth + nodeBoxPad;
+                var boxHeight = Math.max(outerNodeRadius(node) * 2, labelHeight) + nodeBoxPad;
                 return {
                     key: node.id,
-                    width: outerNodeRadius(node) * 2 + labelWidth + 24,
-                    height: Math.max(outerNodeRadius(node) * 2, labelHeight) + 24,
+                    width: boxWidth,
+                    height: boxHeight,
                     nodeRadius: outerNodeRadius(node),
                 };
             }).sort(function (left, right) {
@@ -5727,8 +5819,8 @@
                 var nodePack = packVariableRectangles(subgroupRectangles, 1.35, 14);
                 return Object.assign({}, subgroup, {
                     nodePack: nodePack,
-                    width: Math.max(132, subgroupRegionLabel(subgroup).length * 5.2 + 28, nodePack.width + 28),
-                    height: Math.max(86, nodePack.height + 46),
+                    width: Math.max(subgroupMinWidth, subgroupRegionLabel(subgroup).length * 5.2 + 28, nodePack.width + 28),
+                    height: Math.max(subgroupMinHeight, nodePack.height + 46),
                 });
             }).sort(function (left, right) { return left.key.localeCompare(right.key); });
             var subgroupPack = packVariableRectangles(subgroups, 1.35, subgroupGap);
@@ -5741,11 +5833,11 @@
                 subgroups: subgroups,
                 subgroupPack: subgroupPack,
                 width: Math.max(
-                    190,
+                    projectMinWidth,
                     projectRegionSummaryWidth(members[0], members) + 28,
                     subgroupPack.width + 36,
                 ),
-                height: Math.max(130, subgroupPack.height + 60),
+                height: Math.max(projectMinHeight, subgroupPack.height + 60),
             };
         }).sort(function (left, right) { return left.key.localeCompare(right.key); });
         var projectsByBuild = d3.group(projects, function (project) { return project.build; });
@@ -5759,8 +5851,8 @@
                 build: buildName,
                 projects: entry[1],
                 projectPack: packed,
-                width: Math.max(260, headingWidth + 54, packed.width + 48),
-                height: Math.max(190, packed.height + 82),
+                width: Math.max(buildMinWidth, headingWidth + 54, packed.width + 48),
+                height: Math.max(buildMinHeight, packed.height + 82),
             };
         }).sort(function (left, right) { return left.key.localeCompare(right.key); });
         var buildPack = packVariableRectangles(buildRects, viewportAspect, buildGap);
@@ -5787,8 +5879,8 @@
             centers.set(buildRect.build, rectangleCenter(buildCell));
             buildRect.projects.forEach(function (project) {
                 var projectPlacement = buildRect.projectPack.placements.get(project.key);
-                var minX = buildX + 24 + projectPlacement.x;
-                var minY = buildY + 52 + projectPlacement.y;
+                var minX = buildX + projectInsetX + projectPlacement.x;
+                var minY = buildY + projectInsetY + projectPlacement.y;
                 var projectCell = {
                     minX: minX,
                     minY: minY,
@@ -5799,10 +5891,10 @@
                 project.subgroups.forEach(function (subgroup) {
                     var subgroupPlacement = project.subgroupPack.placements.get(subgroup.key);
                     var subgroupCell = {
-                        minX: projectCell.minX + 18 + subgroupPlacement.x,
-                        minY: projectCell.minY + 38 + subgroupPlacement.y,
-                        maxX: projectCell.minX + 18 + subgroupPlacement.x + subgroup.width,
-                        maxY: projectCell.minY + 38 + subgroupPlacement.y + subgroup.height,
+                        minX: projectCell.minX + subgroupInsetX + subgroupPlacement.x,
+                        minY: projectCell.minY + subgroupInsetY + subgroupPlacement.y,
+                        maxX: projectCell.minX + subgroupInsetX + subgroupPlacement.x + subgroup.width,
+                        maxY: projectCell.minY + subgroupInsetY + subgroupPlacement.y + subgroup.height,
                     };
                     subgroupCells.set(subgroup.key, subgroupCell);
                     subgroupByKey.set(subgroup.key, subgroup);
@@ -5813,8 +5905,8 @@
                         node.subgroupKey = subgroup.key;
                         node.labelDirection = "right";
                         homes.set(node.id, {
-                            x: subgroupCell.minX + 14 + placement.x + rectangle.nodeRadius + 10,
-                            y: subgroupCell.minY + 34 + placement.y + rectangle.height / 2,
+                            x: subgroupCell.minX + nodeInsetX + placement.x + rectangle.nodeRadius + 10,
+                            y: subgroupCell.minY + nodeInsetY + placement.y + rectangle.height / 2,
                         });
                     });
                 });
@@ -5831,6 +5923,196 @@
         };
     }
 
+    function layoutSeedToViewport(nodes, width, height, buildByName) {
+        var gap = 8;
+        var pad = 6;
+        var frame = { x: pad, y: pad, w: Math.max(1, width - pad * 2), h: Math.max(1, height - pad * 2) };
+        var projects = Array.from(d3.group(nodes, function (node) {
+            return projectKey(node.build, node.project);
+        }), function (entry) {
+            var members = entry[1].slice().sort(function (left, right) { return left.id.localeCompare(right.id); });
+            var rectangles = members.map(function (node) {
+                var bounds = labelBounds(node);
+                return {
+                    key: node.id,
+                    width: Math.max(64, outerNodeRadius(node) * 2 + bounds.width + 14),
+                    height: Math.max(22, Math.max(outerNodeRadius(node) * 2, bounds.height) + 8),
+                    nodeRadius: outerNodeRadius(node),
+                };
+            });
+            var rectangleByNode = new Map(rectangles.map(function (rectangle) {
+                return [rectangle.key, rectangle];
+            }));
+            var subgroups = automaticNodeSubgroups(members);
+            return {
+                key: entry[0],
+                build: members[0].build,
+                project: members[0].project,
+                members: members,
+                rectangles: rectangles,
+                rectangleByNode: rectangleByNode,
+                subgroups: subgroups,
+                weight: members.length,
+            };
+        }).sort(function (left, right) { return left.key.localeCompare(right.key); });
+        var buildItems = Array.from(d3.group(projects, function (project) { return project.build; }), function (entry) {
+            var members = entry[1];
+            return {
+                key: entry[0],
+                build: entry[0],
+                projects: members,
+                weight: members.reduce(function (sum, project) { return sum + project.weight; }, 0),
+            };
+        }).sort(function (left, right) { return left.key.localeCompare(right.key); });
+        var buildTiles = tileWeightedRects(buildItems, frame.x, frame.y, frame.w, frame.h, gap);
+        var cells = new Map();
+        var centers = new Map();
+        var projectCells = new Map();
+        var subgroupCells = new Map();
+        var subgroupByKey = new Map();
+        var laidSubgroups = [];
+        var homes = new Map();
+        buildItems.forEach(function (buildItem) {
+            var tile = buildTiles.get(buildItem.key);
+            var buildCell = { minX: tile.x, minY: tile.y, maxX: tile.x + tile.w, maxY: tile.y + tile.h };
+            cells.set(buildItem.build, buildCell);
+            centers.set(buildItem.build, rectangleCenter(buildCell));
+            var projectTiles = tileWeightedRects(buildItem.projects, tile.x + 4, tile.y + 18, tile.w - 8, tile.h - 22, 6);
+            buildItem.projects.forEach(function (project) {
+                var projectTile = projectTiles.get(project.key);
+                var projectCell = {
+                    minX: projectTile.x,
+                    minY: projectTile.y,
+                    maxX: projectTile.x + projectTile.w,
+                    maxY: projectTile.y + projectTile.h,
+                };
+                projectCells.set(project.key, projectCell);
+                var packed = packSeedIntoTile(project.rectangles, projectTile);
+                project.subgroups.forEach(function (subgroup) {
+                    var memberHomes = [];
+                    subgroup.members.forEach(function (node) {
+                        var placed = packed.get(node.id);
+                        if (!placed) return;
+                        node.subgroupKey = subgroup.key;
+                        node.labelDirection = "right";
+                        homes.set(node.id, { x: placed.x, y: placed.y });
+                        memberHomes.push(placed);
+                    });
+                    if (!memberHomes.length) return;
+                    var minX = Math.min.apply(null, memberHomes.map(function (home) { return home.x - 16; }));
+                    var maxX = Math.max.apply(null, memberHomes.map(function (home) { return home.x + 16; }));
+                    var minY = Math.min.apply(null, memberHomes.map(function (home) { return home.y - 14; }));
+                    var maxY = Math.max.apply(null, memberHomes.map(function (home) { return home.y + 14; }));
+                    var subgroupCell = {
+                        minX: Math.max(projectCell.minX + 2, minX),
+                        minY: Math.max(projectCell.minY + 2, minY),
+                        maxX: Math.min(projectCell.maxX - 2, maxX),
+                        maxY: Math.min(projectCell.maxY - 2, maxY),
+                    };
+                    subgroupCells.set(subgroup.key, subgroupCell);
+                    subgroupByKey.set(subgroup.key, subgroup);
+                    laidSubgroups.push(subgroup);
+                });
+            });
+        });
+        return {
+            cells: cells,
+            centers: centers,
+            projectCells: projectCells,
+            subgroupCells: subgroupCells,
+            subgroupByKey: subgroupByKey,
+            subgroups: laidSubgroups,
+            homes: homes,
+        };
+    }
+
+    function tileWeightedRects(items, x, y, w, h, gap) {
+        var tiles = new Map();
+        if (!items.length) return tiles;
+        if (items.length === 1) {
+            tiles.set(items[0].key, { x: x, y: y, w: w, h: h });
+            return tiles;
+        }
+        var ranked = items.slice().sort(function (left, right) {
+            return right.weight - left.weight || left.key.localeCompare(right.key);
+        });
+        var totalWeight = ranked.reduce(function (sum, item) { return sum + item.weight; }, 0) || 1;
+        var heavy = ranked[0];
+        if (heavy && heavy.weight / totalWeight >= 0.34 && ranked.length > 1) {
+            var band = Math.max(96, (h - gap) * heavy.weight / totalWeight);
+            tiles.set(heavy.key, { x: x, y: y, w: w, h: band });
+            tileWeightedRects(ranked.slice(1), x, y + band + gap, w, h - band - gap, gap)
+                .forEach(function (tile, key) { tiles.set(key, tile); });
+            return tiles;
+        }
+        var left = [];
+        var right = [];
+        var leftWeight = 0;
+        var rightWeight = 0;
+        ranked.forEach(function (item) {
+            if (leftWeight <= rightWeight) {
+                left.push(item);
+                leftWeight += item.weight;
+            } else {
+                right.push(item);
+                rightWeight += item.weight;
+            }
+        });
+        if (!right.length) return stackWeightedRects(ranked, x, y, w, h, gap);
+        var colWidth = (w - gap) / 2;
+        stackWeightedRects(left, x, y, colWidth, h, gap).forEach(function (tile, key) { tiles.set(key, tile); });
+        stackWeightedRects(right, x + colWidth + gap, y, colWidth, h, gap).forEach(function (tile, key) {
+            tiles.set(key, tile);
+        });
+        return tiles;
+    }
+
+    function stackWeightedRects(items, x, y, w, h, gap) {
+        var tiles = new Map();
+        var total = items.reduce(function (sum, item) { return sum + item.weight; }, 0) || 1;
+        var available = h - gap * Math.max(0, items.length - 1);
+        var cursor = y;
+        items.forEach(function (item) {
+            var itemHeight = Math.max(28, available * item.weight / total);
+            tiles.set(item.key, { x: x, y: cursor, w: w, h: itemHeight });
+            cursor += itemHeight + gap;
+        });
+        return tiles;
+    }
+
+    function packSeedIntoTile(rectangles, tile) {
+        var placed = new Map();
+        if (!rectangles.length) return placed;
+        var availW = Math.max(48, tile.w - 12);
+        var availH = Math.max(28, tile.h - 16);
+        var best = null;
+        var maxCols = Math.max(1, rectangles.length);
+        for (var cols = 1; cols <= maxCols; cols += 1) {
+            var pack = packVariableRectangles(rectangles, cols, 6, cols);
+            if (!pack || !pack.width) continue;
+            var fits = pack.width <= availW + 1 && pack.height <= availH + 1;
+            var overflow = Math.max(0, pack.width - availW) + Math.max(0, pack.height - availH);
+            if (!best || (fits && !best.fits) || (fits === best.fits && overflow < best.overflow) ||
+                (fits === best.fits && overflow === best.overflow && pack.height < best.pack.height)) {
+                best = { pack: pack, fits: fits, overflow: overflow };
+            }
+            if (fits && pack.height <= availH) break;
+        }
+        var chosen = (best && best.pack) || packVariableRectangles(rectangles, 1, 6, 1);
+        var scale = Math.min(availW / Math.max(1, chosen.width), availH / Math.max(1, chosen.height), 1);
+        var originX = tile.x + 6 + Math.max(0, (availW - chosen.width * scale) / 2);
+        var originY = tile.y + 10 + Math.max(0, (availH - chosen.height * scale) / 2);
+        rectangles.forEach(function (rectangle) {
+            var spot = chosen.placements.get(rectangle.key);
+            if (!spot) return;
+            placed.set(rectangle.key, {
+                x: originX + (spot.x + rectangle.nodeRadius + 8) * scale,
+                y: originY + (spot.y + rectangle.height / 2) * scale,
+            });
+        });
+        return placed;
+    }
+
     function initializeNodes(nodes, layout) {
         nodes.forEach(function (node) {
             var home = layout.homes.get(node.id) || layout.centers.get(node.build);
@@ -5839,7 +6121,7 @@
         });
     }
 
-    function packVariableRectangles(rectangles, targetAspect, gap) {
+    function packVariableRectangles(rectangles, targetAspect, gap, maxColumns) {
         if (!rectangles.length) return { width: 0, height: 0, placements: new Map() };
         var best = null;
         var idealColumns = Math.max(1, Math.round(Math.sqrt(rectangles.length * targetAspect)));
@@ -5848,6 +6130,12 @@
             Array.from(new Set([-3, -2, -1, 0, 1, 2, 3].map(function (offset) {
                 return Math.max(1, Math.min(rectangles.length, idealColumns + offset));
             }).concat([1, rectangles.length])));
+        if (maxColumns) {
+            columnCandidates = columnCandidates.filter(function (columns) { return columns <= maxColumns; });
+            if (!columnCandidates.length) {
+                columnCandidates = [Math.max(1, Math.min(maxColumns, rectangles.length))];
+            }
+        }
         columnCandidates.forEach(function (columns) {
             var placements = new Map();
             var y = 0;
@@ -7014,14 +7302,19 @@
         var minY = Infinity;
         var maxX = -Infinity;
         var maxY = -Infinity;
+        var compactFit = typeof window !== "undefined" && window.matchMedia &&
+            window.matchMedia("(max-width: 480px)").matches;
+        var padX = compactFit ? 8 : 36;
+        var padTop = compactFit ? 12 : 56;
+        var padBottom = compactFit ? 8 : 36;
         nodes.forEach(function (node) {
             var bounds = nodeVisualBounds(node);
             var build = builds.find(function (candidate) { return candidate.name === node.build; });
-            var headingWidth = build && build.labelWidth ? build.labelWidth + 28 : 0;
-            minX = Math.min(minX, bounds.minX - 36);
-            maxX = Math.max(maxX, bounds.maxX + 36, bounds.minX + headingWidth);
-            minY = Math.min(minY, bounds.minY - 56);
-            maxY = Math.max(maxY, bounds.maxY + 36);
+            var headingWidth = !compactFit && build && build.labelWidth ? build.labelWidth + 28 : 0;
+            minX = Math.min(minX, bounds.minX - padX);
+            maxX = Math.max(maxX, bounds.maxX + padX, bounds.minX + headingWidth);
+            minY = Math.min(minY, bounds.minY - padTop);
+            maxY = Math.max(maxY, bounds.maxY + padBottom);
         });
         (links || []).forEach(function (edge) {
             var bounds = edgeVisualBounds(edge);
@@ -7396,6 +7689,8 @@
         var entityType = build.visibleEntityType || "file";
         var noun = count === 1 ? entityType : entityType + "s";
         var context = build.context + " / " + count + " " + noun + " in this frame";
+        if (typeof window !== "undefined" && window.matchMedia &&
+            window.matchMedia("(max-width: 480px)").matches) return;
         text.append("tspan").attr("dx", 7).attr("class", "srcx-dashboard__architecture-build-context")
             .text(context);
     }

@@ -51,15 +51,15 @@ class AtlasMapHtmlChromeTest :
                     rendered.document shouldNotContain "data-srcx-filter-close"
                     rendered.document shouldContain "data-srcx-map-legend"
                     rendered.document shouldContain "data-srcx-graph-search"
+                    rendered.document shouldContain "data-srcx-scope-toggle"
+                    rendered.document shouldContain "srcx-dashboard__architecture-search"
                     rendered.document shouldContain "data-srcx-graph-navigator"
                     rendered.document shouldContain "FILE SOURCE"
                     rendered.document shouldNotContain "data-srcx-graph-navigator hidden"
                     rendered.document shouldNotContain "Workspace <strong>atlas.</strong>"
                     rendered.document shouldNotContain "Explore files first ·"
-                    rendered.document shouldContain "srcx-dashboard__architecture-filter--projects\\\" hidden"
-                    rendered.document shouldContain "srcx-dashboard__architecture-filter--source-sets\\\" hidden"
-                    rendered.document shouldNotContain "data-srcx-path-filter"
-                    rendered.document shouldNotContain "data-srcx-path-tree"
+                    rendered.document shouldContain "architecture-filter--projects\" hidden"
+                    rendered.document shouldContain "architecture-filter--source-sets\" hidden"
                     rendered.document shouldNotContain "data-srcx-graph-navigator hidden"
                     rendered.document shouldContain "\"name\":\"atlas-root\""
                     rendered.document shouldContain "\"name\":\"atlas-lib\""
@@ -70,6 +70,7 @@ class AtlasMapHtmlChromeTest :
                     rendered.document shouldContain "\"fileNodeCount\":3"
                     rendered.document shouldContain "\"fileNodeCount\":2"
                     rendered.document shouldContain "\"fileNodeCount\":1"
+                    rendered.document shouldContain "\"availableNodes\":[]"
                     rendered.fragment.substringBefore("</style>") shouldContain
                         ".srcx-theme .srcx-dashboard__architecture-graph\n" +
                         "    .srcx-dashboard__architecture-navigator"
@@ -85,6 +86,23 @@ class AtlasMapHtmlChromeTest :
                     rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 768px)"
                     rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 1024px)"
                     rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 1440px)"
+                    rendered.fragment.substringBefore("</style>") shouldContain
+                        "block-size: auto !important"
+                    rendered.fragment.substringBefore("</style>") shouldContain
+                        "min-block-size: 0 !important"
+                    rendered.fragment.substringBefore("</style>") shouldContain
+                        ".srcx-dashboard__architecture-graph:not([data-srcx-fullscreen=\"true\"])"
+                    rendered.fragment.substringBefore("</style>") shouldContain
+                        ".srcx-dashboard__architecture-graph[data-srcx-fullscreen=\"true\"]\n" +
+                        "    [data-srcx-graph-action],"
+                    rendered.fragment.substringBefore("</style>") shouldContain
+                        "z-index: 2147483647"
+                    rendered.fragment.substringBefore("</style>") shouldContain
+                        "color: transparent !important"
+                    rendered.fragment.substringBefore("</style>") shouldContain
+                        "-webkit-text-fill-color: transparent !important"
+                    rendered.fragment.substringBefore("</style>") shouldContain
+                        "max-inline-size: 44px !important"
                     Files.exists(preview) shouldBe true
                 }
             }
@@ -99,7 +117,8 @@ class AtlasMapHtmlChromeTest :
                     rendered.document shouldContain "Index a build"
                     rendered.document shouldContain
                         "Add a Kotlin/Gradle build to this workspace and run srcx-context."
-                    rendered.document shouldNotContain "Box select"
+                    rendered.document.substringBefore("<script") shouldNotContain "Box select"
+                    rendered.document shouldContain "Show source"
                     rendered.document shouldNotContain "Shift-drag"
                 }
             }

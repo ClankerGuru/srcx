@@ -328,6 +328,10 @@ internal class WorkspaceArchitectureHtmlRenderer(
     private fun renderControls(): String =
         buildString {
             appendLine("<div class=\"srcx-dashboard__architecture-controls\" data-srcx-graph-controls hidden>")
+            appendLine(
+                "<button type=\"button\" class=\"srcx-dashboard__architecture-scope-toggle\" " +
+                    "data-srcx-scope-toggle aria-pressed=\"false\">Scope</button>",
+            )
             appendLine("<div class=\"srcx-dashboard__architecture-lenses\" role=\"group\" aria-label=\"Map lens\">")
             appendLine("<button type=\"button\" data-srcx-graph-view=\"files\" aria-pressed=\"true\">Files</button>")
             appendLine(

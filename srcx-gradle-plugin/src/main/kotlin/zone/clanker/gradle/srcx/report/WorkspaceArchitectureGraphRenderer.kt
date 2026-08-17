@@ -130,7 +130,9 @@ private fun renderWorkspaceArchitectureGraph(
         cycles = fileGraph.cycles,
         analysisCycles = fileGraph.analysisCycles,
         findings = fileGraph.findings,
-        sourceFiles = availableFileGraph.sourceFiles,
+        sourceFiles = fileGraph.sourceFiles.filter { source ->
+            fileGraph.nodes.any { node -> node.id == source.id }
+        },
         availableNodes = availableNodes,
         availableEdges = availableEdges,
         availableFileNodes = availableFileGraph.nodes,
@@ -696,13 +698,13 @@ internal data class WorkspaceArchitectureGraphRenderer(
             "analysisCycles" to analysisCycles.joinToString(prefix = "[", postfix = "]") { it.toJson() },
             "findings" to findings.joinToString(prefix = "[", postfix = "]") { it.toJson() },
             "sourceFiles" to sourceFiles.joinToString(prefix = "[", postfix = "]") { it.toJson() },
-            "availableNodes" to availableNodes.joinToString(prefix = "[", postfix = "]") { it.toJson() },
-            "availableEdges" to availableEdges.joinToString(prefix = "[", postfix = "]") { it.toJson() },
-            "availableFileNodes" to
-                availableFileNodes.joinToString(prefix = "[", postfix = "]") { it.toJson() },
-            "availableFileEdges" to
-                availableFileEdges.joinToString(prefix = "[", postfix = "]") { it.toJson() },
-            "availableCycles" to availableCycles.joinToString(prefix = "[", postfix = "]") { it.toJson() },
+            // Linear payload: shown files + aggregated non-import edges + important symbols.
+            // Do not dump availableNodes / availableFile* catalogs.
+            "availableNodes" to "[]",
+            "availableEdges" to "[]",
+            "availableFileNodes" to "[]",
+            "availableFileEdges" to "[]",
+            "availableCycles" to "[]",
         )
 }
 
