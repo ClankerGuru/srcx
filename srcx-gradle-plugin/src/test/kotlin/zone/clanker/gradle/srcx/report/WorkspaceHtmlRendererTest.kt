@@ -1069,6 +1069,10 @@ private fun BehaviorSpec.registerAtlasUxContractTests() {
             assertAtlasFindChromeContract(script, mapStyles)
         }
 
+        then("FIND kind chips switch lenses and isolate matching nodes") {
+            assertAtlasFindKindSemanticContract(script)
+        }
+
         then("the navigator scopes builds, projects, and source sets accessibly") {
             assertAtlasNavigatorContract(script, styles)
         }
@@ -2055,9 +2059,28 @@ private fun assertAtlasFindChromeContract(
     script shouldContain "function applyClassKeep(mode, build)"
     script shouldContain "function matchesClassKeep(node)"
     script shouldContain "classKeep: null"
+    script shouldContain "findRestoreView: null"
+    script shouldContain "function setGraphView(view)"
+    script shouldContain "function syncFindKindView()"
     script shouldContain "function wireFindChrome()"
     styles shouldContain ".srcx-dashboard__architecture-find-chrome"
     styles shouldContain "data-srcx-legend=\"open\""
+}
+
+private fun assertAtlasFindKindSemanticContract(script: String) {
+    script shouldContain "if (kindId === \"class\") return semantic === \"CONCRETE_CLASS\""
+    script shouldContain "return semantic === \"INTERFACE\" && !declarationLooksFunInterface(subject)"
+    script shouldContain "if (kindId === \"function\") return kind === \"fun\" || kind === \"function\" || kind === \"method\""
+    script shouldContain "if (kindId === \"property\") return kind === \"val/var\" || kind === \"property\" || kind === \"val\""
+    script shouldNotContain "if (kindId === \"class\") {\n" +
+        "                return semantic === \"CONCRETE_CLASS\" || semantic === \"ABSTRACT_CLASS\""
+    script shouldContain "function findKindWantsSymbols()"
+    script shouldContain "if (findKindWantsSymbols()) setGraphView(\"symbols\")"
+    script shouldContain "else setGraphView(\"files\")"
+    script shouldContain "if (restore) setGraphView(restore)"
+    script shouldContain "if (!state.selectedFindKinds.size) state.findRestoreView = state.view"
+    script shouldContain "wantsSymbols && node.entityType === \"file\") return false"
+    script shouldContain "!wantsSymbols && byFamily.file.length && node.entityType !== \"file\") return false"
 }
 
 private fun assertAtlasToolbarReadabilityContract(

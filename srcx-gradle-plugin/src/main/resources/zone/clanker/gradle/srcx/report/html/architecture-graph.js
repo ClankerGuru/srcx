@@ -139,6 +139,7 @@
             pathRovingEntryId: null,
             selectedRelationshipKind: "all",
             selectedFindKinds: new Set(),
+            findRestoreView: null,
             usedAtLeast: 0,
             legendOpen: false,
             classKeep: null,
@@ -3552,18 +3553,17 @@
             var semantic = declarationSemantic(subject);
             var kind = String(subject.kind || "").toLowerCase();
             var path = nodeFilePath(subject.entityType === "file" ? subject : host || subject);
-            if (kindId === "class") {
-                return semantic === "CONCRETE_CLASS" || semantic === "ABSTRACT_CLASS" ||
-                    semantic === "ENUM" || semantic === "SINGLETON_OBJECT";
+            if (kindId === "class") return semantic === "CONCRETE_CLASS";
+            if (kindId === "interface") {
+                return semantic === "INTERFACE" && !declarationLooksFunInterface(subject);
             }
-            if (kindId === "interface") return semantic === "INTERFACE";
             if (kindId === "fun-interface") return declarationLooksFunInterface(subject);
             if (kindId === "object") return semantic === "SINGLETON_OBJECT";
             if (kindId === "enum") return semantic === "ENUM";
             if (kindId === "sealed-class") return declarationLooksSealed(subject);
-            if (kindId === "function") return kind === "fun" || kind === "function";
+            if (kindId === "function") return kind === "fun" || kind === "function" || kind === "method";
             if (kindId === "property") return kind === "val/var" || kind === "property" || kind === "val";
-            if (kindId === "variable") return kind === "val/var" || kind === "variable" || kind === "var";
+            if (kindId === "variable") return kind === "variable" || kind === "var";
             if (kindId === "file") return Boolean(path);
             if (kindId === "kotlin" || kindId === "java" || kindId === "gradle-kts") {
                 return fileLanguageKind(path) === kindId;
@@ -3571,22 +3571,50 @@
             return false;
         }
 
-        function matchesFindKinds(node) {
-            // Same family = OR. Across families = AND.
-            if (!state.selectedFindKinds.size) return true;
+        function selectedFindKindFamilies() {
             var byFamily = { type: [], member: [], file: [] };
             state.selectedFindKinds.forEach(function (kindId) {
                 var family = findKindFamily(kindId);
                 if (byFamily[family]) byFamily[family].push(kindId);
             });
+            return byFamily;
+        }
+
+        function findKindWantsSymbols() {
+            var families = selectedFindKindFamilies();
+            return families.type.length > 0 || families.member.length > 0;
+        }
+
+        function matchesFindKinds(node) {
+            // Same family = OR. Across families = AND.
+            if (!state.selectedFindKinds.size) return true;
+            var byFamily = selectedFindKindFamilies();
+            var wantsSymbols = byFamily.type.length > 0 || byFamily.member.length > 0;
+            if (wantsSymbols && node.entityType === "file") return false;
+            if (!wantsSymbols && byFamily.file.length && node.entityType !== "file") return false;
             return Object.keys(byFamily).every(function (family) {
                 if (!byFamily[family].length) return true;
                 return byFamily[family].some(function (kindId) {
-                    return kindSubjects(node).some(function (subject) {
-                        return subjectMatchesFindKind(subject, kindId, node);
-                    });
+                    return subjectMatchesFindKind(node, kindId, node);
                 });
             });
+        }
+
+        function setGraphView(view) {
+            if (!["files", "symbols", "problems", "cycles"].includes(view)) return;
+            state.view = view;
+            controls.querySelectorAll("[data-srcx-graph-view]").forEach(function (button) {
+                button.setAttribute("aria-pressed", String(button.dataset.srcxGraphView === view));
+            });
+        }
+
+        function syncFindKindView() {
+            if (!state.selectedFindKinds.size) {
+                if (state.findRestoreView) setGraphView(state.findRestoreView);
+                return;
+            }
+            if (findKindWantsSymbols()) setGraphView("symbols");
+            else setGraphView("files");
         }
 
         function nodeUsedCount(node) {
@@ -3800,8 +3828,15 @@
         }
 
         function toggleFindKind(kindId) {
+            if (!state.selectedFindKinds.size) state.findRestoreView = state.view;
             if (state.selectedFindKinds.has(kindId)) state.selectedFindKinds.delete(kindId);
             else state.selectedFindKinds.add(kindId);
+            if (!state.selectedFindKinds.size) {
+                syncFindKindView();
+                state.findRestoreView = null;
+            } else {
+                syncFindKindView();
+            }
             renderFindChrome();
             draw();
         }
@@ -3818,11 +3853,14 @@
         }
 
         function clearFindChrome() {
+            var restore = state.findRestoreView;
             state.selectedFindKinds = new Set();
             state.usedAtLeast = 0;
             state.classKeep = null;
             state.query = "";
             search.value = "";
+            state.findRestoreView = null;
+            if (restore) setGraphView(restore);
             renderFindChrome();
         }
 
@@ -4824,10 +4862,7 @@
                 button.addEventListener("click", function () {
                     clearSelection(false);
                     detailReturnFocus = null;
-                    state.view = button.dataset.srcxGraphView;
-                    controls.querySelectorAll("[data-srcx-graph-view]").forEach(function (candidate) {
-                        candidate.setAttribute("aria-pressed", String(candidate === button));
-                    });
+                    setGraphView(button.dataset.srcxGraphView);
                     renderRelationshipKindFilter();
                     draw();
                 });
