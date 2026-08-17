@@ -619,3 +619,77 @@ body.srcx-atlas-document {
 .srcx-theme .srcx-dashboard__architecture-graph-head {
     display: none !important;
 }
+
+
+/* UX fail: compact scope chips, one select mode, 390 shows the map. */
+.srcx-theme .srcx-dashboard__architecture-filter-label,
+.srcx-theme .srcx-dashboard__architecture-filter-context,
+.srcx-theme .srcx-dashboard__architecture-filter-button small,
+.srcx-dashboard__architecture-selection-status {
+    display: none !important;
+}
+.srcx-theme .srcx-dashboard__architecture-graph
+    .srcx-dashboard__architecture-navigator {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    inset: auto;
+    max-height: 44px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 10px;
+    position: relative;
+    width: 100%;
+    z-index: 8;
+}
+.srcx-theme .srcx-dashboard__architecture-filter,
+.srcx-theme .srcx-dashboard__architecture-filter--builds {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.srcx-theme .srcx-dashboard__architecture-filter-rail {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+}
+.srcx-theme .srcx-dashboard__architecture-filter-button {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    max-width: none;
+    min-height: 32px;
+    min-width: 0;
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+.srcx-theme .srcx-dashboard__architecture-filter-button strong {
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.srcx-theme .srcx-dashboard__architecture-selection-toolbar {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+}
+.srcx-theme .srcx-dashboard__architecture-viewport {
+    min-height: min(70dvh, 720px);
+}
+@media (max-width: 390px) {
+    .srcx-theme .srcx-dashboard__architecture-graph
+        .srcx-dashboard__architecture-navigator,
+    .srcx-theme .srcx-dashboard__architecture-selection-toolbar,
+    .srcx-theme .srcx-dashboard__architecture-controls,
+    .srcx-theme .srcx-dashboard__architecture-legend {
+        display: none !important;
+    }
+    .srcx-theme .srcx-dashboard__architecture-viewport,
+    .srcx-theme .srcx-dashboard__architecture-graph {
+        min-height: 100dvh;
+    }
+}

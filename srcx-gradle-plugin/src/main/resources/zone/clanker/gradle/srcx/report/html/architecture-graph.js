@@ -4005,20 +4005,16 @@
             else if (options.kind === "project") button.dataset.srcxFilterProject = key;
             else button.dataset.srcxFilterSourceSet = key;
             button.setAttribute("aria-pressed", String(options.selected));
-            button.setAttribute("aria-label", options.title + "; " + options.summary);
+            button.setAttribute("aria-label", options.title);
             button.tabIndex = options.selected ? 0 : -1;
             if (options.color) button.style.setProperty("--srcx-build-color", options.color);
             var swatch = document.createElement("i");
             swatch.className = "srcx-dashboard__architecture-filter-swatch" +
                 (options.color ? "" : " is-all");
             swatch.setAttribute("aria-hidden", "true");
-            var copy = document.createElement("span");
             var title = document.createElement("strong");
-            var summary = document.createElement("small");
             title.textContent = options.title;
-            summary.textContent = options.summary;
-            copy.append(title, summary);
-            button.append(swatch, copy);
+            button.append(swatch, title);
             button.addEventListener("click", options.select);
             return button;
         }
@@ -4192,7 +4188,7 @@
         }
 
         function ensureSelectionToolbar() {
-            if (root.dataset.srcxAtlasState === "empty" || !data.fileNodes || data.fileNodes.length === 0) return;
+            if (root.dataset.srcxAtlasState === "empty" || !(data.fileNodes && data.fileNodes.length)) return;
             if (selectionToolbar) return;
             selectionToolbar = document.createElement("div");
             selectionToolbar.className = "srcx-dashboard__architecture-selection-toolbar";
@@ -4221,16 +4217,7 @@
             selectionStatus.setAttribute("role", "status");
             selectionStatus.setAttribute("aria-live", "polite");
             selectionStatus.setAttribute("aria-atomic", "true");
-            selectionToolbar.append(
-                boxSelectButton,
-                selectProjectButton,
-                selectBuildButton,
-                frameSelectionButton,
-                frameProjectButton,
-                frameBuildButton,
-                clearNodeSelectionButton,
-                selectionStatus,
-            );
+            selectionToolbar.append(boxSelectButton, clearNodeSelectionButton);
             var filterPanel = navigatorElement.querySelector(".srcx-dashboard__architecture-filter-panel");
             navigatorElement.insertBefore(selectionToolbar, filterPanel || filterContext);
             updateSelectionToolbar();
@@ -4266,9 +4253,10 @@
                 selectBuildButton.setAttribute("aria-label", "Select all visible nodes in build " + anchor.build);
             }
             root.dataset.srcxSelectionCount = String(count);
-            selectionStatus.textContent = announcement || (count ? count + (count === 1 ? " node selected" :
-                " nodes selected") + "; drag any selected node to move the group" :
-                "No nodes selected; Shift-drag empty canvas or choose Box select");
+            if (selectionStatus) {
+                selectionStatus.textContent = announcement || (count ? count + (count === 1 ? " node selected" :
+                    " nodes selected") : "");
+            }
             syncClearSelectedButton();
         }
 
