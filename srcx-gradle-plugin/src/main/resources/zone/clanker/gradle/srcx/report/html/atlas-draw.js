@@ -110,16 +110,16 @@
             };
         });
         var layout = layoutLooseRooms(nodes, width, height);
-        var rooms = svg.append("g").attr("class", "srcx-dashboard__architecture-svg-rooms");
+        var rooms = svg.append("g").attr("class", "srcx-dashboard__architecture-build-regions");
         layout.cells.forEach(function (cell, build) {
-            rooms.append("rect")
-                .attr("class", "srcx-dashboard__architecture-svg-build")
+            var group = rooms.append("g").attr("class", "srcx-dashboard__architecture-build-region");
+            group.append("rect")
+                .attr("class", "srcx-dashboard__architecture-build-region-body")
                 .attr("x", cell.minX)
                 .attr("y", cell.minY)
                 .attr("width", Math.max(1, cell.maxX - cell.minX))
                 .attr("height", Math.max(1, cell.maxY - cell.minY));
-            rooms.append("text")
-                .attr("class", "srcx-dashboard__architecture-svg-build-label")
+            group.append("text")
                 .attr("x", cell.minX + 10)
                 .attr("y", cell.minY + 16)
                 .text(build);

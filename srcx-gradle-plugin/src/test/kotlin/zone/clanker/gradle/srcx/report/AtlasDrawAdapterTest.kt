@@ -17,6 +17,7 @@ class AtlasDrawAdapterTest :
                 adapter shouldContain "srcx-dashboard__architecture-svg-node-ring is-finding-ring"
                 adapter shouldContain "srcx-dashboard__architecture-svg-node-ring is-cycle-ring"
                 adapter shouldContain "srcx-dashboard__architecture-svg-node-ring is-analysis-cycle-ring"
+                adapter shouldContain "srcx-dashboard__architecture-build-region-body"
                 adapter shouldContain "function layoutLooseRooms"
                 adapter shouldContain "function packLooseParticles"
                 adapter shouldNotContain "function packLabeledSeedGrid"
