@@ -35,10 +35,7 @@ class SrcxContextCleanTest :
                     Srcx.HTML_INDEX_FILE shouldBe "index.html"
                     Srcx.HTML_FRAGMENT_FILE shouldBe "report.html"
                     Srcx.HTML_STYLES_FILE shouldBe "gort.css"
-                    Srcx.HTML_HOST_SCRIPT shouldBe "atlas-host.js"
                     Srcx.HTML_D3_FILE shouldBe "d3.js"
-                    Srcx.HTML_DRAW_FILE shouldBe "atlas-draw.js"
-                    Srcx.HTML_SEED_LOADER_FILE shouldBe "atlas-seed-loader.js"
                 }
             }
         }
@@ -170,8 +167,8 @@ class SrcxContextCleanTest :
                     projectDir.resolve(".srcx/relationships/index.md").shouldExist()
                     projectDir.resolve(".srcx/site/index.html").shouldExist()
                     projectDir.resolve(".srcx/site/report.html").shouldExist()
-                    projectDir.resolve(".srcx/site/${Srcx.HTML_HOST_SCRIPT}").shouldExist()
-                    projectDir.resolve(".srcx/site/atlas.sqlite").shouldExist()
+                    projectDir.resolve(".srcx/site/${Srcx.HTML_STYLES_FILE}").shouldExist()
+                    projectDir.resolve(".srcx/site/${Srcx.HTML_D3_FILE}").shouldExist()
                     val content = dashboardFile.readText()
                     content shouldContain "# ctx-test"
                     content shouldContain "[Workspace Relationships](relationships/index.md)"

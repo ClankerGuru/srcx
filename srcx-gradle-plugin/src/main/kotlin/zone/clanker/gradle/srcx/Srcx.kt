@@ -63,30 +63,8 @@ data object Srcx {
     /** Concatenated Gort theme, dashboard, and atlas-map CSS next to [HTML_INDEX_FILE]. */
     const val HTML_STYLES_FILE = "gort.css"
 
-    /** Compose/Wasm Atlas host script next to [HTML_INDEX_FILE]. */
-    const val HTML_HOST_SCRIPT = "atlas-host.js"
-
-    /** D3 vendor sidecar next to [HTML_INDEX_FILE]. Dead on the live host. */
+    /** D3 vendor sidecar next to [HTML_INDEX_FILE]. Architecture-graph stays inlined. */
     const val HTML_D3_FILE = "d3.js"
-
-    /** D3 adapter sidecar. Dead on the live host. */
-    const val HTML_DRAW_FILE = "atlas-draw.js"
-
-    /** Kotlin/Wasm seed reader module next to [HTML_INDEX_FILE]. */
-    const val HTML_SEED_MODULE_FILE = "atlas-seed.mjs"
-
-    const val HTML_SEED_UNINSTANTIATED_FILE = "atlas-seed.uninstantiated.mjs"
-
-    const val HTML_SEED_WASM_FILE = "atlas-seed.wasm"
-
-    /** Classic-script Wasm bytes so file:// does not fetch the .wasm. */
-    const val HTML_SEED_WASM_BYTES_FILE = "atlas-seed-bytes.js"
-
-    /** Classic-script sqlite bytes so file:// can boot without fetch. */
-    const val HTML_SQLITE_BYTES_FILE = "atlas-sqlite-bytes.js"
-
-    /** Classic Wasm instantiate + boot hook. Not a module. */
-    const val HTML_SEED_LOADER_FILE = "atlas-seed-loader.js"
 
     /** Dependency scopes excluded from scanning by default. */
     val DEFAULT_EXCLUDED_DEP_SCOPES: Set<String> =

@@ -59,7 +59,6 @@ class WorkspaceHtmlRendererTest :
                 val report = fullWorkspaceReport()
                 val rendered = WorkspaceHtmlRenderer().render(report)
                 val article = rendered.fragment.substringBefore("<script src=")
-                val graphJson = buildWorkspaceArchitectureGraph(report).toJson()
 
                 then("the embedded fragment is the dashboard article without inlined styles") {
                     rendered.fragment shouldStartWith "<article class=\"srcx-theme srcx-page srcx-dashboard\""
@@ -83,15 +82,9 @@ class WorkspaceHtmlRendererTest :
                         "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>"
                     rendered.document shouldNotContain "<script data-srcx-vendor=\"d3-7.9.0\">"
                     rendered.document shouldNotContain "cdn.jsdelivr"
-                    rendered.document shouldContain
-                        "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>"
-                    rendered.document shouldContain "<script src=\"${Srcx.HTML_SEED_LOADER_FILE}\"></script>"
-                    rendered.document shouldNotContain "<script src=\"${Srcx.HTML_SQLITE_BYTES_FILE}\">"
-                    rendered.document shouldNotContain "type=\"module\""
-                    rendered.document shouldNotContain "data-srcx-architecture-data"
-                    rendered.document shouldNotContain "<script data-srcx-owned=\"architecture-graph\">"
+                    rendered.document shouldContain "<script data-srcx-owned=\"architecture-graph\">"
+                    rendered.document shouldContain "data-srcx-architecture-data"
                     rendered.d3 shouldBe WorkspaceHtmlResourceRenderer().d3Vendor()
-                    rendered.draw shouldBe WorkspaceHtmlResourceRenderer().drawAdapter()
                 }
 
                 then("the frame explains the report in workspace terms") {
@@ -147,7 +140,7 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain
                         "style=\"--srcx-build-color: ${workspaceBuildColor("library-build")}\"></i>" +
                         "<b>library-build</b>"
-                    graphJson shouldContain "\"color\":\"${workspaceBuildColor("render-lab")}\""
+                    article shouldContain "\"color\":\"${workspaceBuildColor("render-lab")}\""
                     article shouldNotContain "data-value="
                     article shouldContain "<strong>2 hubs / expand</strong>"
                     article shouldContain
@@ -217,10 +210,10 @@ class WorkspaceHtmlRendererTest :
                         .findAll(article)
                         .count() shouldBe 1
                     article shouldContain "src/main/kotlin/com/example/domain/RuntimeService.kt:21"
-                    graphJson shouldContain "\"id\":\"$findingId\""
-                    graphJson shouldContain "\"componentIds\":[\"com.example.domain.RuntimeService\"]"
-                    graphJson shouldContain "\"componentSymbolIds\":[\"render-lab:::app::main::"
-                    graphJson shouldContain
+                    article shouldContain "\"id\":\"$findingId\""
+                    article shouldContain "\"componentIds\":[\"com.example.domain.RuntimeService\"]"
+                    article shouldContain "\"componentSymbolIds\":[\"render-lab:::app::main::"
+                    article shouldContain
                         "\"componentFileIds\":[\"file::render-lab:::app::main::" +
                         "src/main/kotlin/com/example/domain/RuntimeService.kt\"]"
                 }
@@ -243,12 +236,10 @@ class WorkspaceHtmlRendererTest :
                     Regex("data-srcx-open-finding data-srcx-finding-id=\"$findingId\"")
                         .findAll(article)
                         .count() shouldBe 1
-                    val graphJson = buildWorkspaceArchitectureGraph(report).toJson()
-                    graphJson shouldContain "\"analysisCycles\":[{\"id\":\"analysis-cycle-1\""
-                    graphJson shouldContain "\"findingIds\":[\"$findingId\"]"
-                    graphJson shouldContain "\"analysisCycleId\":\"analysis-cycle-1\""
-                    graphJson shouldContain "\"evidence\":\"ANALYZER_INFERRED\""
-                    article shouldNotContain "data-srcx-architecture-data"
+                    article shouldContain "\"analysisCycles\":[{\"id\":\"analysis-cycle-1\""
+                    article shouldContain "\"findingIds\":[\"$findingId\"]"
+                    article shouldContain "\"analysisCycleId\":\"analysis-cycle-1\""
+                    article shouldContain "\"evidence\":\"ANALYZER_INFERRED\""
                 }
 
                 then("build edges and the cumulative workspace graph are rendered") {
@@ -385,20 +376,20 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain "RuntimeRepository.kt"
                     article shouldContain "render-lab:::app::main"
                     article shouldContain "library-build:::codec::main"
-                    graphJson shouldContain "\"label\":\"call record\", \"evidence\":\"DIRECT\""
-                    graphJson shouldContain "\"label\":\"uses type x2\", \"evidence\":\"DERIVED\""
-                    graphJson shouldContain "\"evidence\":\"HEURISTIC\""
-                    graphJson shouldContain "\"crossBuild\":true"
-                    graphJson shouldContain "\"context\":\"Root build\""
-                    graphJson shouldContain "\"context\":\"Included build\""
-                    graphJson shouldContain "\"totalRelationshipRecordCount\":4"
-                    graphJson shouldContain "\"shownRelationshipRecordCount\":4"
-                    graphJson shouldContain "\"shownSymbolRelationshipRecordCount\":4"
-                    graphJson shouldContain "\"recordCount\":1"
-                    graphJson shouldContain "\"defaultView\":\"files\""
-                    graphJson shouldContain "\"fileNodes\""
-                    graphJson shouldContain "\"fileEdges\""
-                    graphJson shouldContain "\"findings\""
+                    article shouldContain "\"label\":\"call record\", \"evidence\":\"DIRECT\""
+                    article shouldContain "\"label\":\"uses type x2\", \"evidence\":\"DERIVED\""
+                    article shouldContain "\"evidence\":\"HEURISTIC\""
+                    article shouldContain "\"crossBuild\":true"
+                    article shouldContain "\"context\":\"Root build\""
+                    article shouldContain "\"context\":\"Included build\""
+                    article shouldContain "\"totalRelationshipRecordCount\":4"
+                    article shouldContain "\"shownRelationshipRecordCount\":4"
+                    article shouldContain "\"shownSymbolRelationshipRecordCount\":4"
+                    article shouldContain "\"recordCount\":1"
+                    article shouldContain "\"defaultView\":\"files\""
+                    article shouldContain "\"fileNodes\""
+                    article shouldContain "\"fileEdges\""
+                    article shouldContain "\"findings\""
                     article shouldNotContain "Raw edge evidence"
                     article shouldNotContain "Source and relationship evidence"
                     article shouldNotContain "colored enclosure"
@@ -621,12 +612,11 @@ class WorkspaceHtmlRendererTest :
                     rendered.document shouldContain escaped
                     rendered.fragment shouldNotContain payload
                     rendered.fragment shouldNotContain "{{slot}}"
-                    val graphJson = buildWorkspaceArchitectureGraph(escapingWorkspaceReport(payload)).toJson()
-                    graphJson shouldContain "\"sourceFiles\""
-                    graphJson shouldContain "\\u003cscript\\u003ealert"
-                    graphJson shouldContain "\\u2028"
-                    graphJson shouldContain "\\u2029"
-                    graphJson shouldNotContain "</script><script>alert"
+                    rendered.fragment shouldContain "\"sourceFiles\""
+                    rendered.fragment shouldContain "\\u003cscript\\u003ealert"
+                    rendered.fragment shouldContain "\\u2028"
+                    rendered.fragment shouldContain "\\u2029"
+                    rendered.fragment shouldNotContain "</script><script>alert"
                 }
             }
         }
@@ -675,11 +665,6 @@ class WorkspaceHtmlRendererTest :
                 WorkspaceHtmlResourceRenderer().scripts() shouldNotContain
                     "<script data-srcx-vendor=\"d3-7.9.0\">"
                 WorkspaceHtmlResourceRenderer().scripts() shouldContain
-                    "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>"
-                WorkspaceHtmlResourceRenderer().scripts() shouldContain
-                    "<script src=\"${Srcx.HTML_SEED_LOADER_FILE}\"></script>"
-                WorkspaceHtmlResourceRenderer().scripts() shouldNotContain "type=\"module\""
-                WorkspaceHtmlResourceRenderer().scripts() shouldNotContain
                     "<script data-srcx-owned=\"architecture-graph\">"
                 "before</ScRiPt>after".escapeClosingScriptSequence() shouldBe "before<\\/script>after"
             }

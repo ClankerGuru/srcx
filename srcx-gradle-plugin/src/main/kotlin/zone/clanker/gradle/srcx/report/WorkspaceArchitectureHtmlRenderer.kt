@@ -119,6 +119,9 @@ internal class WorkspaceArchitectureHtmlRenderer(
             appendLine(renderDetailPanel())
             appendLine("</div>")
             appendLine(renderAtlasGuide(graph))
+            append("<script type=\"application/json\" data-srcx-architecture-data>")
+            append(graph.toJson())
+            appendLine("</script>")
             appendLine("</section>")
         }
 
@@ -454,7 +457,7 @@ internal class WorkspaceArchitectureHtmlRenderer(
 
     private fun renderFallback(graph: WorkspaceArchitectureGraphRenderer): String =
         buildString {
-            appendLine("<div class=\"srcx-dashboard__architecture-fallback\" data-srcx-graph-fallback hidden>")
+            appendLine("<div class=\"srcx-dashboard__architecture-fallback\" data-srcx-graph-fallback>")
             if (graph.fileNodes.isEmpty()) {
                 appendLine(renderEmptyGraph())
             } else {

@@ -17,8 +17,6 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import zone.clanker.gradle.srcx.Srcx
 import zone.clanker.gradle.srcx.atlas.AtlasSqliteWriter
-import zone.clanker.gradle.srcx.report.AtlasComposeHostRenderer
-import zone.clanker.gradle.srcx.report.AtlasStoreRenderer
 import zone.clanker.gradle.srcx.analysis.ImportantSymbolPolicy
 import zone.clanker.gradle.srcx.model.AnalysisSummary
 import zone.clanker.gradle.srcx.model.ArchitectureEntryPointKind
@@ -313,35 +311,13 @@ abstract class ContextTask : DefaultTask() {
         outputDirectory: File,
         report: WorkspaceReport,
     ) {
+        val rendered = WorkspaceHtmlRenderer().render(report)
         val siteDirectory = File(outputDirectory, Srcx.HTML_SITE_DIR).apply { mkdirs() }
-        siteDirectory.listFiles()?.forEach { child -> child.deleteRecursively() }
-        val store = AtlasStoreRenderer().contents(report)
-        AtlasSqliteWriter().write(siteDirectory.toPath(), store)
-        val host = AtlasComposeHostRenderer().document(report.name)
-        File(siteDirectory, Srcx.HTML_INDEX_FILE).writeText(host)
-        File(siteDirectory, Srcx.HTML_FRAGMENT_FILE).writeText(host)
-        copyComposeHost(siteDirectory)
-    }
-
-    private fun copyComposeHost(siteDirectory: File) {
-        val root = "/zone/clanker/gradle/srcx/report/html/compose/"
-        val listing =
-            requireNotNull(javaClass.getResourceAsStream(root + "listing.txt")) {
-                "Missing Compose Atlas host listing"
-            }.use { stream -> stream.readBytes().toString(Charsets.UTF_8) }
-        listing
-            .lineSequence()
-            .map { line -> line.trim() }
-            .filter { line -> line.isNotEmpty() && line != Srcx.HTML_INDEX_FILE }
-            .forEach { name ->
-                val stream =
-                    requireNotNull(javaClass.getResourceAsStream(root + name)) {
-                        "Missing Compose Atlas host resource: $name"
-                    }
-                val dest = File(siteDirectory, name)
-                dest.parentFile.mkdirs()
-                stream.use { input -> dest.outputStream().use { output -> input.copyTo(output) } }
-            }
+        File(siteDirectory, Srcx.HTML_INDEX_FILE).writeText(rendered.document)
+        File(siteDirectory, Srcx.HTML_FRAGMENT_FILE).writeText(rendered.fragment)
+        File(siteDirectory, Srcx.HTML_STYLES_FILE).writeText(rendered.styles)
+        File(siteDirectory, Srcx.HTML_D3_FILE).writeText(rendered.d3)
+        AtlasSqliteWriter().write(siteDirectory.toPath(), report.name)
     }
 
     private fun buildEntryPoints(summaries: List<ProjectSummary>): List<EntryPointSummary> =
