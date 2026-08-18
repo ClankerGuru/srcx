@@ -16,6 +16,7 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import zone.clanker.gradle.srcx.Srcx
+import zone.clanker.gradle.srcx.atlas.AtlasSqliteWriter
 import zone.clanker.gradle.srcx.analysis.ImportantSymbolPolicy
 import zone.clanker.gradle.srcx.model.AnalysisSummary
 import zone.clanker.gradle.srcx.model.ArchitectureEntryPointKind
@@ -314,6 +315,7 @@ abstract class ContextTask : DefaultTask() {
         val siteDirectory = File(outputDirectory, Srcx.HTML_SITE_DIR).apply { mkdirs() }
         File(siteDirectory, Srcx.HTML_INDEX_FILE).writeText(rendered.document)
         File(siteDirectory, Srcx.HTML_FRAGMENT_FILE).writeText(rendered.fragment)
+        AtlasSqliteWriter().write(siteDirectory.toPath(), report.name)
     }
 
     private fun buildEntryPoints(summaries: List<ProjectSummary>): List<EntryPointSummary> =

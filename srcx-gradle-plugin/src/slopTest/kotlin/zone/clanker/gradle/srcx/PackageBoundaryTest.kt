@@ -161,5 +161,42 @@ class PackageBoundaryTest :
                     }
                 }
             }
+
+            `when`("files are in the atlas package") {
+                val atlasFiles =
+                    mainScope.files.filter {
+                        it.packagee?.name?.contains("srcx.atlas") == true
+                    }
+
+                then("atlas never imports from the task package") {
+                    atlasFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.task") }
+                    }
+                }
+
+                then("atlas never imports from the parse package") {
+                    atlasFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.parse") }
+                    }
+                }
+
+                then("atlas never imports from the analysis package") {
+                    atlasFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.analysis") }
+                    }
+                }
+
+                then("atlas never imports from the scan package") {
+                    atlasFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.scan") }
+                    }
+                }
+
+                then("atlas never imports from the report package") {
+                    atlasFiles.assertTrue {
+                        it.imports.none { imp -> imp.name.contains("srcx.report") }
+                    }
+                }
+            }
         }
     })

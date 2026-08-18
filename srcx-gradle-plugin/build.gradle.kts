@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":workspace-report-model"))
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
+    implementation("org.xerial:sqlite-jdbc:3.53.2.0")
     implementation("org.webjars.npm:d3:7.9.0") {
         isTransitive = false
     }
