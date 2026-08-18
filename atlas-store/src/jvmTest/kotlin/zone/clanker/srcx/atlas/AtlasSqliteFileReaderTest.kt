@@ -38,7 +38,12 @@ class AtlasSqliteFileReaderTest :
                         statement.setString(10, "FILE")
                         statement.setString(11, "FILE")
                         statement.setString(12, "file::reader-lab:::main::A.kt")
-                        statement.setBytes(13, AtlasCborRenderer.encodeNode(AtlasNodePayload(content = "class A")))
+                        statement.setBytes(
+                            13,
+                            AtlasCborRenderer.encodeNode(
+                                AtlasNodePayload(content = "class A {\n  val x = \"unterminated?\n\"\n}"),
+                            ),
+                        )
                         statement.executeUpdate()
                     }
                 }
@@ -49,32 +54,12 @@ class AtlasSqliteFileReaderTest :
                     seed.meta.seedLimit shouldBe 42
                     seed.meta.workspace shouldBe "reader-lab"
                     seed.nodes.single().name shouldBe "A.kt"
-                    AtlasCborRenderer.decodeNode(seed.nodes.single().payload).content shouldBe "class A"
-                    val encoded = AtlasSeedJsonRenderer.encode(seed)
-                    encoded shouldBe encoded
-                    encoded.contains("\"fileNodes\":[") shouldBe true
-                    encoded.contains("\"availableNodes\":[]") shouldBe true
-                    encoded.contains("\"availableNodes\":[{") shouldBe false
-                    val fileId = seed.nodes.single().id
-                    val withNul =
-                        AtlasSeedJsonRenderer.encode(
-                            seed.copy(
-                                relationships =
-                                    listOf(
-                                        AtlasRelationshipRecord(
-                                            id = AtlasStoreSchema.relationshipId(fileId, "CALL", fileId),
-                                            sourceId = fileId,
-                                            targetId = fileId,
-                                            kind = "CALL",
-                                            family = AtlasStoreSchema.FAMILY_NON_IMPORT,
-                                            recordCount = 1,
-                                            payload = ByteArray(0),
-                                        ),
-                                    ),
-                            ),
-                        )
-                    withNul.contains("\\u0000") shouldBe true
-                    withNul.contains("\u0000") shouldBe false
+                    AtlasCborRenderer.decodeNode(seed.nodes.single().payload).content shouldBe
+                        "class A {\n  val x = \"unterminated?\n\"\n}"
+                    val drawn = AtlasDrawSeedRenderer.from(seed)
+                    drawn.fileNodes.size shouldBe 1
+                    drawn.fileNodes.single().content shouldBe "class A {\n  val x = \"unterminated?\n\"\n}"
+                    drawn.nodeLimit shouldBe 42
                 }
             }
         }

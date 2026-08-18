@@ -23,6 +23,7 @@ class AtlasDrawAdapterTest :
                 adapter shouldNotContain "mid - 14"
                 adapter shouldContain ".catch("
                 adapter shouldContain "srcxAtlasSqliteBase64"
+                adapter shouldNotContain "JSON.parse"
             }
         }
     })

@@ -1,13 +1,13 @@
 package zone.clanker.srcx.atlas.site
 
-import zone.clanker.srcx.atlas.AtlasSeedJsonRenderer
+import zone.clanker.srcx.atlas.AtlasDrawSeedRenderer
 import zone.clanker.srcx.atlas.AtlasSqliteFileReader
 import zone.clanker.srcx.atlas.AtlasStoreSchema
 
 /**
- * Minimal Kotlin/Wasm seed reader: open atlas.sqlite bytes, SELECT seed=1, hand to the D3 adapter.
+ * Minimal Kotlin/Wasm seed reader: open atlas.sqlite bytes, SELECT seed=1, hand a JS object to D3.
  *
- * Does not own hover/click/persist. That is Cut 3.
+ * Does not JSON.parse a graph string. Does not own hover/click/persist. That is Cut 3.
  */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -19,11 +19,11 @@ fun readAtlasSeed(encoded: String) {
     require(seed.meta.seedLimit == AtlasStoreSchema.SEED_LIMIT) {
         "atlas.sqlite seed_limit must be ${AtlasStoreSchema.SEED_LIMIT}"
     }
-    drawAtlasSeed(AtlasSeedJsonRenderer.encode(seed))
+    drawAtlasSeed(AtlasDrawSeedRenderer.from(seed).toJsObject())
 }
 
 fun main() {
-    // atlas-draw.js fetches atlas.sqlite and calls readAtlasSeed.
+    // atlas-draw.js loads atlas.sqlite bytes and calls readAtlasSeed.
 }
 
 private fun decodeBase64(encoded: String): ByteArray {
@@ -50,7 +50,7 @@ private fun decodeBase64(encoded: String): ByteArray {
 
 @OptIn(ExperimentalWasmJsInterop::class)
 @JsFun(
-    "(json) => { if (typeof window !== 'undefined' && window.srcxAtlasDraw) { " +
-        "window.srcxAtlasDraw(document.querySelector('[data-srcx-architecture-graph]'), JSON.parse(json)); } }",
+    "(data) => { if (typeof window !== 'undefined' && window.srcxAtlasDraw) { " +
+        "window.srcxAtlasDraw(document.querySelector('[data-srcx-architecture-graph]'), data); } }",
 )
-external fun drawAtlasSeed(json: String)
+external fun drawAtlasSeed(data: JsAny)
