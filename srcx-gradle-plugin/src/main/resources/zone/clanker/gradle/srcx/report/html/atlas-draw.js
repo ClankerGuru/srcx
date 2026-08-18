@@ -22,15 +22,20 @@
     }
 
     function loadSqliteBytes() {
+        if (window.srcxAtlasSqliteBase64) {
+            return Promise.resolve(decodeBase64(window.srcxAtlasSqliteBase64));
+        }
+        if (document.location.protocol === "file:") {
+            return Promise.reject(new Error("atlas.sqlite sidecar missing on file://"));
+        }
         var url = new URL("atlas.sqlite", document.baseURI).href;
-        return fetchBytes(url).catch(function () {
-            return xhrBytes(url);
-        }).catch(function () {
-            if (window.srcxAtlasSqliteBase64) {
-                return decodeBase64(window.srcxAtlasSqliteBase64);
-            }
-            throw new Error("atlas.sqlite could not be read from " + url);
-        });
+        try {
+            return fetchBytes(url).catch(function () {
+                return xhrBytes(url);
+            });
+        } catch (error) {
+            return Promise.reject(error);
+        }
     }
 
     function fetchBytes(url) {
