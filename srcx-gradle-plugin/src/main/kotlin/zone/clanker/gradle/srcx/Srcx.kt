@@ -63,10 +63,13 @@ data object Srcx {
     /** Concatenated Gort theme, dashboard, and atlas-map CSS next to [HTML_INDEX_FILE]. */
     const val HTML_STYLES_FILE = "gort.css"
 
-    /** D3 vendor sidecar next to [HTML_INDEX_FILE]. */
+    /** Compose/Wasm Atlas host script next to [HTML_INDEX_FILE]. */
+    const val HTML_HOST_SCRIPT = "atlas-host.js"
+
+    /** D3 vendor sidecar next to [HTML_INDEX_FILE]. Dead on the live host. */
     const val HTML_D3_FILE = "d3.js"
 
-    /** D3 adapter sidecar. Not the architecture-graph mouse dump. */
+    /** D3 adapter sidecar. Dead on the live host. */
     const val HTML_DRAW_FILE = "atlas-draw.js"
 
     /** Kotlin/Wasm seed reader module next to [HTML_INDEX_FILE]. */

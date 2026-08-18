@@ -5,7 +5,6 @@ import io.kotest.matchers.file.shouldExist
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
-import zone.clanker.gradle.srcx.report.WorkspaceHtmlResourceRenderer
 import org.gradle.testkit.runner.GradleRunner
 import org.gradle.testkit.runner.TaskOutcome
 import java.io.File
@@ -184,28 +183,18 @@ class SrcxPluginTest :
                     projectDir.gradle(Srcx.TASK_CONTEXT).build()
                     val standalone = projectDir.resolve(".srcx/site/index.html")
                     val fragment = projectDir.resolve(".srcx/site/report.html")
-                    val styles = projectDir.resolve(".srcx/site/${Srcx.HTML_STYLES_FILE}")
-                    val d3 = projectDir.resolve(".srcx/site/${Srcx.HTML_D3_FILE}")
                     standalone.shouldExist()
                     fragment.shouldExist()
-                    styles.shouldExist()
-                    d3.shouldExist()
                     standalone.readText() shouldContain "<!doctype html>"
                     standalone.readText() shouldContain "test-workspace"
-                    standalone.readText() shouldContain
-                        "<link rel=\"stylesheet\" href=\"${Srcx.HTML_STYLES_FILE}\" data-srcx-theme=\"gort\">"
-                    standalone.readText() shouldContain
-                        "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>"
-                    standalone.readText() shouldContain
-                        "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>"
-                    standalone.readText() shouldContain "<script src=\"${Srcx.HTML_SEED_LOADER_FILE}\"></script>"
+                    standalone.readText() shouldContain "id=\"atlas-root\""
+                    standalone.readText() shouldContain "<script src=\"${Srcx.HTML_HOST_SCRIPT}\"></script>"
                     standalone.readText() shouldNotContain "data-srcx-architecture-data"
-                    projectDir.resolve(".srcx/site/${Srcx.HTML_SEED_LOADER_FILE}").shouldExist()
-                    projectDir.resolve(".srcx/site/${Srcx.HTML_SQLITE_BYTES_FILE}").shouldExist()
-                    standalone.readText() shouldNotContain "<style data-srcx-theme=\"gort\">"
-                    fragment.readText() shouldNotContain "<style data-srcx-theme=\"gort\">"
-                    styles.readText() shouldBe WorkspaceHtmlResourceRenderer().styles()
-                    d3.readText() shouldBe WorkspaceHtmlResourceRenderer().d3Vendor()
+                    standalone.readText() shouldNotContain "architecture-fallback-files"
+                    standalone.readText() shouldNotContain "<script src=\"${Srcx.HTML_D3_FILE}\""
+                    standalone.readText() shouldNotContain "<script src=\"${Srcx.HTML_DRAW_FILE}\""
+                    projectDir.resolve(".srcx/site/${Srcx.HTML_HOST_SCRIPT}").shouldExist()
+                    projectDir.resolve(".srcx/site/atlas.sqlite").shouldExist()
                 }
             }
 

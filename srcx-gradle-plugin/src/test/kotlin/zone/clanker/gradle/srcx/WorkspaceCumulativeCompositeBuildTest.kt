@@ -119,19 +119,14 @@ class WorkspaceCumulativeCompositeBuildTest :
                 }
 
                 then("the generated site safely transports source and remains self-contained") {
-                    siteHtml shouldContain
-                        "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>"
-                    siteHtml shouldContain
-                        "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>"
+                    siteHtml shouldContain "<script src=\"${Srcx.HTML_HOST_SCRIPT}\"></script>"
+                    siteHtml shouldContain "id=\"atlas-root\""
                     siteHtml shouldNotContain "<script data-srcx-owned=\"architecture-graph\">"
                     siteHtml shouldNotContain "data-srcx-architecture-data"
-                    siteHtml shouldContain
-                        "<link rel=\"stylesheet\" href=\"${Srcx.HTML_STYLES_FILE}\" data-srcx-theme=\"gort\">"
-                    siteHtml shouldNotContain "<style data-srcx-theme=\"gort\">"
-                    rootOutput.resolve("site/${Srcx.HTML_STYLES_FILE}").shouldExist()
-                    rootOutput.resolve("site/${Srcx.HTML_D3_FILE}").shouldExist()
-                    rootOutput.resolve("site/${Srcx.HTML_DRAW_FILE}").shouldExist()
-                    rootOutput.resolve("site/${Srcx.HTML_SEED_WASM_FILE}").shouldExist()
+                    siteHtml shouldNotContain "architecture-fallback-files"
+                    siteHtml shouldNotContain "<script src=\"${Srcx.HTML_D3_FILE}\""
+                    rootOutput.resolve("site/${Srcx.HTML_HOST_SCRIPT}").shouldExist()
+                    rootOutput.resolve("site/atlas.sqlite").shouldExist()
                 }
 
                 then("included build output stays a local summary rather than the relationship-document root") {

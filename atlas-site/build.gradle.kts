@@ -1,5 +1,7 @@
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.compose")
+    id("org.jetbrains.compose")
     id("clkx-toolchain")
     id("clkx-detekt")
     id("clkx-ktlint")
@@ -12,15 +14,34 @@ kotlin {
     jvm()
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
     wasmJs {
-        outputModuleName.set("atlas-seed")
+        outputModuleName.set("atlas-host")
         browser {
-            binaries.executable()
+            commonWebpackConfig {
+                outputFileName = "atlas-host.js"
+            }
         }
+        binaries.executable()
     }
 
     sourceSets {
-        wasmJsMain.dependencies {
+        commonMain.dependencies {
             implementation(project(":atlas-store"))
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.ui)
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
+        jvmTest.dependencies {
+            implementation(kotlin("test-junit5"))
+            implementation("io.kotest:kotest-runner-junit5:5.9.1")
+            implementation("io.kotest:kotest-assertions-core:5.9.1")
+        }
+        wasmJsMain.dependencies {
+            implementation(compose.ui)
+            implementation(compose.foundation)
         }
     }
 }
@@ -48,6 +69,17 @@ tasks.named("check") {
     dependsOn("slopTest")
 }
 
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+}
+
 detekt {
-    source.setFrom(files("src/wasmJsMain/kotlin"))
+    source.setFrom(
+        files(
+            "src/commonMain/kotlin",
+            "src/jvmMain/kotlin",
+            "src/jvmTest/kotlin",
+            "src/wasmJsMain/kotlin",
+        ),
+    )
 }

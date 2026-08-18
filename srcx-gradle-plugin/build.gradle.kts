@@ -17,23 +17,35 @@ base {
     archivesName.set("plugin-srcx")
 }
 
-val atlasSeedWasm =
-    tasks.register<Copy>("syncAtlasSeedWasm") {
-        dependsOn(":atlas-site:compileProductionExecutableKotlinWasmJsOptimize")
-        from(
-            rootProject.layout.projectDirectory.dir(
-                "atlas-site/build/compileSync/wasmJs/main/productionExecutable/optimized",
-            ),
-        ) {
-            include("atlas-seed.wasm", "atlas-seed.mjs", "atlas-seed.uninstantiated.mjs")
+val atlasComposeHost =
+    tasks.register("syncAtlasComposeHost") {
+        dependsOn(":atlas-site:wasmJsBrowserDistribution")
+        val fromDir =
+            rootProject.layout.projectDirectory.dir("atlas-site/build/dist/wasmJs/productionExecutable")
+        val intoDir = layout.buildDirectory.dir("generated/atlas-compose-host")
+        inputs.dir(fromDir)
+        outputs.dir(intoDir)
+        doLast {
+            val source = fromDir.asFile
+            val target = intoDir.get().asFile
+            target.deleteRecursively()
+            target.mkdirs()
+            source.copyRecursively(target, overwrite = true)
+            val names =
+                source
+                    .walkTopDown()
+                    .filter { file -> file.isFile }
+                    .map { file -> file.relativeTo(source).invariantSeparatorsPath }
+                    .sorted()
+                    .joinToString("\n")
+            target.resolve("listing.txt").writeText(names + "\n")
         }
-        into(layout.buildDirectory.dir("generated/atlas-seed-wasm"))
     }
 
 tasks.named<Copy>("processResources") {
-    dependsOn(atlasSeedWasm)
-    from(layout.buildDirectory.dir("generated/atlas-seed-wasm")) {
-        into("zone/clanker/gradle/srcx/report/html/wasm")
+    dependsOn(atlasComposeHost)
+    from(layout.buildDirectory.dir("generated/atlas-compose-host")) {
+        into("zone/clanker/gradle/srcx/report/html/compose")
     }
 }
 
