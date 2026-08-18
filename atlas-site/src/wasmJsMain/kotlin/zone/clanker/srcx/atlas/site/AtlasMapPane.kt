@@ -46,7 +46,19 @@ fun AtlasMapPane(
     BoxWithConstraints(modifier = modifier) {
         val placed =
             remember(seed, maxWidth, maxHeight) {
-                seed?.let { AtlasMapLayout.place(it, constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()) }
+                val width = constraints.maxWidth.toFloat()
+                val height = constraints.maxHeight.toFloat()
+                if (seed != null) {
+                    AtlasMapLayout.place(seed, width, height)
+                } else {
+                    AtlasMapLayout.Placed(
+                        rooms =
+                            listOf(
+                                AtlasMapLayout.Room("atlas", 12f, 12f, width - 12f, height - 12f),
+                            ),
+                        particles = emptyList(),
+                    )
+                }
             }
         val visibleIds =
             remember(placed, query, kinds, usedAtLeast) {
