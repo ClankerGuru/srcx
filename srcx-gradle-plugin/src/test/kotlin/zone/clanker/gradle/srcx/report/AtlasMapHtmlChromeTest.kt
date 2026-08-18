@@ -67,16 +67,18 @@ class AtlasMapHtmlChromeTest :
                     rendered.document shouldContain "architecture-filter--projects\" hidden"
                     rendered.document shouldContain "architecture-filter--source-sets\" hidden"
                     rendered.document shouldNotContain "data-srcx-graph-navigator hidden"
-                    rendered.document shouldContain "\"name\":\"atlas-root\""
-                    rendered.document shouldContain "\"name\":\"atlas-lib\""
-                    rendered.document shouldContain "\"name\":\"atlas-plugin\""
                     rendered.document shouldContain "AtlasApp.kt"
                     rendered.document shouldContain "CoreIndex.kt"
                     rendered.document shouldContain "PluginMain.kt"
-                    rendered.document shouldContain "\"fileNodeCount\":3"
-                    rendered.document shouldContain "\"fileNodeCount\":2"
-                    rendered.document shouldContain "\"fileNodeCount\":1"
-                    rendered.document shouldContain "\"availableNodes\":[]"
+                    val graphJson = buildWorkspaceArchitectureGraph(report).toJson()
+                    graphJson shouldContain "\"name\":\"atlas-root\""
+                    graphJson shouldContain "\"name\":\"atlas-lib\""
+                    graphJson shouldContain "\"name\":\"atlas-plugin\""
+                    graphJson shouldContain "\"fileNodeCount\":3"
+                    graphJson shouldContain "\"fileNodeCount\":2"
+                    graphJson shouldContain "\"fileNodeCount\":1"
+                    rendered.document shouldNotContain "data-srcx-architecture-data"
+                    rendered.document shouldNotContain "\"availableNodes\":[{"
                     val styles = rendered.styles
                     styles shouldContain
                         ".srcx-theme .srcx-dashboard__architecture-graph\n" +
@@ -125,7 +127,7 @@ class AtlasMapHtmlChromeTest :
                     rendered.document shouldContain
                         "Add a Kotlin/Gradle build to this workspace and run srcx-context."
                     rendered.document.substringBefore("<script") shouldNotContain "Box select"
-                    rendered.document shouldContain "Show source"
+                    rendered.document shouldContain "FILE SOURCE"
                     rendered.document shouldNotContain "Shift-drag"
                 }
             }
@@ -137,9 +139,10 @@ class AtlasMapHtmlChromeTest :
 
                 then("the atlas publishes the one-build data state from the scan") {
                     rendered.document shouldContain "data-srcx-atlas-state=\"one-build\""
-                    rendered.document shouldContain "\"name\":\"atlas-root\""
-                    rendered.document shouldNotContain "\"name\":\"atlas-lib\""
                     rendered.document shouldContain "AtlasApp.kt"
+                    val graphJson = buildWorkspaceArchitectureGraph(oneBuildAtlasReport()).toJson()
+                    graphJson shouldContain "\"name\":\"atlas-root\""
+                    graphJson shouldNotContain "\"name\":\"atlas-lib\""
                 }
             }
         }

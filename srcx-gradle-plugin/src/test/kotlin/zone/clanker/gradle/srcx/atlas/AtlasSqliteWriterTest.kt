@@ -1,5 +1,7 @@
 package zone.clanker.gradle.srcx.atlas
 
+import zone.clanker.srcx.atlas.AtlasStoreMeta
+import zone.clanker.srcx.atlas.AtlasStoreSchema
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.longs.shouldBeLessThan
@@ -38,14 +40,20 @@ class AtlasSqliteWriterTest :
                 val database = site.resolve(AtlasStoreSchema.FILE_NAME)
                 val firstSize = Files.size(database)
 
-                then("the file is replaced with schema and one meta row") {
+                then("the file is replaced with schema 2 and one meta row") {
                     Files.isRegularFile(database) shouldBe true
-                    tableNames(database) shouldContainExactly listOf(AtlasStoreSchema.META_TABLE)
+                    tableNames(database) shouldContainExactly
+                        listOf(
+                            AtlasStoreSchema.IMPORTS_TABLE,
+                            AtlasStoreSchema.META_TABLE,
+                            AtlasStoreSchema.NODES_TABLE,
+                            AtlasStoreSchema.RELATIONSHIPS_TABLE,
+                        )
                     columnNames(database) shouldContainExactly
                         listOf("schema_version", "generated_at", "workspace", "seed_limit")
                     readMeta(database) shouldBe
                         AtlasStoreMeta(
-                            schemaVersion = 1,
+                            schemaVersion = 2,
                             generatedAt = "2026-08-17T12:00:00Z",
                             workspace = "kind-lab",
                             seedLimit = 42,
@@ -59,7 +67,7 @@ class AtlasSqliteWriterTest :
                     metaRowCount(database) shouldBe 1
                     readMeta(database) shouldBe
                         AtlasStoreMeta(
-                            schemaVersion = 1,
+                            schemaVersion = 2,
                             generatedAt = "2026-08-17T13:00:00Z",
                             workspace = "kind-lab",
                             seedLimit = 42,
@@ -68,17 +76,33 @@ class AtlasSqliteWriterTest :
                 }
             }
 
+            `when`("the 42 seed is written from a workspace report") {
+                val site = Files.createTempDirectory("atlas-store-seed-")
+                val report = seedReport()
+                writer.write(site, zone.clanker.gradle.srcx.report.AtlasStoreRenderer().contents(report, "2026-08-17T14:00:00Z"))
+                val database = site.resolve(AtlasStoreSchema.FILE_NAME)
+
+                then("seed 42 file and symbol nodes land with imports and no available catalog") {
+                    readMeta(database).schemaVersion shouldBe 2
+                    readMeta(database).seedLimit shouldBe 42
+                    query(database, "SELECT COUNT(*) FROM nodes WHERE seed = 1 AND entity = 'file'") { it.getInt(1) }
+                        .single() shouldBe 1
+                    query(database, "SELECT COUNT(*) FROM nodes WHERE seed = 1 AND entity = 'symbol'") { it.getInt(1) }
+                        .single() shouldBe 1
+                    query(database, "SELECT name FROM sqlite_master WHERE type = 'index' ORDER BY name") { it.getString(1) }
+                        .filter { name -> name.startsWith("imports_") } shouldContainExactly
+                        listOf("imports_source_file_id", "imports_target_id")
+                    Files.size(database) shouldBeLessThan 6_000_000
+                }
+            }
+
             `when`("the seed HTML is rendered beside the store") {
                 val html = WorkspaceHtmlRenderer().render(seedReport()).document
 
-                then("the HTML seed stays 42 with empty available catalogs") {
-                    html shouldContain "\"nodeLimit\":42"
-                    html shouldContain "\"fileNodeLimit\":42"
-                    html shouldContain "\"availableNodes\":[]"
-                    html shouldContain "\"availableFileNodes\":[]"
-                    html shouldContain "\"availableFileEdges\":[]"
-                    html shouldContain "\"availableEdges\":[]"
+                then("the HTML is a shell without a graph island or available catalog dump") {
+                    html shouldNotContain "data-srcx-architecture-data"
                     html shouldNotContain "\"availableNodes\":[{"
+                    html shouldNotContain "\"availableFileNodes\":[{"
                     html.toByteArray().size.toLong() shouldBeLessThan 6_000_000
                 }
             }

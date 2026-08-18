@@ -17,6 +17,7 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import zone.clanker.gradle.srcx.Srcx
 import zone.clanker.gradle.srcx.atlas.AtlasSqliteWriter
+import zone.clanker.gradle.srcx.report.AtlasStoreRenderer
 import zone.clanker.gradle.srcx.analysis.ImportantSymbolPolicy
 import zone.clanker.gradle.srcx.model.AnalysisSummary
 import zone.clanker.gradle.srcx.model.ArchitectureEntryPointKind
@@ -317,7 +318,23 @@ abstract class ContextTask : DefaultTask() {
         File(siteDirectory, Srcx.HTML_FRAGMENT_FILE).writeText(rendered.fragment)
         File(siteDirectory, Srcx.HTML_STYLES_FILE).writeText(rendered.styles)
         File(siteDirectory, Srcx.HTML_D3_FILE).writeText(rendered.d3)
-        AtlasSqliteWriter().write(siteDirectory.toPath(), report.name)
+        File(siteDirectory, Srcx.HTML_DRAW_FILE).writeText(rendered.draw)
+        writeWasmSeedReader(siteDirectory)
+        AtlasSqliteWriter().write(siteDirectory.toPath(), AtlasStoreRenderer().contents(report))
+    }
+
+    private fun writeWasmSeedReader(siteDirectory: File) {
+        listOf(
+            Srcx.HTML_SEED_MODULE_FILE,
+            Srcx.HTML_SEED_UNINSTANTIATED_FILE,
+            Srcx.HTML_SEED_WASM_FILE,
+        ).forEach { name ->
+            val stream =
+                requireNotNull(javaClass.getResourceAsStream("/zone/clanker/gradle/srcx/report/html/wasm/$name")) {
+                    "Missing Wasm seed reader resource: $name"
+                }
+            stream.use { input -> File(siteDirectory, name).outputStream().use { output -> input.copyTo(output) } }
+        }
     }
 
     private fun buildEntryPoints(summaries: List<ProjectSummary>): List<EntryPointSummary> =

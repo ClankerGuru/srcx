@@ -1,4 +1,4 @@
-package zone.clanker.gradle.srcx.atlas
+package zone.clanker.srcx.atlas
 
 /** One-row overflow-store header written on every Atlas regen. */
 data class AtlasStoreMeta(

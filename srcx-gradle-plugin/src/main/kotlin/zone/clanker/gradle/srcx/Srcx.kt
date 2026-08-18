@@ -63,8 +63,18 @@ data object Srcx {
     /** Concatenated Gort theme, dashboard, and atlas-map CSS next to [HTML_INDEX_FILE]. */
     const val HTML_STYLES_FILE = "gort.css"
 
-    /** D3 vendor sidecar next to [HTML_INDEX_FILE]. Architecture-graph stays inlined. */
+    /** D3 vendor sidecar next to [HTML_INDEX_FILE]. */
     const val HTML_D3_FILE = "d3.js"
+
+    /** D3 adapter sidecar. Not the architecture-graph mouse dump. */
+    const val HTML_DRAW_FILE = "atlas-draw.js"
+
+    /** Kotlin/Wasm seed reader module next to [HTML_INDEX_FILE]. */
+    const val HTML_SEED_MODULE_FILE = "atlas-seed.mjs"
+
+    const val HTML_SEED_UNINSTANTIATED_FILE = "atlas-seed.uninstantiated.mjs"
+
+    const val HTML_SEED_WASM_FILE = "atlas-seed.wasm"
 
     /** Dependency scopes excluded from scanning by default. */
     val DEFAULT_EXCLUDED_DEP_SCOPES: Set<String> =

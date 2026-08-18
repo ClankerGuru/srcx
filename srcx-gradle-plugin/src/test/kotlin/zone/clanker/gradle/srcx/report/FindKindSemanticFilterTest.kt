@@ -41,7 +41,7 @@ class FindKindSemanticFilterTest :
                 WorkspaceHtmlResourceRenderer.readClasspathResource(
                     WorkspaceHtmlResourceRenderer.ARCHITECTURE_GRAPH_SCRIPT,
                 )
-            val graph = parseArchitectureData(rendered.document)
+            val graph = parseArchitectureData(buildWorkspaceArchitectureGraph(report).toJson())
 
             `when`("FIND kind predicates are applied to the rendered seed") {
                 val symbols = graph.symbols
@@ -118,9 +118,7 @@ private fun subjectMatchesFindKind(
     }
 }
 
-private fun parseArchitectureData(document: String): KindGraph {
-    val marker = "<script type=\"application/json\" data-srcx-architecture-data>"
-    val raw = document.substringAfter(marker).substringBefore("</script>")
+private fun parseArchitectureData(raw: String): KindGraph {
     val root = Json.parseToJsonElement(raw).jsonObject
     val symbols =
         symbolNodes(root).map { node ->

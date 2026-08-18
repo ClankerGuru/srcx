@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":workspace-report-model"))
+    implementation(project(":atlas-store"))
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
     implementation("org.xerial:sqlite-jdbc:3.53.2.0")
     implementation("org.webjars.npm:d3:7.9.0") {
@@ -14,6 +15,26 @@ dependencies {
 
 base {
     archivesName.set("plugin-srcx")
+}
+
+val atlasSeedWasm =
+    tasks.register<Copy>("syncAtlasSeedWasm") {
+        dependsOn(":atlas-site:compileProductionExecutableKotlinWasmJsOptimize")
+        from(
+            rootProject.layout.projectDirectory.dir(
+                "atlas-site/build/compileSync/wasmJs/main/productionExecutable/optimized",
+            ),
+        ) {
+            include("atlas-seed.wasm", "atlas-seed.mjs", "atlas-seed.uninstantiated.mjs")
+        }
+        into(layout.buildDirectory.dir("generated/atlas-seed-wasm"))
+    }
+
+tasks.named<Copy>("processResources") {
+    dependsOn(atlasSeedWasm)
+    from(layout.buildDirectory.dir("generated/atlas-seed-wasm")) {
+        into("zone/clanker/gradle/srcx/report/html/wasm")
+    }
 }
 
 gradlePlugin {

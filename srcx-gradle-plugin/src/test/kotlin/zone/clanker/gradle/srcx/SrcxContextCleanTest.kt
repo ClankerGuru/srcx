@@ -36,6 +36,7 @@ class SrcxContextCleanTest :
                     Srcx.HTML_FRAGMENT_FILE shouldBe "report.html"
                     Srcx.HTML_STYLES_FILE shouldBe "gort.css"
                     Srcx.HTML_D3_FILE shouldBe "d3.js"
+                    Srcx.HTML_DRAW_FILE shouldBe "atlas-draw.js"
                 }
             }
         }

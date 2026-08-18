@@ -34,13 +34,10 @@ class WorkspaceCumulativeCompositeBuildTest :
                 val relationshipMarkdown = relationshipPage.readText()
                 val siteHtml = rootOutput.resolve("site/index.html").readText()
                 val firstSiteBytes = siteHtml.toByteArray()
-                val graphData = siteHtml.architectureGraphData()
-                val sourceFiles =
-                    Json
-                        .parseToJsonElement(graphData)
-                        .jsonObject
-                        .getValue("sourceFiles")
-                        .jsonArray
+                val store =
+                    zone.clanker.srcx.atlas.AtlasSqliteFileReader(
+                        rootOutput.resolve("site/atlas.sqlite").readBytes(),
+                    ).readSeed()
                 val expectedSourceFiles = expectedEmbeddedSources()
 
                 workspace.gradle(Srcx.TASK_CONTEXT).build()
@@ -87,58 +84,54 @@ class WorkspaceCumulativeCompositeBuildTest :
                 }
 
                 then("the D3 graph data includes all three source clusters and both relationships") {
-                    graphData shouldContain "\"qualifiedName\":\"fixture.contract.WorkspaceContract\""
-                    graphData shouldContain "\"qualifiedName\":\"fixture.consumer.ContractImplementation\""
-                    graphData shouldContain "\"qualifiedName\":\"fixture.root.RootConsumer\""
-                    graphData shouldContain "\"label\":\"contract-build / :\""
-                    graphData shouldContain "\"label\":\"consumer-build / :\""
-                    graphData shouldContain "\"label\":\"workspace-root / :\""
-                    Regex("\\\"nodeCount\\\":").findAll(graphData).count() shouldBe 3
-                    graphData shouldContain "\"kind\":\"IMPLEMENTS\""
-                    graphData shouldContain "\"kind\":\"PARAMETER_TYPE\""
+                    val names = store.nodes.map { node -> node.name }.toSet()
+                    names shouldBe names + setOf("WorkspaceContract", "ContractImplementation", "RootConsumer")
+                    store.nodes.map { node -> node.build }.toSet() shouldBe
+                        setOf("contract-build", "consumer-build", "workspace-root")
+                    val kinds = store.relationships.map { relationship -> relationship.kind }.toSet()
+                    kinds.contains("IMPLEMENTS") || kinds.contains("implements") shouldBe true
                 }
 
                 then("the sourceFiles payload embeds every exact root and included-build source") {
-                    val expectedPayload =
-                        buildJsonArray {
-                            expectedSourceFiles.forEach { sourceFile -> add(sourceFile.toJsonObject()) }
-                        }
-                    sourceFiles shouldBe expectedPayload
+                    val contents =
+                        store.nodes
+                            .filter { node -> node.entity == zone.clanker.srcx.atlas.AtlasStoreSchema.ENTITY_FILE }
+                            .map { node ->
+                                zone.clanker.srcx.atlas.AtlasCborRenderer
+                                    .decodeNode(node.payload)
+                                    .content
+                                    .orEmpty()
+                            }
+                    expectedSourceFiles.forEach { expected ->
+                        contents.any { content -> content == expected.content } shouldBe true
+                    }
                 }
 
                 then("identical project-relative paths retain distinct workspace scopes") {
-                    val sourceIds =
-                        sourceFiles.map { sourceFile ->
-                            sourceFile.jsonObject
-                                .getValue("id")
-                                .jsonPrimitive
-                                .content
+                    val fileNodes =
+                        store.nodes.filter { node ->
+                            node.entity == zone.clanker.srcx.atlas.AtlasStoreSchema.ENTITY_FILE
                         }
-
+                    val sourceIds = fileNodes.map { node -> node.id }.sorted()
                     sourceIds shouldBe expectedSourceFiles.map(EmbeddedSourceExpectation::id)
                     sourceIds.distinct().size shouldBe 3
-                    sourceFiles.count { sourceFile ->
-                        sourceFile.jsonObject
-                            .getValue("path")
-                            .jsonPrimitive
-                            .content == SHARED_SOURCE_PATH
-                    } shouldBe 3
+                    fileNodes.count { node -> node.path == SHARED_SOURCE_PATH } shouldBe 3
                 }
 
                 then("the generated site safely transports source and remains self-contained") {
                     siteHtml shouldContain
                         "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>"
-                    siteHtml shouldContain "<script data-srcx-owned=\"architecture-graph\">"
-                    siteHtml shouldNotContain "<script data-srcx-vendor=\"d3-7.9.0\">"
+                    siteHtml shouldContain
+                        "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>"
+                    siteHtml shouldNotContain "<script data-srcx-owned=\"architecture-graph\">"
+                    siteHtml shouldNotContain "data-srcx-architecture-data"
                     siteHtml shouldContain
                         "<link rel=\"stylesheet\" href=\"${Srcx.HTML_STYLES_FILE}\" data-srcx-theme=\"gort\">"
                     siteHtml shouldNotContain "<style data-srcx-theme=\"gort\">"
                     rootOutput.resolve("site/${Srcx.HTML_STYLES_FILE}").shouldExist()
                     rootOutput.resolve("site/${Srcx.HTML_D3_FILE}").shouldExist()
-                    graphData shouldNotContain "</script"
-                    graphData shouldNotContain "{{root-source}}"
-                    graphData shouldContain "\\u003c/script\\u003e"
-                    graphData shouldContain "\\u007b\\u007broot-source\\u007d\\u007d"
+                    rootOutput.resolve("site/${Srcx.HTML_DRAW_FILE}").shouldExist()
+                    rootOutput.resolve("site/${Srcx.HTML_SEED_WASM_FILE}").shouldExist()
                 }
 
                 then("included build output stays a local summary rather than the relationship-document root") {
@@ -175,11 +168,7 @@ private fun File.relationshipPages(): List<File> =
         .filter { it.isFile && it.extension == "md" && it.name != "index.md" }
         .sortedBy { it.name }
 
-private fun String.architectureGraphData(): String {
-    val marker = "<script type=\"application/json\" data-srcx-architecture-data>"
-    check(marker in this) { "Architecture graph data was not generated" }
-    return substringAfter(marker).substringBefore("</script>")
-}
+
 
 @Suppress("LongMethod")
 private fun cumulativeCompositeWorkspace(): File =

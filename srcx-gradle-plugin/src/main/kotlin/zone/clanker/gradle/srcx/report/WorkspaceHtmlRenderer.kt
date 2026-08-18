@@ -26,11 +26,13 @@ class WorkspaceHtmlRenderer internal constructor(
         val article = resources.dashboard(slots).trim()
         val styles = resources.styles()
         val d3 = resources.d3Vendor()
+        val draw = resources.drawAdapter()
         return RenderedWorkspaceHtml(
             fragment = article,
             document = renderDocument(report.name, article),
             styles = styles,
             d3 = d3,
+            draw = draw,
         )
     }
 
@@ -61,5 +63,6 @@ class WorkspaceHtmlRenderer internal constructor(
         val document: String,
         val styles: String,
         val d3: String,
+        val draw: String,
     )
 }

@@ -26,6 +26,8 @@ plugins {
 rootProject.name = "srcx"
 
 include(":srcx-gradle-plugin")
+include(":atlas-store")
+include(":atlas-site")
 include(":workspace-report-model")
 include(":docx-gradle-plugin")
 include(":docx-index")

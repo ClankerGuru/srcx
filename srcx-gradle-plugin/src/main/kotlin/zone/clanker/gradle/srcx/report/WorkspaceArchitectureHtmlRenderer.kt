@@ -119,9 +119,6 @@ internal class WorkspaceArchitectureHtmlRenderer(
             appendLine(renderDetailPanel())
             appendLine("</div>")
             appendLine(renderAtlasGuide(graph))
-            append("<script type=\"application/json\" data-srcx-architecture-data>")
-            append(graph.toJson())
-            appendLine("</script>")
             appendLine("</section>")
         }
 

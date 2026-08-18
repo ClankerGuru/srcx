@@ -196,7 +196,9 @@ class SrcxPluginTest :
                         "<link rel=\"stylesheet\" href=\"${Srcx.HTML_STYLES_FILE}\" data-srcx-theme=\"gort\">"
                     standalone.readText() shouldContain
                         "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>"
-                    standalone.readText() shouldContain "data-srcx-architecture-data"
+                    standalone.readText() shouldContain
+                        "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>"
+                    standalone.readText() shouldNotContain "data-srcx-architecture-data"
                     standalone.readText() shouldNotContain "<style data-srcx-theme=\"gort\">"
                     fragment.readText() shouldNotContain "<style data-srcx-theme=\"gort\">"
                     styles.readText() shouldBe WorkspaceHtmlResourceRenderer().styles()

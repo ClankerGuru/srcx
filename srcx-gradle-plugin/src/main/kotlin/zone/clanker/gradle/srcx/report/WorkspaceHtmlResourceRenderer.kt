@@ -33,14 +33,21 @@ internal class WorkspaceHtmlResourceRenderer {
 
     fun d3Vendor(): String = d3Script
 
+    fun drawAdapter(): String = resources.getValue(ATLAS_DRAW_SCRIPT)
+
     fun scripts(): String =
         buildString {
             appendLine(
                 "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>",
             )
-            appendLine("<script data-srcx-owned=\"architecture-graph\">")
-            appendLine(resources.getValue(ARCHITECTURE_GRAPH_SCRIPT).escapeClosingScriptSequence().trimEnd())
-            append("</script>")
+            appendLine(
+                "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>",
+            )
+            appendLine("<script type=\"module\">")
+            appendLine("import { readAtlasSeed } from \"./${Srcx.HTML_SEED_MODULE_FILE}\";")
+            appendLine("window.srcxAtlasReadSeed = readAtlasSeed;")
+            appendLine("if (window.srcxAtlasBoot) window.srcxAtlasBoot();")
+            appendLine("</script>")
         }
 
     internal fun renderTemplate(
@@ -71,6 +78,7 @@ internal class WorkspaceHtmlResourceRenderer {
         const val ATLAS_MAP_STYLES = "atlas-map.css"
         const val THEME = "theme.css"
         const val ARCHITECTURE_GRAPH_SCRIPT = "architecture-graph.js"
+        const val ATLAS_DRAW_SCRIPT = "atlas-draw.js"
         const val RESOURCE_ROOT = "/zone/clanker/gradle/srcx/report/html/"
 
         val SLOT_PATTERN = Regex("""\{\{([a-zA-Z][a-zA-Z0-9]*)}}""")
@@ -81,6 +89,7 @@ internal class WorkspaceHtmlResourceRenderer {
                 ATLAS_MAP_STYLES,
                 DASHBOARD,
                 ARCHITECTURE_GRAPH_SCRIPT,
+                ATLAS_DRAW_SCRIPT,
                 "components/disclosure.html",
                 "components/empty-state.html",
                 "components/masthead.html",
