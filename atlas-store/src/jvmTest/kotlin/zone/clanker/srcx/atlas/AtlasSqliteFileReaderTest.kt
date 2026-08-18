@@ -50,6 +50,31 @@ class AtlasSqliteFileReaderTest :
                     seed.meta.workspace shouldBe "reader-lab"
                     seed.nodes.single().name shouldBe "A.kt"
                     AtlasCborRenderer.decodeNode(seed.nodes.single().payload).content shouldBe "class A"
+                    val encoded = AtlasSeedJsonRenderer.encode(seed)
+                    encoded shouldBe encoded
+                    encoded.contains("\"fileNodes\":[") shouldBe true
+                    encoded.contains("\"availableNodes\":[]") shouldBe true
+                    encoded.contains("\"availableNodes\":[{") shouldBe false
+                    val fileId = seed.nodes.single().id
+                    val withNul =
+                        AtlasSeedJsonRenderer.encode(
+                            seed.copy(
+                                relationships =
+                                    listOf(
+                                        AtlasRelationshipRecord(
+                                            id = AtlasStoreSchema.relationshipId(fileId, "CALL", fileId),
+                                            sourceId = fileId,
+                                            targetId = fileId,
+                                            kind = "CALL",
+                                            family = AtlasStoreSchema.FAMILY_NON_IMPORT,
+                                            recordCount = 1,
+                                            payload = ByteArray(0),
+                                        ),
+                                    ),
+                            ),
+                        )
+                    withNul.contains("\\u0000") shouldBe true
+                    withNul.contains("\u0000") shouldBe false
                 }
             }
         }

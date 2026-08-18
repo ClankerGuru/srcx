@@ -5,11 +5,59 @@
     window.srcxAtlasBoot = bootFromSqlite;
 
     function bootFromSqlite() {
-        if (!window.d3 || typeof window.srcxAtlasReadSeed !== "function") return;
-        fetch("atlas.sqlite").then(function (response) {
+        if (!window.d3) {
+            console.error("SRCX atlas boot: D3 is missing");
+            return;
+        }
+        loadSqliteBytes()
+            .then(function (bytes) {
+                if (typeof window.srcxAtlasReadSeed !== "function") {
+                    throw new Error("Wasm seed reader is not ready");
+                }
+                window.srcxAtlasReadSeed(bytesToBase64(bytes));
+            })
+            .catch(function (error) {
+                console.error("SRCX atlas seed failed", error);
+            });
+    }
+
+    function loadSqliteBytes() {
+        var url = new URL("atlas.sqlite", document.baseURI).href;
+        return fetchBytes(url).catch(function () {
+            return xhrBytes(url);
+        }).catch(function () {
+            if (window.srcxAtlasSqliteBase64) {
+                return decodeBase64(window.srcxAtlasSqliteBase64);
+            }
+            throw new Error("atlas.sqlite could not be read from " + url);
+        });
+    }
+
+    function fetchBytes(url) {
+        return fetch(url).then(function (response) {
+            if (!response.ok) throw new Error("fetch " + url + " -> " + response.status);
             return response.arrayBuffer();
         }).then(function (buffer) {
-            window.srcxAtlasReadSeed(bytesToBase64(new Uint8Array(buffer)));
+            return new Uint8Array(buffer);
+        });
+    }
+
+    function xhrBytes(url) {
+        return new Promise(function (resolve, reject) {
+            var request = new XMLHttpRequest();
+            request.open("GET", url, true);
+            request.responseType = "arraybuffer";
+            request.onload = function () {
+                if (request.status === 0 || (request.status >= 200 && request.status < 300)) {
+                    resolve(new Uint8Array(request.response));
+                    return;
+                }
+                reject(new Error("xhr " + url + " -> " + request.status));
+            };
+            request.onerror = function () {
+                reject(new Error("xhr " + url + " failed"));
+            };
+            request.send();
         });
     }
 
@@ -22,20 +70,31 @@
         return btoa(pieces.join(""));
     }
 
+    function decodeBase64(encoded) {
+        var binary = atob(encoded);
+        var bytes = new Uint8Array(binary.length);
+        for (var index = 0; index < binary.length; index += 1) {
+            bytes[index] = binary.charCodeAt(index);
+        }
+        return bytes;
+    }
+
     function drawSeed(root, data) {
         if (!root || !window.d3 || !data || !Array.isArray(data.fileNodes)) return;
+        if (data.fileNodes.length === 0) return;
         var svgElement = root.querySelector("[data-srcx-graph-svg]");
         var fallback = root.querySelector("[data-srcx-graph-fallback]");
         var viewport = root.querySelector(".srcx-dashboard__architecture-viewport");
         if (!svgElement || !viewport) return;
         if (fallback) fallback.hidden = true;
         svgElement.removeAttribute("hidden");
-        var width = Math.max(320, viewport.clientWidth || 390);
-        var height = Math.max(320, viewport.clientHeight || 390);
+        var width = Math.max(320, viewport.clientWidth || 1024);
+        var height = Math.max(320, viewport.clientHeight || 640);
         var svg = d3.select(svgElement);
         svg.selectAll("*").remove();
         svg.attr("viewBox", "0 0 " + width + " " + height);
         var nodes = data.fileNodes.map(function (node) {
+            var records = Number(node.relationshipRecordCount || 0);
             return {
                 id: node.id,
                 name: node.name,
@@ -45,11 +104,12 @@
                 sourceSet: node.sourceSet,
                 symbols: node.symbols || [],
                 content: node.content || "",
+                important: !!node.important,
+                relationshipRecordCount: records,
+                visualSignal: Math.min(1, records / 24),
             };
         });
-        var builds = {};
-        (data.builds || []).forEach(function (build) { builds[build.name] = build; });
-        var layout = layoutSeedToViewport(nodes, width, height, builds);
+        var layout = layoutLooseRooms(nodes, width, height);
         var rooms = svg.append("g").attr("class", "srcx-dashboard__architecture-svg-rooms");
         layout.cells.forEach(function (cell, build) {
             rooms.append("rect")
@@ -60,14 +120,15 @@
                 .attr("height", Math.max(1, cell.maxY - cell.minY));
             rooms.append("text")
                 .attr("class", "srcx-dashboard__architecture-svg-build-label")
-                .attr("x", cell.minX + 8)
-                .attr("y", cell.minY + 12)
+                .attr("x", cell.minX + 10)
+                .attr("y", cell.minY + 16)
                 .text(build);
         });
+        var homes = layout.homes;
         var edges = svg.append("g").attr("class", "srcx-dashboard__architecture-svg-edges");
         (data.fileEdges || []).forEach(function (edge) {
-            var source = layout.homes.get(edge.source);
-            var target = layout.homes.get(edge.target);
+            var source = homes.get(edge.source);
+            var target = homes.get(edge.target);
             if (!source || !target) return;
             edges.append("line")
                 .attr("class", "srcx-dashboard__architecture-svg-edge")
@@ -80,27 +141,42 @@
         var groups = nodeLayer.selectAll("g")
             .data(nodes, function (node) { return node.id; })
             .join("g")
-            .attr("class", "srcx-dashboard__architecture-svg-node is-label-pinned")
+            .attr("class", function (node) {
+                return "srcx-dashboard__architecture-svg-node" + (node.important ? " is-important" : "");
+            })
             .attr("transform", function (node) {
-                var home = layout.homes.get(node.id) || { x: width / 2, y: height / 2 };
+                var home = homes.get(node.id) || { x: width / 2, y: height / 2 };
                 return "translate(" + home.x + "," + home.y + ")";
             });
         groups.append("circle")
             .attr("class", "srcx-dashboard__architecture-svg-node-hit")
-            .attr("r", 16);
+            .attr("r", function (node) { return outerNodeRadius(node) + 6; });
         groups.append("circle")
             .attr("class", "srcx-dashboard__architecture-svg-node-dot")
-            .attr("r", 8);
+            .attr("r", nodeRadius);
         groups.append("circle")
             .attr("class", "srcx-dashboard__architecture-svg-node-core")
-            .attr("r", 3);
+            .attr("r", function (node) { return Math.max(2, nodeRadius(node) * 0.36); });
+        groups.append("circle")
+            .attr("class", "srcx-dashboard__architecture-svg-node-ring is-importance-ring")
+            .attr("r", function (node) { return nodeRadius(node) + 4; });
+        groups.append("circle")
+            .attr("class", "srcx-dashboard__architecture-svg-node-ring is-finding-ring")
+            .attr("r", function (node) { return nodeRadius(node) + 7; });
+        groups.append("circle")
+            .attr("class", "srcx-dashboard__architecture-svg-node-ring is-cycle-ring")
+            .attr("r", function (node) { return nodeRadius(node) + 10; });
+        groups.append("circle")
+            .attr("class", "srcx-dashboard__architecture-svg-node-ring is-analysis-cycle-ring")
+            .attr("r", function (node) { return nodeRadius(node) + 13; });
         groups.append("text")
             .attr("class", "srcx-dashboard__architecture-svg-node-name srcx-dashboard__architecture-svg-node-label")
-            .attr("dx", function (node) { return node.labelDirection === "left" ? -12 : 12; })
-            .attr("text-anchor", function (node) { return node.labelDirection === "left" ? "end" : "start"; })
+            .attr("dx", function (node) { return outerNodeRadius(node) + 6; })
             .attr("dy", "0.32em")
+            .attr("text-anchor", "start")
             .text(function (node) { return node.name; });
         root.dataset.srcxEnhanced = "true";
+        root.dataset.srcxSeedCount = String(nodes.length);
         fillFileSource(root, nodes[0]);
     }
 
@@ -112,9 +188,19 @@
         if (fields && node.content) fields.textContent = node.content;
     }
 
-    function layoutSeedToViewport(nodes, width, height, buildByName) {
-        var gap = 8;
-        var pad = 6;
+    function nodeRadius(node) {
+        var signal = Math.max(0, Math.min(1, Number(node.visualSignal || 0)));
+        return 4.5 + Math.pow(signal, 0.72) * 15.5;
+    }
+
+    function outerNodeRadius(node) {
+        var radius = nodeRadius(node);
+        if (node && node.important) radius = Math.max(radius, nodeRadius(node) + 4);
+        return radius;
+    }
+
+    function layoutLooseRooms(nodes, width, height) {
+        var pad = 10;
         var overlay = 44;
         var frame = {
             x: pad,
@@ -122,104 +208,61 @@
             w: Math.max(1, width - pad * 2),
             h: Math.max(1, height - pad * 2 - overlay),
         };
-        var projects = Array.from(d3.group(nodes, function (node) {
-            return node.build + "::" + node.project;
-        }), function (entry) {
-            var members = entry[1].slice().sort(function (left, right) { return left.id.localeCompare(right.id); });
-            var rectangles = members.map(function (node) {
-                return { key: node.id, width: 96, height: 24, nodeRadius: 8 };
-            });
+        var builds = Array.from(d3.group(nodes, function (node) { return node.build; }), function (entry) {
             return {
                 key: entry[0],
-                build: members[0].build,
-                project: members[0].project,
-                members: members,
-                rectangles: rectangles,
-                weight: members.length,
+                members: entry[1].slice().sort(function (left, right) { return left.id.localeCompare(right.id); }),
             };
         }).sort(function (left, right) { return left.key.localeCompare(right.key); });
-        var buildItems = Array.from(d3.group(projects, function (project) { return project.build; }), function (entry) {
-            return {
-                key: entry[0],
-                build: entry[0],
-                projects: entry[1],
-                weight: entry[1].reduce(function (sum, project) { return sum + project.weight; }, 0),
-            };
-        }).sort(function (left, right) { return left.key.localeCompare(right.key); });
-        var cols = seedLabelColumns(frame.w);
-        var heading = 10;
-        var bandGap = 2;
-        var totalRows = buildItems.reduce(function (sum, item) {
-            return sum + Math.max(1, Math.ceil(item.weight / Math.max(1, cols)));
-        }, 0);
-        var reserved = buildItems.length * (heading + bandGap);
-        var rowH = Math.max(26, Math.min(28, (frame.h - reserved) / Math.max(1, totalRows)));
-        var cursor = frame.y;
-        var buildTiles = new Map();
-        buildItems.forEach(function (buildItem) {
-            var rows = Math.max(1, Math.ceil(buildItem.weight / Math.max(1, cols)));
-            var band = heading + rows * rowH;
-            buildTiles.set(buildItem.key, {
-                x: frame.x,
-                y: cursor,
-                w: frame.w,
-                h: band,
-                cols: cols,
-                heading: heading,
-                rowH: rowH,
-            });
-            cursor += band + bandGap;
-        });
+        var gap = 16;
+        var heading = 22;
+        var rows = Math.max(1, Math.ceil(Math.sqrt(builds.length)));
+        var cols = Math.max(1, Math.ceil(builds.length / rows));
+        var cellW = (frame.w - gap * (cols - 1)) / cols;
+        var cellH = (frame.h - gap * (rows - 1)) / rows;
         var cells = new Map();
         var homes = new Map();
-        buildItems.forEach(function (buildItem) {
-            var tile = buildTiles.get(buildItem.key);
-            cells.set(buildItem.build, {
-                minX: tile.x,
-                minY: tile.y,
-                maxX: tile.x + tile.w,
-                maxY: tile.y + tile.h,
-            });
-            var allRects = [];
-            buildItem.projects.forEach(function (project) {
-                allRects = allRects.concat(project.rectangles);
-            });
-            var packed = packLabeledSeedGrid(allRects, tile);
-            buildItem.projects.forEach(function (project) {
-                project.members.forEach(function (node) {
-                    var placed = packed.get(node.id);
-                    if (!placed) return;
-                    node.labelDirection = placed.direction;
-                    homes.set(node.id, { x: placed.x, y: placed.y });
-                });
+        builds.forEach(function (build, index) {
+            var col = index % cols;
+            var row = Math.floor(index / cols);
+            var cell = {
+                minX: frame.x + col * (cellW + gap),
+                minY: frame.y + row * (cellH + gap),
+                maxX: frame.x + col * (cellW + gap) + cellW,
+                maxY: frame.y + row * (cellH + gap) + cellH,
+            };
+            cells.set(build.key, cell);
+            var inner = {
+                x: cell.minX + 16,
+                y: cell.minY + heading,
+                w: Math.max(40, cell.maxX - cell.minX - 32),
+                h: Math.max(40, cell.maxY - cell.minY - heading - 12),
+            };
+            var packed = packLooseParticles(build.members, inner);
+            build.members.forEach(function (node) {
+                var placed = packed.get(node.id);
+                if (placed) homes.set(node.id, placed);
             });
         });
         return { cells: cells, homes: homes };
     }
 
-    function seedLabelColumns(width) {
-        var cols = Math.max(1, Math.floor(Math.max(1, width) / 168));
-        if (width >= 220 && cols < 2) cols = 2;
-        return cols;
-    }
-
-    function packLabeledSeedGrid(rectangles, tile) {
+    function packLooseParticles(members, inner) {
         var placed = new Map();
-        if (!rectangles.length) return placed;
-        var ordered = rectangles.slice().sort(function (left, right) { return left.key.localeCompare(right.key); });
-        var cols = tile.cols || seedLabelColumns(tile.w);
-        var heading = tile.heading || 18;
-        var rows = Math.max(1, Math.ceil(ordered.length / Math.max(1, cols)));
-        var rowH = tile.rowH || Math.max(18, (tile.h - heading) / rows);
-        var mid = tile.x + tile.w / 2;
-        ordered.forEach(function (rectangle, index) {
+        if (!members.length) return placed;
+        var count = members.length;
+        var cols = Math.max(2, Math.round(Math.sqrt(count * (inner.w / Math.max(1, inner.h)))));
+        var rows = Math.max(1, Math.ceil(count / cols));
+        var stepX = inner.w / cols;
+        var stepY = inner.h / rows;
+        members.forEach(function (node, index) {
             var col = index % cols;
             var row = Math.floor(index / cols);
-            var leftCol = cols > 1 && col === 0;
-            placed.set(rectangle.key, {
-                x: leftCol ? mid - 14 : (cols > 1 ? mid + 14 : tile.x + 16),
-                y: tile.y + heading + row * rowH + rowH / 2,
-                direction: leftCol ? "left" : "right",
+            var jitterX = ((index * 37) % 7) - 3;
+            var jitterY = ((index * 53) % 7) - 3;
+            placed.set(node.id, {
+                x: inner.x + (col + 0.5) * stepX + jitterX,
+                y: inner.y + (row + 0.5) * stepY + jitterY,
             });
         });
         return placed;

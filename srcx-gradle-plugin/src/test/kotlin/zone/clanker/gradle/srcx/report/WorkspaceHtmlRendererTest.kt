@@ -85,6 +85,8 @@ class WorkspaceHtmlRendererTest :
                     rendered.document shouldNotContain "cdn.jsdelivr"
                     rendered.document shouldContain
                         "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>"
+                    rendered.document shouldContain "<script src=\"${Srcx.HTML_SEED_LOADER_FILE}\"></script>"
+                    rendered.document shouldNotContain "type=\"module\""
                     rendered.document shouldNotContain "data-srcx-architecture-data"
                     rendered.document shouldNotContain "<script data-srcx-owned=\"architecture-graph\">"
                     rendered.d3 shouldBe WorkspaceHtmlResourceRenderer().d3Vendor()
@@ -673,6 +675,9 @@ class WorkspaceHtmlRendererTest :
                     "<script data-srcx-vendor=\"d3-7.9.0\">"
                 WorkspaceHtmlResourceRenderer().scripts() shouldContain
                     "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>"
+                WorkspaceHtmlResourceRenderer().scripts() shouldContain
+                    "<script src=\"${Srcx.HTML_SEED_LOADER_FILE}\"></script>"
+                WorkspaceHtmlResourceRenderer().scripts() shouldNotContain "type=\"module\""
                 WorkspaceHtmlResourceRenderer().scripts() shouldNotContain
                     "<script data-srcx-owned=\"architecture-graph\">"
                 "before</ScRiPt>after".escapeClosingScriptSequence() shouldBe "before<\\/script>after"

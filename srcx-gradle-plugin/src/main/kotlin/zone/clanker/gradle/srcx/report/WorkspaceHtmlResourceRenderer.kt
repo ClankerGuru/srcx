@@ -43,11 +43,9 @@ internal class WorkspaceHtmlResourceRenderer {
             appendLine(
                 "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>",
             )
-            appendLine("<script type=\"module\">")
-            appendLine("import { readAtlasSeed } from \"./${Srcx.HTML_SEED_MODULE_FILE}\";")
-            appendLine("window.srcxAtlasReadSeed = readAtlasSeed;")
-            appendLine("if (window.srcxAtlasBoot) window.srcxAtlasBoot();")
-            appendLine("</script>")
+            appendLine("<script src=\"${Srcx.HTML_SEED_WASM_BYTES_FILE}\"></script>")
+            appendLine("<script src=\"${Srcx.HTML_SQLITE_BYTES_FILE}\"></script>")
+            appendLine("<script src=\"${Srcx.HTML_SEED_LOADER_FILE}\"></script>")
         }
 
     internal fun renderTemplate(

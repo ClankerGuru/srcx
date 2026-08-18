@@ -76,6 +76,15 @@ data object Srcx {
 
     const val HTML_SEED_WASM_FILE = "atlas-seed.wasm"
 
+    /** Classic-script Wasm bytes so file:// does not fetch the .wasm. */
+    const val HTML_SEED_WASM_BYTES_FILE = "atlas-seed-bytes.js"
+
+    /** Classic-script sqlite bytes so file:// can boot without fetch. */
+    const val HTML_SQLITE_BYTES_FILE = "atlas-sqlite-bytes.js"
+
+    /** Classic Wasm instantiate + boot hook. Not a module. */
+    const val HTML_SEED_LOADER_FILE = "atlas-seed-loader.js"
+
     /** Dependency scopes excluded from scanning by default. */
     val DEFAULT_EXCLUDED_DEP_SCOPES: Set<String> =
         setOf(

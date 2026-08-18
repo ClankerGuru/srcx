@@ -198,7 +198,10 @@ class SrcxPluginTest :
                         "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>"
                     standalone.readText() shouldContain
                         "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>"
+                    standalone.readText() shouldContain "<script src=\"${Srcx.HTML_SEED_LOADER_FILE}\"></script>"
                     standalone.readText() shouldNotContain "data-srcx-architecture-data"
+                    projectDir.resolve(".srcx/site/${Srcx.HTML_SEED_LOADER_FILE}").shouldExist()
+                    projectDir.resolve(".srcx/site/${Srcx.HTML_SQLITE_BYTES_FILE}").shouldExist()
                     standalone.readText() shouldNotContain "<style data-srcx-theme=\"gort\">"
                     fragment.readText() shouldNotContain "<style data-srcx-theme=\"gort\">"
                     styles.readText() shouldBe WorkspaceHtmlResourceRenderer().styles()

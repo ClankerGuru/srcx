@@ -17,6 +17,7 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import zone.clanker.gradle.srcx.Srcx
 import zone.clanker.gradle.srcx.atlas.AtlasSqliteWriter
+import zone.clanker.gradle.srcx.report.AtlasSeedBootRenderer
 import zone.clanker.gradle.srcx.report.AtlasStoreRenderer
 import zone.clanker.gradle.srcx.analysis.ImportantSymbolPolicy
 import zone.clanker.gradle.srcx.model.AnalysisSummary
@@ -320,7 +321,9 @@ abstract class ContextTask : DefaultTask() {
         File(siteDirectory, Srcx.HTML_D3_FILE).writeText(rendered.d3)
         File(siteDirectory, Srcx.HTML_DRAW_FILE).writeText(rendered.draw)
         writeWasmSeedReader(siteDirectory)
-        AtlasSqliteWriter().write(siteDirectory.toPath(), AtlasStoreRenderer().contents(report))
+        val store = AtlasStoreRenderer().contents(report)
+        AtlasSqliteWriter().write(siteDirectory.toPath(), store)
+        writeFileBootSidecars(siteDirectory)
     }
 
     private fun writeWasmSeedReader(siteDirectory: File) {
@@ -335,6 +338,26 @@ abstract class ContextTask : DefaultTask() {
                 }
             stream.use { input -> File(siteDirectory, name).outputStream().use { output -> input.copyTo(output) } }
         }
+    }
+
+    private fun writeFileBootSidecars(siteDirectory: File) {
+        val boot = AtlasSeedBootRenderer()
+        val wasm =
+            requireNotNull(javaClass.getResourceAsStream("/zone/clanker/gradle/srcx/report/html/wasm/${Srcx.HTML_SEED_WASM_FILE}")) {
+                "Missing Wasm seed reader resource: ${Srcx.HTML_SEED_WASM_FILE}"
+            }.use { stream -> stream.readBytes() }
+        val uninstantiated =
+            requireNotNull(
+                javaClass.getResourceAsStream(
+                    "/zone/clanker/gradle/srcx/report/html/wasm/${Srcx.HTML_SEED_UNINSTANTIATED_FILE}",
+                ),
+            ) {
+                "Missing Wasm seed reader resource: ${Srcx.HTML_SEED_UNINSTANTIATED_FILE}"
+            }.use { stream -> stream.readBytes().toString(Charsets.UTF_8) }
+        val sqlite = File(siteDirectory, zone.clanker.srcx.atlas.AtlasStoreSchema.FILE_NAME).readBytes()
+        File(siteDirectory, Srcx.HTML_SEED_WASM_BYTES_FILE).writeText(boot.wasmBytesScript(wasm))
+        File(siteDirectory, Srcx.HTML_SQLITE_BYTES_FILE).writeText(boot.sqliteBytesScript(sqlite))
+        File(siteDirectory, Srcx.HTML_SEED_LOADER_FILE).writeText(boot.classicLoader(uninstantiated))
     }
 
     private fun buildEntryPoints(summaries: List<ProjectSummary>): List<EntryPointSummary> =
