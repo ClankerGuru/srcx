@@ -9,8 +9,13 @@
             console.error("SRCX atlas boot: D3 is missing");
             return;
         }
+        hideFallbackCards();
         loadSqliteBytes()
             .then(function (bytes) {
+                if (typeof window.srcxAtlasReadSeedBytes === "function") {
+                    window.srcxAtlasReadSeedBytes(bytes);
+                    return;
+                }
                 if (typeof window.srcxAtlasReadSeed !== "function") {
                     throw new Error("Wasm seed reader is not ready");
                 }
@@ -21,21 +26,51 @@
             });
     }
 
+    function hideFallbackCards() {
+        document.querySelectorAll("[data-srcx-graph-fallback]").forEach(function (fallback) {
+            fallback.hidden = true;
+        });
+    }
+
+    function isHttpProtocol() {
+        var protocol = document.location.protocol;
+        return protocol === "http:" || protocol === "https:";
+    }
+
     function loadSqliteBytes() {
+        if (isHttpProtocol()) {
+            var url = new URL("atlas.sqlite", document.baseURI).href;
+            try {
+                return fetchBytes(url).catch(function () {
+                    return xhrBytes(url);
+                });
+            } catch (error) {
+                return Promise.reject(error);
+            }
+        }
         if (window.srcxAtlasSqliteBase64) {
             return Promise.resolve(decodeBase64(window.srcxAtlasSqliteBase64));
         }
-        if (document.location.protocol === "file:") {
-            return Promise.reject(new Error("atlas.sqlite sidecar missing on file://"));
-        }
-        var url = new URL("atlas.sqlite", document.baseURI).href;
-        try {
-            return fetchBytes(url).catch(function () {
-                return xhrBytes(url);
-            });
-        } catch (error) {
-            return Promise.reject(error);
-        }
+        return injectSqliteSidecar();
+    }
+
+    function injectSqliteSidecar() {
+        return new Promise(function (resolve, reject) {
+            var script = document.createElement("script");
+            script.src = new URL("atlas-sqlite-bytes.js", document.baseURI).href;
+            script.setAttribute("data-srcx-sqlite-bytes", "");
+            script.onload = function () {
+                if (window.srcxAtlasSqliteBase64) {
+                    resolve(decodeBase64(window.srcxAtlasSqliteBase64));
+                    return;
+                }
+                reject(new Error("atlas.sqlite sidecar missing on file://"));
+            };
+            script.onerror = function () {
+                reject(new Error("atlas.sqlite sidecar missing on file://"));
+            };
+            document.head.appendChild(script);
+        });
     }
 
     function fetchBytes(url) {
@@ -93,11 +128,16 @@
         if (!svgElement || !viewport) return;
         if (fallback) fallback.hidden = true;
         svgElement.removeAttribute("hidden");
+        var controls = root.querySelector("[data-srcx-graph-controls]");
+        var navigatorElement = root.querySelector("[data-srcx-graph-navigator]");
+        if (controls) controls.hidden = false;
+        if (navigatorElement) navigatorElement.hidden = false;
         var width = Math.max(320, viewport.clientWidth || 1024);
         var height = Math.max(320, viewport.clientHeight || 640);
         var svg = d3.select(svgElement);
         svg.selectAll("*").remove();
         svg.attr("viewBox", "0 0 " + width + " " + height);
+        var zoomLayer = svg.append("g").attr("class", "srcx-dashboard__architecture-zoom-layer");
         var nodes = data.fileNodes.map(function (node) {
             var records = Number(node.relationshipRecordCount || 0);
             return {
@@ -125,7 +165,7 @@
         });
         var layout = layoutRoomsOfAir(nodes, width, height);
         scatterParticlesInRooms(nodes, links, layout.cells);
-        var rooms = svg.append("g").attr("class", "srcx-dashboard__architecture-build-regions");
+        var rooms = zoomLayer.append("g").attr("class", "srcx-dashboard__architecture-build-regions");
         layout.cells.forEach(function (cell, build) {
             var group = rooms.append("g").attr("class", "srcx-dashboard__architecture-build-region");
             group.append("rect")
@@ -140,7 +180,7 @@
                 .text(build);
         });
         var nodeById = new Map(nodes.map(function (node) { return [node.id, node]; }));
-        var edges = svg.append("g").attr("class", "srcx-dashboard__architecture-svg-edges");
+        var edges = zoomLayer.append("g").attr("class", "srcx-dashboard__architecture-svg-edges");
         links.forEach(function (edge) {
             var source = typeof edge.source === "object" ? edge.source : nodeById.get(edge.source);
             var target = typeof edge.target === "object" ? edge.target : nodeById.get(edge.target);
@@ -152,7 +192,7 @@
                 .attr("x2", target.x)
                 .attr("y2", target.y);
         });
-        var nodeLayer = svg.append("g").attr("class", "srcx-dashboard__architecture-svg-nodes");
+        var nodeLayer = zoomLayer.append("g").attr("class", "srcx-dashboard__architecture-svg-nodes");
         var groups = nodeLayer.selectAll("g")
             .data(nodes, function (node) { return node.id; })
             .join("g")
@@ -191,15 +231,175 @@
             .text(function (node) { return node.name; });
         root.dataset.srcxEnhanced = "true";
         root.dataset.srcxSeedCount = String(nodes.length);
-        fillFileSource(root, nodes[0]);
+        wireSeedInteractions(root, nodes, groups, svg, zoomLayer, width, height);
     }
 
     function fillFileSource(root, node) {
         if (!node) return;
         var title = root.querySelector("[data-srcx-detail-title]");
         var fields = root.querySelector("[data-srcx-detail-fields]");
+        var kicker = root.querySelector("[data-srcx-detail-kicker]");
+        if (kicker) kicker.textContent = "FILE SOURCE";
         if (title) title.textContent = node.path || node.name;
-        if (fields && node.content) fields.textContent = node.content;
+        if (fields) fields.textContent = node.content || "";
+    }
+
+    function openDetail(root, node) {
+        fillFileSource(root, node);
+        var detail = root.querySelector("[data-srcx-detail]");
+        if (!detail) return;
+        detail.hidden = false;
+        detail.classList.add("is-open");
+    }
+
+    function closeDetail(root) {
+        var detail = root.querySelector("[data-srcx-detail]");
+        if (!detail) return;
+        detail.hidden = true;
+        detail.classList.remove("is-open");
+    }
+
+    function wireSeedInteractions(root, nodes, groups, svg, zoomLayer, width, height) {
+        var selectedId = null;
+        var usedAtLeast = 0;
+        var selectedKinds = new Set();
+        var search = root.querySelector("[data-srcx-graph-search]");
+        var findKinds = root.querySelector("[data-srcx-find-kinds]");
+        var usedAtLeastValue = root.querySelector("[data-srcx-used-at-least-value]");
+        var usedAtLeastDec = root.querySelector("[data-srcx-used-at-least-dec]");
+        var usedAtLeastInc = root.querySelector("[data-srcx-used-at-least-inc]");
+        var clearSelected = root.querySelector("[data-srcx-clear-selected]");
+        var detailClose = root.querySelector("[data-srcx-detail-close]");
+        var zoom = d3.zoom().scaleExtent([0.4, 8]).on("zoom", function (event) {
+            zoomLayer.attr("transform", event.transform);
+        });
+        svg.call(zoom);
+
+        groups
+            .on("mouseenter", function (event, node) {
+                groups.classed("is-hovered", function (item) { return item.id === node.id; });
+            })
+            .on("mouseleave", function () {
+                groups.classed("is-hovered", false);
+            })
+            .on("click", function (event, node) {
+                event.stopPropagation();
+                selectedId = node.id;
+                groups.classed("is-selected", function (item) { return item.id === node.id; });
+                openDetail(root, node);
+                if (clearSelected) clearSelected.disabled = false;
+            });
+
+        svg.on("click", function () {
+            selectedId = null;
+            groups.classed("is-selected", false);
+            closeDetail(root);
+            if (clearSelected) clearSelected.disabled = true;
+        });
+
+        if (clearSelected) {
+            clearSelected.disabled = true;
+            clearSelected.addEventListener("click", function () {
+                selectedId = null;
+                groups.classed("is-selected", false);
+                closeDetail(root);
+                clearSelected.disabled = true;
+            });
+        }
+        if (detailClose) {
+            detailClose.addEventListener("click", function () {
+                selectedId = null;
+                groups.classed("is-selected", false);
+                closeDetail(root);
+                if (clearSelected) clearSelected.disabled = true;
+            });
+        }
+
+        function applyFilters() {
+            var query = search ? String(search.value || "").trim().toLowerCase() : "";
+            groups.style("display", function (node) {
+                if (usedAtLeast && Number(node.relationshipRecordCount || 0) < usedAtLeast) return "none";
+                if (query) {
+                    var hay = ((node.name || "") + " " + (node.path || "")).toLowerCase();
+                    if (hay.indexOf(query) < 0) return "none";
+                }
+                if (selectedKinds.size && !nodeMatchesKinds(node, selectedKinds)) return "none";
+                return null;
+            });
+        }
+
+        if (search) search.addEventListener("input", applyFilters);
+        if (usedAtLeastInc) {
+            usedAtLeastInc.addEventListener("click", function () {
+                usedAtLeast += 1;
+                if (usedAtLeastValue) usedAtLeastValue.textContent = String(usedAtLeast);
+                applyFilters();
+            });
+        }
+        if (usedAtLeastDec) {
+            usedAtLeastDec.addEventListener("click", function () {
+                usedAtLeast = Math.max(0, usedAtLeast - 1);
+                if (usedAtLeastValue) usedAtLeastValue.textContent = String(usedAtLeast);
+                applyFilters();
+            });
+        }
+        if (findKinds) {
+            findKinds.addEventListener("click", function (event) {
+                var button = event.target.closest("[data-srcx-find-kind]");
+                if (!button) return;
+                var kind = String(button.getAttribute("data-srcx-find-kind") || "").toLowerCase();
+                if (!kind) return;
+                if (selectedKinds.has(kind)) selectedKinds.delete(kind);
+                else selectedKinds.add(kind);
+                button.setAttribute("aria-pressed", selectedKinds.has(kind) ? "true" : "false");
+                applyFilters();
+            });
+        }
+        root.querySelectorAll("[data-srcx-graph-view]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                root.querySelectorAll("[data-srcx-graph-view]").forEach(function (item) {
+                    item.setAttribute("aria-pressed", "false");
+                });
+                button.setAttribute("aria-pressed", "true");
+                root.dataset.srcxGraphLens = button.getAttribute("data-srcx-graph-view") || "files";
+            });
+        });
+
+        function applyZoom(scaleBy) {
+            svg.transition().duration(160).call(zoom.scaleBy, scaleBy);
+        }
+        function resetZoom() {
+            svg.transition().duration(160).call(zoom.transform, d3.zoomIdentity);
+        }
+        root.querySelectorAll("[data-srcx-graph-action]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                var action = button.getAttribute("data-srcx-graph-action");
+                if (action === "zoom-in") applyZoom(1.2);
+                else if (action === "zoom-out") applyZoom(1 / 1.2);
+                else if (action === "fit" || action === "reset") resetZoom();
+            });
+        });
+        var fullscreen = root.querySelector("[data-srcx-graph-fullscreen]");
+        if (fullscreen) {
+            fullscreen.addEventListener("click", function () {
+                var on = root.dataset.srcxFullscreen === "true";
+                root.dataset.srcxFullscreen = on ? "false" : "true";
+                fullscreen.setAttribute("aria-pressed", on ? "false" : "true");
+            });
+        }
+    }
+
+    function nodeMatchesKinds(node, selectedKinds) {
+        var name = String(node.name || "").toLowerCase();
+        if (selectedKinds.has("file")) return true;
+        if (selectedKinds.has("kotlin") && name.endsWith(".kt")) return true;
+        if (selectedKinds.has("java") && name.endsWith(".java")) return true;
+        if (selectedKinds.has("gradle-kts") && name.endsWith(".kts")) return true;
+        return (node.symbols || []).some(function (symbol) {
+            var kind = String(symbol.kind || "").toLowerCase();
+            var semantic = String(symbol.declarationSemantic || "").toLowerCase();
+            return selectedKinds.has(kind) || selectedKinds.has(semantic);
+        });
     }
 
     function nodeRadius(node) {

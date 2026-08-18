@@ -19,6 +19,7 @@ class AtlasSeedBootRendererTest :
                 loader shouldContain "srcxAtlasWasmBase64"
                 loader shouldContain "WebAssembly.instantiate(wasmBuffer"
                 loader shouldContain "window.srcxAtlasReadSeed"
+                loader shouldContain "window.srcxAtlasReadSeedBytes"
                 loader shouldContain ".catch("
                 loader shouldNotContain "instantiateStreaming"
                 loader shouldNotContain "import.meta"

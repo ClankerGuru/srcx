@@ -454,7 +454,7 @@ internal class WorkspaceArchitectureHtmlRenderer(
 
     private fun renderFallback(graph: WorkspaceArchitectureGraphRenderer): String =
         buildString {
-            appendLine("<div class=\"srcx-dashboard__architecture-fallback\" data-srcx-graph-fallback>")
+            appendLine("<div class=\"srcx-dashboard__architecture-fallback\" data-srcx-graph-fallback hidden>")
             if (graph.fileNodes.isEmpty()) {
                 appendLine(renderEmptyGraph())
             } else {

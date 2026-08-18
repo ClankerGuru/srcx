@@ -31,6 +31,7 @@ class AtlasSeedBootRenderer {
                 """
                 instantiate({}).then(function (result) {
                   window.srcxAtlasReadSeed = result.exports.readAtlasSeed;
+                  window.srcxAtlasReadSeedBytes = result.exports.readAtlasSeedBytes;
                   if (window.srcxAtlasBoot) window.srcxAtlasBoot();
                 }).catch(function (error) {
                   console.error("SRCX atlas wasm failed", error);

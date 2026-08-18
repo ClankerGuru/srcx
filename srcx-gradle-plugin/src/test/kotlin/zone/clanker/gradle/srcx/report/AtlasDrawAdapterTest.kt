@@ -26,16 +26,18 @@ class AtlasDrawAdapterTest :
                 adapter shouldNotContain "mid - 14"
                 adapter shouldNotContain "stepX"
                 adapter shouldContain ".catch("
+                adapter shouldContain "srcxAtlasReadSeedBytes"
+                adapter shouldContain "injectSqliteSidecar"
+                adapter shouldContain "isHttpProtocol"
                 adapter shouldContain "srcxAtlasSqliteBase64"
                 adapter shouldContain "sidecar missing on file://"
+                adapter shouldContain "wireSeedInteractions"
                 adapter shouldNotContain "JSON.parse"
                 val load = adapter.substringAfter("function loadSqliteBytes()", "")
-                load shouldContain "srcxAtlasSqliteBase64"
-                load shouldContain "file:"
-                val sidecarIndex = load.indexOf("srcxAtlasSqliteBase64")
+                val httpIndex = load.indexOf("isHttpProtocol")
                 val fetchIndex = load.indexOf("fetchBytes")
-                require(sidecarIndex >= 0 && (fetchIndex < 0 || sidecarIndex < fetchIndex)) {
-                    "loadSqliteBytes must use srcxAtlasSqliteBase64 before fetch/XHR"
+                require(httpIndex >= 0 && fetchIndex >= 0 && httpIndex < fetchIndex) {
+                    "HTTP must fetch atlas.sqlite instead of parsing the sidecar"
                 }
             }
         }

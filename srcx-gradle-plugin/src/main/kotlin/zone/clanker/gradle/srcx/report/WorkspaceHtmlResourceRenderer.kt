@@ -44,7 +44,6 @@ internal class WorkspaceHtmlResourceRenderer {
                 "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>",
             )
             appendLine("<script src=\"${Srcx.HTML_SEED_WASM_BYTES_FILE}\"></script>")
-            appendLine("<script src=\"${Srcx.HTML_SQLITE_BYTES_FILE}\"></script>")
             appendLine("<script src=\"${Srcx.HTML_SEED_LOADER_FILE}\"></script>")
         }
 

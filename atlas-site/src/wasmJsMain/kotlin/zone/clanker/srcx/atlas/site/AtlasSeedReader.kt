@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalJsExport::class, ExperimentalWasmJsInterop::class)
+
 package zone.clanker.srcx.atlas.site
 
 import zone.clanker.srcx.atlas.AtlasDrawSeedRenderer
@@ -7,12 +9,20 @@ import zone.clanker.srcx.atlas.AtlasStoreSchema
 /**
  * Minimal Kotlin/Wasm seed reader: open atlas.sqlite bytes, SELECT seed=1, hand a JS object to D3.
  *
- * Does not JSON.parse a graph string. Does not own hover/click/persist. That is Cut 3.
+ * Does not JSON.parse a graph string. Persist stays Cut 3.
  */
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 fun readAtlasSeed(encoded: String) {
-    val seed = AtlasSqliteFileReader(decodeBase64(encoded)).readSeed()
+    drawSeedBytes(decodeBase64(encoded))
+}
+
+@JsExport
+fun readAtlasSeedBytes(bytes: JsAny) {
+    drawSeedBytes(jsU8ToBytes(bytes))
+}
+
+private fun drawSeedBytes(bytes: ByteArray) {
+    val seed = AtlasSqliteFileReader(bytes).readSeed()
     require(seed.meta.schemaVersion == AtlasStoreSchema.SCHEMA_VERSION) {
         "atlas.sqlite schema must be ${AtlasStoreSchema.SCHEMA_VERSION}"
     }
@@ -24,6 +34,17 @@ fun readAtlasSeed(encoded: String) {
 
 fun main() {
     // atlas-draw.js loads atlas.sqlite bytes and calls readAtlasSeed.
+}
+
+@JsFun(
+    "(u8) => { let s = ''; const chunk = 0x8000; for (let i = 0; i < u8.length; i += chunk) { " +
+        "s += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + chunk, u8.length))); } return s; }",
+)
+private external fun jsU8ToBin(u8: JsAny): String
+
+private fun jsU8ToBytes(u8: JsAny): ByteArray {
+    val binary = jsU8ToBin(u8)
+    return ByteArray(binary.length) { index -> binary[index].code.toByte() }
 }
 
 private fun decodeBase64(encoded: String): ByteArray {
@@ -48,7 +69,6 @@ private fun decodeBase64(encoded: String): ByteArray {
     return out.dropLast(padding).toByteArray()
 }
 
-@OptIn(ExperimentalWasmJsInterop::class)
 @JsFun(
     "(data) => { if (typeof window !== 'undefined' && window.srcxAtlasDraw) { " +
         "window.srcxAtlasDraw(document.querySelector('[data-srcx-architecture-graph]'), data); } }",

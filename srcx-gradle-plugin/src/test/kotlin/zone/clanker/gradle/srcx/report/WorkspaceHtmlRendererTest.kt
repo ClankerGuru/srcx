@@ -86,6 +86,7 @@ class WorkspaceHtmlRendererTest :
                     rendered.document shouldContain
                         "<script src=\"${Srcx.HTML_DRAW_FILE}\" data-srcx-owned=\"atlas-draw\"></script>"
                     rendered.document shouldContain "<script src=\"${Srcx.HTML_SEED_LOADER_FILE}\"></script>"
+                    rendered.document shouldNotContain "<script src=\"${Srcx.HTML_SQLITE_BYTES_FILE}\">"
                     rendered.document shouldNotContain "type=\"module\""
                     rendered.document shouldNotContain "data-srcx-architecture-data"
                     rendered.document shouldNotContain "<script data-srcx-owned=\"architecture-graph\">"
