@@ -47,6 +47,7 @@ import zone.clanker.gradle.srcx.model.WorkspaceRelationship
 import zone.clanker.gradle.srcx.model.WorkspaceRelationshipKind
 import zone.clanker.gradle.srcx.model.WorkspaceReport
 import zone.clanker.gradle.srcx.model.WorkspaceSourceFile
+import zone.clanker.gradle.srcx.Srcx
 import zone.clanker.gradle.srcx.model.WorkspaceSymbol
 import zone.clanker.gradle.srcx.model.WorkspaceSymbolUsage
 
@@ -57,17 +58,15 @@ class WorkspaceHtmlRendererTest :
             `when`("it is rendered") {
                 val report = fullWorkspaceReport()
                 val rendered = WorkspaceHtmlRenderer().render(report)
-                val article =
-                    rendered.fragment
-                        .substringAfter("</style>")
-                        .substringBefore("<script data-srcx-vendor")
+                val article = rendered.fragment.substringBefore("<script data-srcx-vendor")
 
-                then("the embedded fragment contains scoped inline report styles") {
-                    rendered.fragment shouldStartWith "<style data-srcx-theme=\"gort\">"
-                    rendered.fragment shouldContain ".srcx-theme"
-                    rendered.fragment shouldContain ".srcx-dashboard"
-                    rendered.fragment shouldContain "<article class=\"srcx-theme srcx-page srcx-dashboard\""
+                then("the embedded fragment is the dashboard article without inlined styles") {
+                    rendered.fragment shouldStartWith "<article class=\"srcx-theme srcx-page srcx-dashboard\""
+                    rendered.fragment shouldNotContain "<style data-srcx-theme=\"gort\">"
                     rendered.fragment shouldNotContain "<html"
+                    rendered.styles shouldBe WorkspaceHtmlResourceRenderer().styles()
+                    rendered.styles shouldContain ".srcx-theme"
+                    rendered.styles shouldContain ".srcx-dashboard"
                 }
 
                 then("the standalone result is a self-contained HTML5 document") {
@@ -76,7 +75,9 @@ class WorkspaceHtmlRendererTest :
                     rendered.document shouldContain "<meta charset=\"utf-8\">"
                     rendered.document shouldContain "<title>render-lab SRCX source documentation</title>"
                     rendered.document shouldContain rendered.fragment
-                    rendered.document shouldNotContain "<link"
+                    rendered.document shouldContain
+                        "<link rel=\"stylesheet\" href=\"${Srcx.HTML_STYLES_FILE}\" data-srcx-theme=\"gort\">"
+                    rendered.document shouldNotContain "<style data-srcx-theme=\"gort\">"
                     rendered.document shouldNotContain "<script src="
                     rendered.document shouldNotContain "cdn.jsdelivr"
                     rendered.document shouldContain "<script data-srcx-vendor=\"d3-7.9.0\">"
@@ -452,7 +453,6 @@ class WorkspaceHtmlRendererTest :
                         WorkspaceHtmlRenderer()
                             .render(reportWithoutAggregateFindings)
                             .fragment
-                            .substringAfter("</style>")
 
                     scopedArticle shouldContain "<strong>4</strong>\n    <span>Findings</span>"
                     scopedArticle shouldContain "<div><dt>Total</dt><dd>4</dd></div>"
@@ -477,7 +477,7 @@ class WorkspaceHtmlRendererTest :
                 }
 
                 then("the map-first chrome keeps filters off the hero and exposes FILTER controls") {
-                    val styles = rendered.fragment.substringBefore("</style>")
+                    val styles = rendered.styles
                     val script =
                         WorkspaceHtmlResourceRenderer.readClasspathResource(
                             WorkspaceHtmlResourceRenderer.ARCHITECTURE_GRAPH_SCRIPT,
@@ -550,7 +550,7 @@ class WorkspaceHtmlRendererTest :
             val report = emptyWorkspaceReport().copy(name = "srcx", rootProjects = listOf(rootProject))
 
             `when`("its build comparison details are rendered") {
-                val article = WorkspaceHtmlRenderer().render(report).fragment.substringAfter("</style>")
+                val article = WorkspaceHtmlRenderer().render(report).fragment
                 val builds = article.substringAfter("id=\"builds\"").substringBefore("id=\"health\"")
 
                 then("the compact matrix explains the root build without a project inspector") {

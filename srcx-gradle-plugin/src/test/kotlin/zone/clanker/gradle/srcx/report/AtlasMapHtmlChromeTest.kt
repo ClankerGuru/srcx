@@ -77,37 +77,38 @@ class AtlasMapHtmlChromeTest :
                     rendered.document shouldContain "\"fileNodeCount\":2"
                     rendered.document shouldContain "\"fileNodeCount\":1"
                     rendered.document shouldContain "\"availableNodes\":[]"
-                    rendered.fragment.substringBefore("</style>") shouldContain
+                    val styles = rendered.styles
+                    styles shouldContain
                         ".srcx-theme .srcx-dashboard__architecture-graph\n" +
                         "    .srcx-dashboard__architecture-navigator"
-                    rendered.fragment.substringBefore("</style>") shouldContain "position: absolute"
-                    rendered.fragment.substringBefore("</style>") shouldContain "inset: 0 0 auto 0"
-                    rendered.fragment.substringBefore("</style>") shouldContain "overflow-x: auto"
-                    rendered.fragment.substringBefore("</style>") shouldContain "overflow-x: hidden"
-                    rendered.fragment.substringBefore("</style>") shouldContain "@media (max-width: 390px)"
-                    rendered.fragment.substringBefore("</style>") shouldContain "@media (max-width: 768px)"
-                    rendered.fragment.substringBefore("</style>") shouldContain "@media (max-width: 1024px)"
-                    rendered.fragment.substringBefore("</style>") shouldContain "@media (max-width: 1440px)"
-                    rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 390px)"
-                    rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 768px)"
-                    rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 1024px)"
-                    rendered.fragment.substringBefore("</style>") shouldContain "@container (max-width: 1440px)"
-                    rendered.fragment.substringBefore("</style>") shouldContain
+                    styles shouldContain "position: absolute"
+                    styles shouldContain "inset: 0 0 auto 0"
+                    styles shouldContain "overflow-x: auto"
+                    styles shouldContain "overflow-x: hidden"
+                    styles shouldContain "@media (max-width: 390px)"
+                    styles shouldContain "@media (max-width: 768px)"
+                    styles shouldContain "@media (max-width: 1024px)"
+                    styles shouldContain "@media (max-width: 1440px)"
+                    styles shouldContain "@container (max-width: 390px)"
+                    styles shouldContain "@container (max-width: 768px)"
+                    styles shouldContain "@container (max-width: 1024px)"
+                    styles shouldContain "@container (max-width: 1440px)"
+                    styles shouldContain
                         "block-size: auto !important"
-                    rendered.fragment.substringBefore("</style>") shouldContain
+                    styles shouldContain
                         "min-block-size: 0 !important"
-                    rendered.fragment.substringBefore("</style>") shouldContain
+                    styles shouldContain
                         ".srcx-dashboard__architecture-graph:not([data-srcx-fullscreen=\"true\"])"
-                    rendered.fragment.substringBefore("</style>") shouldContain
+                    styles shouldContain
                         ".srcx-dashboard__architecture-graph[data-srcx-fullscreen=\"true\"]\n" +
                         "    [data-srcx-graph-action],"
-                    rendered.fragment.substringBefore("</style>") shouldContain
+                    styles shouldContain
                         "z-index: 2147483647"
-                    rendered.fragment.substringBefore("</style>") shouldContain
+                    styles shouldContain
                         "color: transparent !important"
-                    rendered.fragment.substringBefore("</style>") shouldContain
+                    styles shouldContain
                         "-webkit-text-fill-color: transparent !important"
-                    rendered.fragment.substringBefore("</style>") shouldContain
+                    styles shouldContain
                         "max-inline-size: 44px !important"
                     Files.exists(preview) shouldBe true
                 }

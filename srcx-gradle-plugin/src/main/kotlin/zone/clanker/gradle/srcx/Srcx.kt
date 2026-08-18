@@ -60,6 +60,9 @@ data object Srcx {
     /** Scoped static documentation fragment for embedding in an existing page. */
     const val HTML_FRAGMENT_FILE = "report.html"
 
+    /** Concatenated Gort theme, dashboard, and atlas-map CSS next to [HTML_INDEX_FILE]. */
+    const val HTML_STYLES_FILE = "gort.css"
+
     /** Dependency scopes excluded from scanning by default. */
     val DEFAULT_EXCLUDED_DEP_SCOPES: Set<String> =
         setOf(

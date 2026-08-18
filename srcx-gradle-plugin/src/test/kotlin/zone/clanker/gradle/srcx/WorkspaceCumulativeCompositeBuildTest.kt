@@ -129,7 +129,10 @@ class WorkspaceCumulativeCompositeBuildTest :
                     siteHtml shouldContain "<script data-srcx-vendor=\"d3-7.9.0\">"
                     siteHtml shouldContain "<script data-srcx-owned=\"architecture-graph\">"
                     siteHtml shouldNotContain "<script src="
-                    siteHtml shouldNotContain "<link "
+                    siteHtml shouldContain
+                        "<link rel=\"stylesheet\" href=\"${Srcx.HTML_STYLES_FILE}\" data-srcx-theme=\"gort\">"
+                    siteHtml shouldNotContain "<style data-srcx-theme=\"gort\">"
+                    rootOutput.resolve("site/${Srcx.HTML_STYLES_FILE}").shouldExist()
                     graphData shouldNotContain "</script"
                     graphData shouldNotContain "{{root-source}}"
                     graphData shouldContain "\\u003c/script\\u003e"

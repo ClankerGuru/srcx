@@ -1,5 +1,6 @@
 package zone.clanker.gradle.srcx.report
 
+import zone.clanker.gradle.srcx.Srcx
 import zone.clanker.gradle.srcx.model.WorkspaceReport
 
 /** Renders a typed [WorkspaceReport] as embedded and standalone HTML without source or Gradle access. */
@@ -23,22 +24,17 @@ class WorkspaceHtmlRenderer internal constructor(
                 architectureRenderer.render(architectureGraph) +
                 mapOf("scriptsHtml" to resources.scripts())
         val article = resources.dashboard(slots).trim()
-        val fragment =
-            buildString {
-                appendLine("<style data-srcx-theme=\"gort\">")
-                appendLine(resources.styles())
-                appendLine("</style>")
-                append(article)
-            }
+        val styles = resources.styles()
         return RenderedWorkspaceHtml(
-            fragment = fragment,
-            document = renderDocument(report.name, fragment),
+            fragment = article,
+            document = renderDocument(report.name, article),
+            styles = styles,
         )
     }
 
     private fun renderDocument(
         workspaceName: String,
-        fragment: String,
+        article: String,
     ): String =
         buildString {
             appendLine("<!doctype html>")
@@ -47,9 +43,12 @@ class WorkspaceHtmlRenderer internal constructor(
             appendLine("<meta charset=\"utf-8\">")
             appendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
             appendLine("<title>${workspaceName.escapeWorkspaceHtml()} SRCX source documentation</title>")
+            appendLine(
+                "<link rel=\"stylesheet\" href=\"${Srcx.HTML_STYLES_FILE}\" data-srcx-theme=\"gort\">",
+            )
             appendLine("</head>")
             appendLine("<body class=\"srcx-atlas-document\" style=\"margin: 0; padding: 0\">")
-            appendLine(fragment)
+            appendLine(article)
             appendLine("</body>")
             appendLine("</html>")
         }
@@ -58,5 +57,6 @@ class WorkspaceHtmlRenderer internal constructor(
     data class RenderedWorkspaceHtml(
         val fragment: String,
         val document: String,
+        val styles: String,
     )
 }

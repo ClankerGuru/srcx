@@ -315,6 +315,7 @@ abstract class ContextTask : DefaultTask() {
         val siteDirectory = File(outputDirectory, Srcx.HTML_SITE_DIR).apply { mkdirs() }
         File(siteDirectory, Srcx.HTML_INDEX_FILE).writeText(rendered.document)
         File(siteDirectory, Srcx.HTML_FRAGMENT_FILE).writeText(rendered.fragment)
+        File(siteDirectory, Srcx.HTML_STYLES_FILE).writeText(rendered.styles)
         AtlasSqliteWriter().write(siteDirectory.toPath(), report.name)
     }
 

@@ -4,6 +4,8 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.file.shouldExist
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
+import zone.clanker.gradle.srcx.report.WorkspaceHtmlResourceRenderer
 import org.gradle.testkit.runner.GradleRunner
 import org.gradle.testkit.runner.TaskOutcome
 import java.io.File
@@ -182,11 +184,17 @@ class SrcxPluginTest :
                     projectDir.gradle(Srcx.TASK_CONTEXT).build()
                     val standalone = projectDir.resolve(".srcx/site/index.html")
                     val fragment = projectDir.resolve(".srcx/site/report.html")
+                    val styles = projectDir.resolve(".srcx/site/${Srcx.HTML_STYLES_FILE}")
                     standalone.shouldExist()
                     fragment.shouldExist()
+                    styles.shouldExist()
                     standalone.readText() shouldContain "<!doctype html>"
                     standalone.readText() shouldContain "test-workspace"
-                    fragment.readText() shouldContain "data-srcx-theme=\"gort\""
+                    standalone.readText() shouldContain
+                        "<link rel=\"stylesheet\" href=\"${Srcx.HTML_STYLES_FILE}\" data-srcx-theme=\"gort\">"
+                    standalone.readText() shouldNotContain "<style data-srcx-theme=\"gort\">"
+                    fragment.readText() shouldNotContain "<style data-srcx-theme=\"gort\">"
+                    styles.readText() shouldBe WorkspaceHtmlResourceRenderer().styles()
                 }
             }
 
