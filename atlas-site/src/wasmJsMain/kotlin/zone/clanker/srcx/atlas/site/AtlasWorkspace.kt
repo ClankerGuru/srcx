@@ -80,7 +80,7 @@ fun AtlasWorkspace(seed: AtlasDrawSeed?) {
                 onHover = { hovered = it },
                 onSelect = { node, nextPan ->
                     selected = node
-                    scale = 2.2f
+                    scale = 2.4f
                     pan = nextPan
                 },
                 modifier = Modifier.weight(1f).fillMaxHeight(),

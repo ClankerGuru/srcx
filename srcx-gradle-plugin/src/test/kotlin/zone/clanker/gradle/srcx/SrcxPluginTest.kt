@@ -188,6 +188,7 @@ class SrcxPluginTest :
                     standalone.readText() shouldContain "<!doctype html>"
                     standalone.readText() shouldContain "test-workspace"
                     standalone.readText() shouldContain "id=\"atlas-root\""
+                    standalone.readText() shouldContain "id=\"atlas-first-paint\""
                     standalone.readText() shouldContain "<script src=\"${Srcx.HTML_HOST_SCRIPT}\"></script>"
                     standalone.readText() shouldNotContain "data-srcx-architecture-data"
                     standalone.readText() shouldNotContain "architecture-fallback-files"

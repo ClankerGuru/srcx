@@ -6,6 +6,7 @@ import io.kotest.matchers.floats.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import zone.clanker.srcx.atlas.AtlasDrawFileNode
 import zone.clanker.srcx.atlas.AtlasDrawSeed
+import zone.clanker.srcx.atlas.AtlasMapLayout
 
 class AtlasMapLayoutTest :
     BehaviorSpec({

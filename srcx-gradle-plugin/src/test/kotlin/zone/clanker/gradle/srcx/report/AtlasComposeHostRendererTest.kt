@@ -10,7 +10,7 @@ class AtlasComposeHostRendererTest :
         given("the Compose Atlas HTML host") {
             val html = AtlasComposeHostRenderer().document("foo-bar-workspace")
 
-            then("it is a kilobyte mount with no file-card dump and no D3") {
+            then("the empty host has no file-card dump and no D3") {
                 html.length shouldBeLessThan 2_000
                 html shouldContain "id=\"atlas-root\""
                 html shouldContain "atlas-host.js"
@@ -18,9 +18,23 @@ class AtlasComposeHostRendererTest :
                 html shouldNotContain "d3.js"
                 html shouldNotContain "atlas-draw.js"
                 html shouldNotContain "architecture-fallback-files"
-                html shouldNotContain "OptionGroupsTest.kt"
                 html shouldNotContain "data-srcx-architecture-data"
                 html shouldNotContain "sql.js"
+            }
+        }
+
+        given("a first-paint map") {
+            val html =
+                AtlasComposeHostRenderer().document(
+                    "foo-bar-workspace",
+                    """<svg id="atlas-first-paint"><rect/><circle/><text>CLIKT-SRC</text></svg>""",
+                )
+
+            then("first paint is rooms and particles, not a card list") {
+                html shouldContain "id=\"atlas-first-paint\""
+                html shouldContain "CLIKT-SRC"
+                html shouldContain "<circle"
+                html shouldNotContain "architecture-fallback-files"
             }
         }
     })

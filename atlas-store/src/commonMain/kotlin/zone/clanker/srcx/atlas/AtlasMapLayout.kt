@@ -1,7 +1,5 @@
-package zone.clanker.srcx.atlas.site
+package zone.clanker.srcx.atlas
 
-import zone.clanker.srcx.atlas.AtlasDrawFileNode
-import zone.clanker.srcx.atlas.AtlasDrawSeed
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max

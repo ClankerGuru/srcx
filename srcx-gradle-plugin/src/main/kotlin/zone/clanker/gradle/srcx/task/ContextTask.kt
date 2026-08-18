@@ -18,6 +18,7 @@ import org.gradle.api.tasks.TaskAction
 import zone.clanker.gradle.srcx.Srcx
 import zone.clanker.gradle.srcx.atlas.AtlasSqliteWriter
 import zone.clanker.gradle.srcx.report.AtlasComposeHostRenderer
+import zone.clanker.gradle.srcx.report.AtlasFirstPaintRenderer
 import zone.clanker.gradle.srcx.report.AtlasStoreRenderer
 import zone.clanker.gradle.srcx.analysis.ImportantSymbolPolicy
 import zone.clanker.gradle.srcx.model.AnalysisSummary
@@ -315,11 +316,14 @@ abstract class ContextTask : DefaultTask() {
     ) {
         val siteDirectory = File(outputDirectory, Srcx.HTML_SITE_DIR).apply { mkdirs() }
         siteDirectory.listFiles()?.forEach { child -> child.deleteRecursively() }
-        File(siteDirectory, Srcx.HTML_INDEX_FILE).writeText(AtlasComposeHostRenderer().document(report.name))
-        File(siteDirectory, Srcx.HTML_FRAGMENT_FILE).writeText(AtlasComposeHostRenderer().document(report.name))
-        copyComposeHost(siteDirectory)
         val store = AtlasStoreRenderer().contents(report)
         AtlasSqliteWriter().write(siteDirectory.toPath(), store)
+        val seed = zone.clanker.srcx.atlas.AtlasDrawSeedRenderer.from(store)
+        val firstPaint = AtlasFirstPaintRenderer.svg(seed)
+        val host = AtlasComposeHostRenderer().document(report.name, firstPaint)
+        File(siteDirectory, Srcx.HTML_INDEX_FILE).writeText(host)
+        File(siteDirectory, Srcx.HTML_FRAGMENT_FILE).writeText(host)
+        copyComposeHost(siteDirectory)
     }
 
     private fun copyComposeHost(siteDirectory: File) {
