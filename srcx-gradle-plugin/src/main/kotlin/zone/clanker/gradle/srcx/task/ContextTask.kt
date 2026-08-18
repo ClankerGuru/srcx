@@ -316,6 +316,7 @@ abstract class ContextTask : DefaultTask() {
         File(siteDirectory, Srcx.HTML_INDEX_FILE).writeText(rendered.document)
         File(siteDirectory, Srcx.HTML_FRAGMENT_FILE).writeText(rendered.fragment)
         File(siteDirectory, Srcx.HTML_STYLES_FILE).writeText(rendered.styles)
+        File(siteDirectory, Srcx.HTML_D3_FILE).writeText(rendered.d3)
         AtlasSqliteWriter().write(siteDirectory.toPath(), report.name)
     }
 

@@ -63,6 +63,9 @@ data object Srcx {
     /** Concatenated Gort theme, dashboard, and atlas-map CSS next to [HTML_INDEX_FILE]. */
     const val HTML_STYLES_FILE = "gort.css"
 
+    /** D3 vendor sidecar next to [HTML_INDEX_FILE]. Architecture-graph stays inlined. */
+    const val HTML_D3_FILE = "d3.js"
+
     /** Dependency scopes excluded from scanning by default. */
     val DEFAULT_EXCLUDED_DEP_SCOPES: Set<String> =
         setOf(

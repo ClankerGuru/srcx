@@ -1,5 +1,7 @@
 package zone.clanker.gradle.srcx.report
 
+import zone.clanker.gradle.srcx.Srcx
+
 /** Loads and resolves the bundled Gort presentation resources. */
 internal class WorkspaceHtmlResourceRenderer {
     private val resources: Map<String, String> =
@@ -29,11 +31,13 @@ internal class WorkspaceHtmlResourceRenderer {
             append(resources.getValue(ATLAS_MAP_STYLES).trimEnd())
         }
 
+    fun d3Vendor(): String = d3Script
+
     fun scripts(): String =
         buildString {
-            appendLine("<script data-srcx-vendor=\"d3-7.9.0\">")
-            appendLine(d3Script.escapeClosingScriptSequence().trimEnd())
-            appendLine("</script>")
+            appendLine(
+                "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>",
+            )
             appendLine("<script data-srcx-owned=\"architecture-graph\">")
             appendLine(resources.getValue(ARCHITECTURE_GRAPH_SCRIPT).escapeClosingScriptSequence().trimEnd())
             append("</script>")

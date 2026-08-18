@@ -58,7 +58,7 @@ class WorkspaceHtmlRendererTest :
             `when`("it is rendered") {
                 val report = fullWorkspaceReport()
                 val rendered = WorkspaceHtmlRenderer().render(report)
-                val article = rendered.fragment.substringBefore("<script data-srcx-vendor")
+                val article = rendered.fragment.substringBefore("<script src=")
 
                 then("the embedded fragment is the dashboard article without inlined styles") {
                     rendered.fragment shouldStartWith "<article class=\"srcx-theme srcx-page srcx-dashboard\""
@@ -78,11 +78,13 @@ class WorkspaceHtmlRendererTest :
                     rendered.document shouldContain
                         "<link rel=\"stylesheet\" href=\"${Srcx.HTML_STYLES_FILE}\" data-srcx-theme=\"gort\">"
                     rendered.document shouldNotContain "<style data-srcx-theme=\"gort\">"
-                    rendered.document shouldNotContain "<script src="
+                    rendered.document shouldContain
+                        "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>"
+                    rendered.document shouldNotContain "<script data-srcx-vendor=\"d3-7.9.0\">"
                     rendered.document shouldNotContain "cdn.jsdelivr"
-                    rendered.document shouldContain "<script data-srcx-vendor=\"d3-7.9.0\">"
                     rendered.document shouldContain "<script data-srcx-owned=\"architecture-graph\">"
                     rendered.document shouldContain "data-srcx-architecture-data"
+                    rendered.d3 shouldBe WorkspaceHtmlResourceRenderer().d3Vendor()
                 }
 
                 then("the frame explains the report in workspace terms") {
@@ -658,7 +660,12 @@ class WorkspaceHtmlRendererTest :
                         WorkspaceHtmlResourceRenderer.D3_WEBJAR_RESOURCE_PATH,
                     )
                 d3 shouldContain "7.9.0"
-                WorkspaceHtmlResourceRenderer().scripts() shouldNotContain "<script src="
+                WorkspaceHtmlResourceRenderer().scripts() shouldContain
+                    "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>"
+                WorkspaceHtmlResourceRenderer().scripts() shouldNotContain
+                    "<script data-srcx-vendor=\"d3-7.9.0\">"
+                WorkspaceHtmlResourceRenderer().scripts() shouldContain
+                    "<script data-srcx-owned=\"architecture-graph\">"
                 "before</ScRiPt>after".escapeClosingScriptSequence() shouldBe "before<\\/script>after"
             }
 

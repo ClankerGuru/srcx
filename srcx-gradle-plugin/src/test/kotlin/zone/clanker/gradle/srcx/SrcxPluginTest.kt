@@ -185,16 +185,22 @@ class SrcxPluginTest :
                     val standalone = projectDir.resolve(".srcx/site/index.html")
                     val fragment = projectDir.resolve(".srcx/site/report.html")
                     val styles = projectDir.resolve(".srcx/site/${Srcx.HTML_STYLES_FILE}")
+                    val d3 = projectDir.resolve(".srcx/site/${Srcx.HTML_D3_FILE}")
                     standalone.shouldExist()
                     fragment.shouldExist()
                     styles.shouldExist()
+                    d3.shouldExist()
                     standalone.readText() shouldContain "<!doctype html>"
                     standalone.readText() shouldContain "test-workspace"
                     standalone.readText() shouldContain
                         "<link rel=\"stylesheet\" href=\"${Srcx.HTML_STYLES_FILE}\" data-srcx-theme=\"gort\">"
+                    standalone.readText() shouldContain
+                        "<script src=\"${Srcx.HTML_D3_FILE}\" data-srcx-vendor=\"d3-7.9.0\"></script>"
+                    standalone.readText() shouldContain "data-srcx-architecture-data"
                     standalone.readText() shouldNotContain "<style data-srcx-theme=\"gort\">"
                     fragment.readText() shouldNotContain "<style data-srcx-theme=\"gort\">"
                     styles.readText() shouldBe WorkspaceHtmlResourceRenderer().styles()
+                    d3.readText() shouldBe WorkspaceHtmlResourceRenderer().d3Vendor()
                 }
             }
 

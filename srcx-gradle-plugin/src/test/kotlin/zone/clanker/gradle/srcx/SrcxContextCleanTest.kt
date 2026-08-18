@@ -35,6 +35,7 @@ class SrcxContextCleanTest :
                     Srcx.HTML_INDEX_FILE shouldBe "index.html"
                     Srcx.HTML_FRAGMENT_FILE shouldBe "report.html"
                     Srcx.HTML_STYLES_FILE shouldBe "gort.css"
+                    Srcx.HTML_D3_FILE shouldBe "d3.js"
                 }
             }
         }
@@ -167,6 +168,7 @@ class SrcxContextCleanTest :
                     projectDir.resolve(".srcx/site/index.html").shouldExist()
                     projectDir.resolve(".srcx/site/report.html").shouldExist()
                     projectDir.resolve(".srcx/site/${Srcx.HTML_STYLES_FILE}").shouldExist()
+                    projectDir.resolve(".srcx/site/${Srcx.HTML_D3_FILE}").shouldExist()
                     val content = dashboardFile.readText()
                     content shouldContain "# ctx-test"
                     content shouldContain "[Workspace Relationships](relationships/index.md)"
