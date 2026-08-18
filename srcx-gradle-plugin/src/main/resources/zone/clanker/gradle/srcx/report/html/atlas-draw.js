@@ -109,7 +109,17 @@
                 visualSignal: Math.min(1, records / 24),
             };
         });
-        var layout = layoutLooseRooms(nodes, width, height);
+        var links = (data.fileEdges || []).map(function (edge) {
+            return {
+                id: edge.id,
+                source: edge.source,
+                target: edge.target,
+                kind: edge.kind,
+                recordCount: edge.recordCount,
+            };
+        });
+        var layout = layoutRoomsOfAir(nodes, width, height);
+        scatterParticlesInRooms(nodes, links, layout.cells);
         var rooms = svg.append("g").attr("class", "srcx-dashboard__architecture-build-regions");
         layout.cells.forEach(function (cell, build) {
             var group = rooms.append("g").attr("class", "srcx-dashboard__architecture-build-region");
@@ -124,11 +134,11 @@
                 .attr("y", cell.minY + 16)
                 .text(build);
         });
-        var homes = layout.homes;
+        var nodeById = new Map(nodes.map(function (node) { return [node.id, node]; }));
         var edges = svg.append("g").attr("class", "srcx-dashboard__architecture-svg-edges");
-        (data.fileEdges || []).forEach(function (edge) {
-            var source = homes.get(edge.source);
-            var target = homes.get(edge.target);
+        links.forEach(function (edge) {
+            var source = typeof edge.source === "object" ? edge.source : nodeById.get(edge.source);
+            var target = typeof edge.target === "object" ? edge.target : nodeById.get(edge.target);
             if (!source || !target) return;
             edges.append("line")
                 .attr("class", "srcx-dashboard__architecture-svg-edge")
@@ -145,8 +155,7 @@
                 return "srcx-dashboard__architecture-svg-node" + (node.important ? " is-important" : "");
             })
             .attr("transform", function (node) {
-                var home = homes.get(node.id) || { x: width / 2, y: height / 2 };
-                return "translate(" + home.x + "," + home.y + ")";
+                return "translate(" + node.x + "," + node.y + ")";
             });
         groups.append("circle")
             .attr("class", "srcx-dashboard__architecture-svg-node-hit")
@@ -199,8 +208,8 @@
         return radius;
     }
 
-    function layoutLooseRooms(nodes, width, height) {
-        var pad = 10;
+    function layoutRoomsOfAir(nodes, width, height) {
+        var pad = 12;
         var overlay = 44;
         var frame = {
             x: pad,
@@ -209,62 +218,131 @@
             h: Math.max(1, height - pad * 2 - overlay),
         };
         var builds = Array.from(d3.group(nodes, function (node) { return node.build; }), function (entry) {
-            return {
-                key: entry[0],
-                members: entry[1].slice().sort(function (left, right) { return left.id.localeCompare(right.id); }),
-            };
+            return { key: entry[0], members: entry[1], weight: Math.max(1, entry[1].length) };
         }).sort(function (left, right) { return left.key.localeCompare(right.key); });
-        var gap = 16;
-        var heading = 22;
-        var rows = Math.max(1, Math.ceil(Math.sqrt(builds.length)));
-        var cols = Math.max(1, Math.ceil(builds.length / rows));
-        var cellW = (frame.w - gap * (cols - 1)) / cols;
-        var cellH = (frame.h - gap * (rows - 1)) / rows;
+        var packed = packWeightedRooms(builds, frame);
         var cells = new Map();
-        var homes = new Map();
-        builds.forEach(function (build, index) {
-            var col = index % cols;
-            var row = Math.floor(index / cols);
-            var cell = {
-                minX: frame.x + col * (cellW + gap),
-                minY: frame.y + row * (cellH + gap),
-                maxX: frame.x + col * (cellW + gap) + cellW,
-                maxY: frame.y + row * (cellH + gap) + cellH,
-            };
-            cells.set(build.key, cell);
-            var inner = {
-                x: cell.minX + 16,
-                y: cell.minY + heading,
-                w: Math.max(40, cell.maxX - cell.minX - 32),
-                h: Math.max(40, cell.maxY - cell.minY - heading - 12),
-            };
-            var packed = packLooseParticles(build.members, inner);
-            build.members.forEach(function (node) {
-                var placed = packed.get(node.id);
-                if (placed) homes.set(node.id, placed);
-            });
+        builds.forEach(function (build) {
+            cells.set(build.key, packed.get(build.key));
         });
-        return { cells: cells, homes: homes };
+        return { cells: cells };
     }
 
-    function packLooseParticles(members, inner) {
-        var placed = new Map();
-        if (!members.length) return placed;
-        var count = members.length;
-        var cols = Math.max(2, Math.round(Math.sqrt(count * (inner.w / Math.max(1, inner.h)))));
-        var rows = Math.max(1, Math.ceil(count / cols));
-        var stepX = inner.w / cols;
-        var stepY = inner.h / rows;
-        members.forEach(function (node, index) {
-            var col = index % cols;
+    function packWeightedRooms(builds, frame) {
+        var cells = new Map();
+        var gap = 18;
+        var cols = builds.length <= 3 ? builds.length : 3;
+        var rowWeight = [];
+        var rowItems = [];
+        builds.forEach(function (build, index) {
             var row = Math.floor(index / cols);
-            var jitterX = ((index * 37) % 7) - 3;
-            var jitterY = ((index * 53) % 7) - 3;
-            placed.set(node.id, {
-                x: inner.x + (col + 0.5) * stepX + jitterX,
-                y: inner.y + (row + 0.5) * stepY + jitterY,
+            if (!rowItems[row]) {
+                rowItems[row] = [];
+                rowWeight[row] = 0;
+            }
+            rowItems[row].push(build);
+            rowWeight[row] += build.weight;
+        });
+        var weightSum = rowWeight.reduce(function (sum, value) { return sum + value; }, 0) || 1;
+        var y = frame.y;
+        rowItems.forEach(function (items, row) {
+            var rowH = Math.max(120, frame.h * (rowWeight[row] / weightSum) - gap);
+            var x = frame.x;
+            var rowTotal = items.reduce(function (sum, item) { return sum + item.weight; }, 0) || 1;
+            items.forEach(function (item) {
+                var cellW = Math.max(140, (frame.w - gap * (items.length - 1)) * (item.weight / rowTotal));
+                cells.set(item.key, {
+                    minX: x,
+                    minY: y,
+                    maxX: x + cellW,
+                    maxY: y + rowH,
+                });
+                x += cellW + gap;
+            });
+            y += rowH + gap;
+        });
+        return cells;
+    }
+
+    function scatterParticlesInRooms(nodes, links, cells) {
+        var byBuild = d3.group(nodes, function (node) { return node.build; });
+        byBuild.forEach(function (members, build) {
+            var cell = cells.get(build);
+            if (!cell) return;
+            scatterParticlesInRoom(members, links, cell);
+        });
+    }
+
+    function scatterParticlesInRoom(members, links, cell) {
+        var heading = 26;
+        var pad = 22;
+        var minX = cell.minX + pad;
+        var maxX = cell.maxX - pad;
+        var minY = cell.minY + heading;
+        var maxY = cell.maxY - pad;
+        var cx = (minX + maxX) / 2;
+        var cy = (minY + maxY) / 2;
+        var rx = Math.max(24, (maxX - minX) / 2);
+        var ry = Math.max(24, (maxY - minY) / 2);
+        var golden = Math.PI * (3 - Math.sqrt(5));
+        members.forEach(function (node, index) {
+            var t = (index + 0.5) / Math.max(1, members.length);
+            var angle = index * golden;
+            var radius = Math.sqrt(t);
+            node.x = cx + Math.cos(angle) * radius * rx * 0.78;
+            node.y = cy + Math.sin(angle) * radius * ry * 0.78;
+        });
+        var foci = new Map();
+        var groups = Array.from(d3.group(members, function (node) {
+            return node.project + "::" + node.sourceSet;
+        }));
+        groups.forEach(function (entry, index) {
+            var angle = index * golden + 1.1;
+            var radius = groups.length === 1 ? 0 : 0.28 + (index % 3) * 0.12;
+            foci.set(entry[0], {
+                x: cx + Math.cos(angle) * radius * rx,
+                y: cy + Math.sin(angle) * radius * ry,
             });
         });
-        return placed;
+        var memberIds = new Set(members.map(function (node) { return node.id; }));
+        var roomLinks = links.filter(function (edge) {
+            var sourceId = edge.source && edge.source.id ? edge.source.id : edge.source;
+            var targetId = edge.target && edge.target.id ? edge.target.id : edge.target;
+            return memberIds.has(sourceId) && memberIds.has(targetId);
+        }).map(function (edge) {
+            return {
+                source: edge.source && edge.source.id ? edge.source.id : edge.source,
+                target: edge.target && edge.target.id ? edge.target.id : edge.target,
+            };
+        });
+        var simulation = d3.forceSimulation(members)
+            .force("charge", d3.forceManyBody().strength(-64))
+            .force("collide", d3.forceCollide().radius(function (node) {
+                return outerNodeRadius(node) + 16;
+            }).iterations(3))
+            .force("x", d3.forceX(function (node) {
+                var focus = foci.get(node.project + "::" + node.sourceSet);
+                return focus ? focus.x : cx;
+            }).strength(0.07))
+            .force("y", d3.forceY(function (node) {
+                var focus = foci.get(node.project + "::" + node.sourceSet);
+                return focus ? focus.y : cy;
+            }).strength(0.07))
+            .stop();
+        if (roomLinks.length) {
+            simulation.force("link", d3.forceLink(roomLinks).id(function (node) {
+                return node.id;
+            }).distance(72).strength(0.08));
+        }
+        var ticks = 0;
+        while (ticks < 140) {
+            simulation.tick();
+            members.forEach(function (node) {
+                var radius = outerNodeRadius(node) + 10;
+                node.x = Math.max(minX + radius, Math.min(maxX - radius, node.x));
+                node.y = Math.max(minY + radius, Math.min(maxY - radius, node.y));
+            });
+            ticks += 1;
+        }
     }
 })();
