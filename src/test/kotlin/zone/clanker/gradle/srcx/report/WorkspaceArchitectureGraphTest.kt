@@ -97,14 +97,23 @@ class WorkspaceArchitectureGraphTest :
                 then("it retains scoped nodes, usage, clusters, and exact aggregated evidence") {
                     graph.nodes shouldHaveSize 2
                     graph.clusters.map { it.label } shouldBe listOf("library / :api", "root / :app")
-                    graph.edges shouldHaveSize 2
-                    val direct = graph.edges.first { it.evidence == ReferenceEvidence.DIRECT.name }
+                    graph.edges shouldHaveSize 3
+                    val direct =
+                        graph.edges.single {
+                            it.kind == WorkspaceRelationshipKind.CALL.name &&
+                                it.evidence == ReferenceEvidence.DIRECT.name
+                        }
                     direct.recordCount shouldBe 2
                     direct.label shouldBe "${WorkspaceRelationshipKind.CALL.label} x2"
                     direct.crossBuild shouldBe true
                     direct.occurrences.map { it.line } shouldBe listOf(9, 14)
                     val heuristic = graph.edges.first { it.evidence == ReferenceEvidence.HEURISTIC.name }
                     heuristic.recordCount shouldBe 1
+                    val importEdge =
+                        graph.edges.single { it.kind == WorkspaceRelationshipKind.IMPORT.name }
+                    importEdge.recordCount shouldBe 1
+                    importEdge.evidence shouldBe ReferenceEvidence.DIRECT.name
+                    importEdge.occurrences.map { it.line } shouldBe listOf(2)
                     val targetNode = graph.nodes.first { it.id == target.identity.value }
                     targetNode.localInbound shouldBe 0
                     targetNode.workspaceInbound shouldBe 3
@@ -125,12 +134,15 @@ class WorkspaceArchitectureGraphTest :
                     val fileEdge = graph.fileEdges.single()
                     fileEdge.source shouldBe sourceFile.id
                     fileEdge.target shouldBe graph.fileNodes.first { it.path == target.projectRelativeFile }.id
-                    fileEdge.recordCount shouldBe 3
+                    fileEdge.recordCount shouldBe 4
                     fileEdge.kindCounts.map { it.kind to it.count } shouldContainExactly
-                        listOf(WorkspaceRelationshipKind.CALL.name to 3)
+                        listOf(
+                            WorkspaceRelationshipKind.CALL.name to 3,
+                            WorkspaceRelationshipKind.IMPORT.name to 1,
+                        )
                     fileEdge.evidenceCounts.map { it.evidence to it.count } shouldContainExactly
-                        listOf(ReferenceEvidence.DIRECT.name to 2, ReferenceEvidence.HEURISTIC.name to 1)
-                    fileEdge.occurrences.map { it.line } shouldContainExactly listOf(9, 14, 22)
+                        listOf(ReferenceEvidence.DIRECT.name to 3, ReferenceEvidence.HEURISTIC.name to 1)
+                    fileEdge.occurrences.map { it.line } shouldContainExactly listOf(9, 14, 22, 2)
                     fileEdge.occurrences.map { it.sourceSymbolId }.distinct() shouldBe listOf(source.identity.value)
                     fileEdge.occurrences.map { it.targetSymbolId }.distinct() shouldBe listOf(target.identity.value)
                 }
@@ -140,7 +152,7 @@ class WorkspaceArchitectureGraphTest :
                     val sourceFile = graph.sourceFiles.first { it.id.contains("Source.kt") }
                     sourceFile.content shouldBe sourceContent
                     sourceFile.declarationLines shouldContainExactly listOf(3)
-                    sourceFile.relationshipLines shouldContainExactly listOf(9, 14, 22)
+                    sourceFile.relationshipLines shouldContainExactly listOf(2, 9, 14, 22)
                     graph.sourceFiles.first { it.id.contains("Contract.kt") }.relationshipLines shouldBe emptyList()
                 }
 
@@ -151,9 +163,15 @@ class WorkspaceArchitectureGraphTest :
                     graph.availableFileEdges shouldBe graph.fileEdges
                     graph.availableCycles shouldBe graph.cycles
                     graph.availableEdges
-                        .single { it.evidence == ReferenceEvidence.DIRECT.name }
-                        .occurrences
+                        .single {
+                            it.kind == WorkspaceRelationshipKind.CALL.name &&
+                                it.evidence == ReferenceEvidence.DIRECT.name
+                        }.occurrences
                         .map { it.line } shouldContainExactly listOf(9, 14)
+                    graph.availableEdges
+                        .single { it.kind == WorkspaceRelationshipKind.IMPORT.name }
+                        .occurrences
+                        .map { it.line } shouldContainExactly listOf(2)
                 }
 
                 then("it emits stable build ownership metadata and explicit record totals") {
@@ -172,8 +190,8 @@ class WorkspaceArchitectureGraphTest :
                     included.indexedSymbolCount shouldBe 1
                     included.projects.single().name shouldBe ":api"
                     included.color shouldBe graph.builds.first { it.name == "library" }.color
-                    graph.totalRelationshipRecordCount shouldBe 3
-                    graph.shownRelationshipRecordCount shouldBe 3
+                    graph.totalRelationshipRecordCount shouldBe 4
+                    graph.shownRelationshipRecordCount shouldBe 4
                 }
 
                 then("JSON transport cannot terminate its script element or expose template slots") {
@@ -191,8 +209,8 @@ class WorkspaceArchitectureGraphTest :
                     json shouldContain "\"builds\""
                     json shouldContain "\"context\":\"Included build\""
                     json shouldContain "\"projects\":[{\"name\":\":app\""
-                    json shouldContain "\"recordCount\":3"
-                    json shouldContain "\"totalRelationshipRecordCount\":3"
+                    json shouldContain "\"recordCount\":4"
+                    json shouldContain "\"totalRelationshipRecordCount\":4"
                     json shouldContain "payload = \\\"\\u003c/script"
                     json shouldContain "\\u003c/script\\u003e"
                     json shouldContain "\\u003catlas data-label='quoted'\\u003e"
@@ -1070,7 +1088,7 @@ class WorkspaceArchitectureGraphTest :
                     WorkspaceRelationshipKind.TYPE_REFERENCE,
                     ReferenceKind.TYPE_REF,
                 )
-            val excludedImport =
+            val keptImport =
                 graphRelationship(
                     connectedSource,
                     connectedTarget,
@@ -1080,7 +1098,7 @@ class WorkspaceArchitectureGraphTest :
                     WorkspaceRelationshipKind.IMPORT,
                     ReferenceKind.IMPORT,
                 )
-            val relationships = directCalls + heuristicCalls + typeRecord + excludedImport
+            val relationships = directCalls + heuristicCalls + typeRecord + keptImport
             val finding =
                 Finding(
                     severity = FindingSeverity.WARNING,
@@ -1116,20 +1134,23 @@ class WorkspaceArchitectureGraphTest :
                     graph.omittedNodeCount shouldBe 1
                 }
 
-                then("symbol edges count exactly the selected non-import endpoint occurrences") {
-                    graph.edges shouldHaveSize 3
-                    graph.edges.sumOf { edge -> edge.recordCount } shouldBe 6
-                    graph.shownSymbolRelationshipRecordCount shouldBe 6
-                    graph.totalRelationshipRecordCount shouldBe 6
+                then("symbol edges count exactly the selected endpoint occurrences including IMPORT") {
+                    graph.edges shouldHaveSize 4
+                    graph.edges.sumOf { edge -> edge.recordCount } shouldBe 7
+                    graph.shownSymbolRelationshipRecordCount shouldBe 7
+                    graph.totalRelationshipRecordCount shouldBe 7
                     graph.edges
                         .flatMap { edge -> edge.occurrences }
                         .map { occurrence -> occurrence.line }
-                        .sorted() shouldContainExactly (1..6).toList()
+                        .sorted() shouldContainExactly (1..7).toList()
                     graph.edges
                         .single { edge ->
                             edge.kind == WorkspaceRelationshipKind.CALL.name &&
                                 edge.evidence == ReferenceEvidence.DIRECT.name
                         }.recordCount shouldBe 3
+                    graph.edges
+                        .single { edge -> edge.kind == WorkspaceRelationshipKind.IMPORT.name }
+                        .recordCount shouldBe 1
                 }
 
                 then("reversing symbols, records, and ranking inputs leaves byte-stable JSON") {

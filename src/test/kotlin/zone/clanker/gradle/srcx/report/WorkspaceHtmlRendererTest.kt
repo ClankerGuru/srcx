@@ -310,7 +310,7 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain "address on a letter"
                     article shouldContain "stack of evidence cards"
                     article shouldContain "pencil-dotted best-supported resolver link"
-                    article shouldContain "Imports are excluded"
+                    article shouldContain "Import records"
                     article shouldContain "Call / construct records"
                     article shouldContain "not severity, quality, or risk"
                     article shouldContain "relationship records"
@@ -321,7 +321,7 @@ class WorkspaceHtmlRendererTest :
                         "data-srcx-graph-status role=\"status\" aria-live=\"polite\""
                     article shouldContain
                         "Files / 3 of 3 relationship or exact-finding file candidates shown / 3 links / " +
-                        "4 of 4 relationship records shown from the total workspace set"
+                        "5 of 5 relationship records shown from the total workspace set"
                     article shouldContain
                         "data-srcx-detail hidden role=\"region\" " +
                         "aria-label=\"Architecture selection evidence\" tabindex=\"-1\""
@@ -337,7 +337,7 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain "Select a node or arrow for source evidence"
                     article shouldContain "bounded relationship-connected projection"
                     article shouldContain "data-srcx-architecture-graph"
-                    article shouldContain "Map limits and evidence / 4 relationship records / expand"
+                    article shouldContain "Map limits and evidence / 5 relationship records / expand"
                     article shouldContain "ApplicationMain"
                     article shouldContain "RuntimeService"
                     article shouldContain "RuntimeRepository"
@@ -352,9 +352,9 @@ class WorkspaceHtmlRendererTest :
                     article shouldContain "\"crossBuild\":true"
                     article shouldContain "\"context\":\"Root build\""
                     article shouldContain "\"context\":\"Included build\""
-                    article shouldContain "\"totalRelationshipRecordCount\":4"
-                    article shouldContain "\"shownRelationshipRecordCount\":4"
-                    article shouldContain "\"shownSymbolRelationshipRecordCount\":4"
+                    article shouldContain "\"totalRelationshipRecordCount\":5"
+                    article shouldContain "\"shownRelationshipRecordCount\":5"
+                    article shouldContain "\"shownSymbolRelationshipRecordCount\":5"
                     article shouldContain "\"recordCount\":1"
                     article shouldContain "\"defaultView\":\"files\""
                     article shouldContain "\"fileNodes\""

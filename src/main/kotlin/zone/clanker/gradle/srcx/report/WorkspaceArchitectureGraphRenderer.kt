@@ -45,7 +45,6 @@ internal fun buildWorkspaceArchitectureGraph(report: WorkspaceReport): Workspace
             .associateBy { it.symbol.identity }
     val relationships =
         report.workspaceIndex.relationships
-            .filterNot { it.kind == WorkspaceRelationshipKind.IMPORT }
             .sortedWith(RELATIONSHIP_COMPARATOR)
     val resolvedRelationships = relationships.filter { it.source != null }
     val prioritySymbols = graphPrioritySymbols(report)

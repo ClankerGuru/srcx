@@ -373,10 +373,15 @@ object SymbolExtractor {
                     val coordinate = arg.entries.joinToString("") { it.text }
                     val parts = coordinate.split(":")
                     if (parts.size < MIN_COORDINATE_PARTS) return@mapNotNull null
+                    val group = parts[0].trim()
+                    val artifact = parts[1].trim()
+                    val version = parts[2].trim()
+                    if (group.isBlank() || artifact.isBlank() || version.isBlank()) return@mapNotNull null
+                    if (group.any { it.isWhitespace() }) return@mapNotNull null
                     DependencyEntry(
-                        group = ArtifactGroup(parts[0]),
-                        artifact = ArtifactName(parts[1]),
-                        version = ArtifactVersion(parts[2]),
+                        group = ArtifactGroup(group),
+                        artifact = ArtifactName(artifact),
+                        version = ArtifactVersion(version),
                         scope = scope,
                     )
                 }
@@ -392,16 +397,23 @@ object SymbolExtractor {
         for (config in project.configurations) {
             if (config.name in excludeScopes) continue
             config.dependencies.forEach { dep ->
-                if (dep.group != null) {
-                    results.add(
-                        DependencyEntry(
-                            group = ArtifactGroup(dep.group.orEmpty()),
-                            artifact = ArtifactName(dep.name),
-                            version = ArtifactVersion(dep.version ?: "unspecified"),
-                            scope = config.name,
-                        ),
-                    )
-                }
+                val group = dep.group?.trim().orEmpty()
+                val artifact = dep.name.trim()
+                if (group.isBlank() || artifact.isBlank() || group.any { it.isWhitespace() }) return@forEach
+                results.add(
+                    DependencyEntry(
+                        group = ArtifactGroup(group),
+                        artifact = ArtifactName(artifact),
+                        version =
+                            ArtifactVersion(
+                                dep.version
+                                    ?.trim()
+                                    .orEmpty()
+                                    .ifBlank { "unspecified" },
+                            ),
+                        scope = config.name,
+                    ),
+                )
             }
         }
         return results.distinctBy { "${it.scope}:${it.group}:${it.artifact}" }

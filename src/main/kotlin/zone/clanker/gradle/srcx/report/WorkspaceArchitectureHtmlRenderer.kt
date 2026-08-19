@@ -248,7 +248,7 @@ internal class WorkspaceArchitectureHtmlRenderer(
                     "multiple records.</li>",
             )
             appendLine(
-                "<li><strong>Imports are excluded</strong> from current Atlas relationship counts and arrows. " +
+                "<li><strong>Import records</strong> are included in Atlas relationship counts and arrows. " +
                     "Files aggregate resolved records between displayed files; Symbols draw exact displayed " +
                     "declaration endpoints.</li>",
             )
